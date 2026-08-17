@@ -1,0 +1,27 @@
+scalar Time
+scalar UUID
+
+type User {
+  id: UUID!
+  email: String!
+  displayName: String!
+  timezone: String!
+  createdAt: Time!
+}
+
+type AuthPayload {
+  user: User!
+  accessToken: String!
+  refreshToken: String!
+}
+
+type Query {
+  me: User
+}
+
+type Mutation {
+  signup(email: String!, password: String!, displayName: String!): AuthPayload!
+  login(email: String!, password: String!): AuthPayload!
+  refreshToken(refreshToken: String!): AuthPayload!
+  logout(refreshToken: String!): Boolean!
+}

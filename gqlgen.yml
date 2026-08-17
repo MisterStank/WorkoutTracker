@@ -1,0 +1,23 @@
+schema:
+  - internal/graphql/schema.graphql
+
+exec:
+  package: graphql
+  filename: internal/graphql/generated.go
+
+model:
+  package: graphql
+  filename: internal/graphql/models_gen.go
+
+resolver:
+  package: graphql
+  filename: internal/graphql/resolver.go
+  type: Resolver
+
+autobind: []
+
+models:
+  UUID:
+    model: github.com/99designs/gqlgen/graphql.UUID
+  Time:
+    model: github.com/99designs/gqlgen/graphql.Time
