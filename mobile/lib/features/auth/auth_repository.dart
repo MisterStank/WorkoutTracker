@@ -44,6 +44,25 @@ class AuthRepository {
         {'refreshToken': refreshToken},
       );
 
+  /// Fetches the current user using whatever access token the GraphQL
+  /// client's auth link attaches. Returns null if there's no valid session
+  /// (no token, expired token, or the server rejects it) rather than
+  /// throwing, since "not logged in" is an expected outcome here.
+  Future<UserResult?> me() async {
+    final result = await _client.query(QueryOptions(
+      document: gql('query Me { me { id email displayName } }'),
+      fetchPolicy: FetchPolicy.networkOnly,
+    ));
+    if (result.hasException) return null;
+    final user = result.data?['me'] as Map<String, dynamic>?;
+    if (user == null) return null;
+    return UserResult(
+      userId: user['id'] as String,
+      email: user['email'] as String,
+      displayName: user['displayName'] as String,
+    );
+  }
+
   Future<void> logout({required String refreshToken}) async {
     final result = await _client.mutate(MutationOptions(
       document: gql('''
@@ -93,4 +112,12 @@ class AuthPayloadResult {
   final String displayName;
   final String accessToken;
   final String refreshToken;
+}
+
+class UserResult {
+  const UserResult({required this.userId, required this.email, required this.displayName});
+
+  final String userId;
+  final String email;
+  final String displayName;
 }

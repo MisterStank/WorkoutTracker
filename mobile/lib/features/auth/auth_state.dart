@@ -4,6 +4,14 @@ sealed class AuthState {
   const AuthState();
 }
 
+/// Shown only once, on app launch, while we check for a stored session.
+/// Kept distinct from AuthAuthenticating so AuthGate can show a splash
+/// screen here but let LoginScreen own its own inline spinner during a
+/// user-initiated login/signup submission.
+class AuthRestoring extends AuthState {
+  const AuthRestoring();
+}
+
 class AuthUnauthenticated extends AuthState {
   const AuthUnauthenticated();
 }

@@ -3,21 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_provider.dart';
 import 'auth_state.dart';
-import 'signup_screen.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends ConsumerStatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
+  final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -29,12 +30,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isLoading = authState is AuthAuthenticating;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Log in')),
+      appBar: AppBar(title: const Text('Sign up')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            TextField(
+              controller: _displayNameController,
+              decoration: const InputDecoration(labelText: 'Display name'),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
@@ -55,17 +61,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             FilledButton(
               onPressed: isLoading
                   ? null
-                  : () => ref.read(authProvider.notifier).login(
+                  : () => ref.read(authProvider.notifier).signup(
                         email: _emailController.text.trim(),
                         password: _passwordController.text,
+                        displayName: _displayNameController.text.trim(),
                       ),
-              child: isLoading ? const CircularProgressIndicator() : const Text('Log in'),
-            ),
-            TextButton(
-              onPressed: isLoading
-                  ? null
-                  : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignupScreen())),
-              child: const Text("Don't have an account? Sign up"),
+              child: isLoading ? const CircularProgressIndicator() : const Text('Sign up'),
             ),
           ],
         ),

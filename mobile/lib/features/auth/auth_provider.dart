@@ -24,10 +24,45 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._repository, this._tokenStorage) : super(const AuthUnauthenticated());
+  AuthNotifier(this._repository, this._tokenStorage) : super(const AuthRestoring()) {
+    _restoreSession();
+  }
 
   final AuthRepository _repository;
   final TokenStorage _tokenStorage;
+
+  /// Runs once on app launch. A stored access token may have expired since
+  /// the app was last open, so a failed `me` is followed by one refresh
+  /// attempt before giving up and treating the session as gone.
+  Future<void> _restoreSession() async {
+    final accessToken = await _tokenStorage.readAccessToken();
+    if (accessToken == null) {
+      state = const AuthUnauthenticated();
+      return;
+    }
+
+    final user = await _repository.me();
+    if (user != null) {
+      state = AuthAuthenticated(userId: user.userId, email: user.email, displayName: user.displayName);
+      return;
+    }
+
+    final refreshToken = await _tokenStorage.readRefreshToken();
+    if (refreshToken == null) {
+      await _tokenStorage.clear();
+      state = const AuthUnauthenticated();
+      return;
+    }
+
+    try {
+      final result = await _repository.refresh(refreshToken: refreshToken);
+      await _tokenStorage.save(accessToken: result.accessToken, refreshToken: result.refreshToken);
+      state = AuthAuthenticated(userId: result.userId, email: result.email, displayName: result.displayName);
+    } catch (_) {
+      await _tokenStorage.clear();
+      state = const AuthUnauthenticated();
+    }
+  }
 
   Future<void> signup({required String email, required String password, required String displayName}) =>
       _authenticate(() => _repository.signup(email: email, password: password, displayName: displayName));
