@@ -207,6 +207,8 @@ func newTestWorkoutService(exercises ...*domain.Exercise) (*service.WorkoutServi
 		newFakeWorkoutRepo(),
 		setRepo,
 		&fakePersonalRecordRepo{sets: setRepo},
+		nil,
+		nil,
 	)
 	return svc, setRepo
 }

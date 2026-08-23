@@ -32,6 +32,7 @@ type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
@@ -42,6 +43,13 @@ type ComplexityRoot struct {
 		AccessToken  func(childComplexity int) int
 		RefreshToken func(childComplexity int) int
 		User         func(childComplexity int) int
+	}
+
+	BodyMetric struct {
+		ID         func(childComplexity int) int
+		MetricType func(childComplexity int) int
+		RecordedAt func(childComplexity int) int
+		Value      func(childComplexity int) int
 	}
 
 	Exercise struct {
@@ -60,6 +68,7 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		FinishWorkout func(childComplexity int, workoutID uuid.UUID, notes *string) int
+		LogBodyMetric func(childComplexity int, metricType string, value float64) int
 		LogSet        func(childComplexity int, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64) int
 		Login         func(childComplexity int, email string, password string) int
 		Logout        func(childComplexity int, refreshToken string) int
@@ -82,12 +91,26 @@ type ComplexityRoot struct {
 		WorkoutSetID func(childComplexity int) int
 	}
 
+	ProgressPoint struct {
+		Day         func(childComplexity int) int
+		MaxWeight   func(childComplexity int) int
+		SetCount    func(childComplexity int) int
+		TotalVolume func(childComplexity int) int
+	}
+
 	Query struct {
-		ActiveWorkout   func(childComplexity int) int
-		Exercises       func(childComplexity int, search *string) int
-		Me              func(childComplexity int) int
-		PersonalRecords func(childComplexity int) int
-		WorkoutHistory  func(childComplexity int, first int, after *string) int
+		ActiveWorkout    func(childComplexity int) int
+		BodyMetrics      func(childComplexity int, metricType string, days int) int
+		Exercises        func(childComplexity int, search *string) int
+		Me               func(childComplexity int) int
+		PersonalRecords  func(childComplexity int) int
+		ProgressOverTime func(childComplexity int, exerciseID uuid.UUID, days int) int
+		VolumeTrend      func(childComplexity int, days int) int
+		WorkoutHistory   func(childComplexity int, first int, after *string) int
+	}
+
+	Subscription struct {
+		WorkoutProgressUpdated func(childComplexity int, workoutID uuid.UUID) int
 	}
 
 	User struct {
@@ -140,6 +163,7 @@ type MutationResolver interface {
 	StartWorkout(ctx context.Context) (*Workout, error)
 	LogSet(ctx context.Context, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64) (*LogSetResult, error)
 	FinishWorkout(ctx context.Context, workoutID uuid.UUID, notes *string) (*Workout, error)
+	LogBodyMetric(ctx context.Context, metricType string, value float64) (*BodyMetric, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*User, error)
@@ -147,6 +171,12 @@ type QueryResolver interface {
 	ActiveWorkout(ctx context.Context) (*Workout, error)
 	WorkoutHistory(ctx context.Context, first int, after *string) (*WorkoutConnection, error)
 	PersonalRecords(ctx context.Context) ([]*PersonalRecord, error)
+	ProgressOverTime(ctx context.Context, exerciseID uuid.UUID, days int) ([]*ProgressPoint, error)
+	VolumeTrend(ctx context.Context, days int) ([]*ProgressPoint, error)
+	BodyMetrics(ctx context.Context, metricType string, days int) ([]*BodyMetric, error)
+}
+type SubscriptionResolver interface {
+	WorkoutProgressUpdated(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -185,6 +215,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.AuthPayload.User(childComplexity), true
+
+	case "BodyMetric.id":
+		if e.ComplexityRoot.BodyMetric.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BodyMetric.ID(childComplexity), true
+	case "BodyMetric.metricType":
+		if e.ComplexityRoot.BodyMetric.MetricType == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BodyMetric.MetricType(childComplexity), true
+	case "BodyMetric.recordedAt":
+		if e.ComplexityRoot.BodyMetric.RecordedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BodyMetric.RecordedAt(childComplexity), true
+	case "BodyMetric.value":
+		if e.ComplexityRoot.BodyMetric.Value == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BodyMetric.Value(childComplexity), true
 
 	case "Exercise.category":
 		if e.ComplexityRoot.Exercise.Category == nil {
@@ -247,6 +302,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.FinishWorkout(childComplexity, args["workoutId"].(uuid.UUID), args["notes"].(*string)), true
+	case "Mutation.logBodyMetric":
+		if e.ComplexityRoot.Mutation.LogBodyMetric == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_logBodyMetric_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.LogBodyMetric(childComplexity, args["metricType"].(string), args["value"].(float64)), true
 	case "Mutation.logSet":
 		if e.ComplexityRoot.Mutation.LogSet == nil {
 			break
@@ -359,12 +425,48 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PersonalRecord.WorkoutSetID(childComplexity), true
 
+	case "ProgressPoint.day":
+		if e.ComplexityRoot.ProgressPoint.Day == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgressPoint.Day(childComplexity), true
+	case "ProgressPoint.maxWeight":
+		if e.ComplexityRoot.ProgressPoint.MaxWeight == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgressPoint.MaxWeight(childComplexity), true
+	case "ProgressPoint.setCount":
+		if e.ComplexityRoot.ProgressPoint.SetCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgressPoint.SetCount(childComplexity), true
+	case "ProgressPoint.totalVolume":
+		if e.ComplexityRoot.ProgressPoint.TotalVolume == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgressPoint.TotalVolume(childComplexity), true
+
 	case "Query.activeWorkout":
 		if e.ComplexityRoot.Query.ActiveWorkout == nil {
 			break
 		}
 
 		return e.ComplexityRoot.Query.ActiveWorkout(childComplexity), true
+	case "Query.bodyMetrics":
+		if e.ComplexityRoot.Query.BodyMetrics == nil {
+			break
+		}
+
+		args, err := ec.field_Query_bodyMetrics_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.BodyMetrics(childComplexity, args["metricType"].(string), args["days"].(int)), true
 	case "Query.exercises":
 		if e.ComplexityRoot.Query.Exercises == nil {
 			break
@@ -389,6 +491,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.PersonalRecords(childComplexity), true
+	case "Query.progressOverTime":
+		if e.ComplexityRoot.Query.ProgressOverTime == nil {
+			break
+		}
+
+		args, err := ec.field_Query_progressOverTime_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ProgressOverTime(childComplexity, args["exerciseId"].(uuid.UUID), args["days"].(int)), true
+	case "Query.volumeTrend":
+		if e.ComplexityRoot.Query.VolumeTrend == nil {
+			break
+		}
+
+		args, err := ec.field_Query_volumeTrend_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.VolumeTrend(childComplexity, args["days"].(int)), true
 	case "Query.workoutHistory":
 		if e.ComplexityRoot.Query.WorkoutHistory == nil {
 			break
@@ -400,6 +524,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.WorkoutHistory(childComplexity, args["first"].(int), args["after"].(*string)), true
+
+	case "Subscription.workoutProgressUpdated":
+		if e.ComplexityRoot.Subscription.WorkoutProgressUpdated == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_workoutProgressUpdated_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Subscription.WorkoutProgressUpdated(childComplexity, args["workoutId"].(uuid.UUID)), true
 
 	case "User.createdAt":
 		if e.ComplexityRoot.User.CreatedAt == nil {
@@ -594,6 +730,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				Data: buf.Bytes(),
 			}
 		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, opCtx.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
 
 	default:
 		return graphql.OneShot(graphql.ErrorResponse(ctx, "unsupported GraphQL operation"))
@@ -651,6 +804,20 @@ func (ec *executionContext) childFields_AuthPayload(ctx context.Context, field g
 	return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
 }
 
+func (ec *executionContext) childFields_BodyMetric(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_BodyMetric_id(ctx, field)
+	case "metricType":
+		return ec.fieldContext_BodyMetric_metricType(ctx, field)
+	case "value":
+		return ec.fieldContext_BodyMetric_value(ctx, field)
+	case "recordedAt":
+		return ec.fieldContext_BodyMetric_recordedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type BodyMetric", field.Name)
+}
+
 func (ec *executionContext) childFields_Exercise(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -705,6 +872,20 @@ func (ec *executionContext) childFields_PersonalRecord(ctx context.Context, fiel
 		return ec.fieldContext_PersonalRecord_workoutSetId(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type PersonalRecord", field.Name)
+}
+
+func (ec *executionContext) childFields_ProgressPoint(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "day":
+		return ec.fieldContext_ProgressPoint_day(ctx, field)
+	case "totalVolume":
+		return ec.fieldContext_ProgressPoint_totalVolume(ctx, field)
+	case "maxWeight":
+		return ec.fieldContext_ProgressPoint_maxWeight(ctx, field)
+	case "setCount":
+		return ec.fieldContext_ProgressPoint_setCount(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProgressPoint", field.Name)
 }
 
 func (ec *executionContext) childFields_User(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -919,6 +1100,28 @@ func (ec *executionContext) field_Mutation_finishWorkout_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_logBodyMetric_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "metricType",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["metricType"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "value",
+		func(ctx context.Context, v any) (float64, error) {
+			return ec.unmarshalNFloat2float64(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["value"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_logSet_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1059,6 +1262,28 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_bodyMetrics_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "metricType",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["metricType"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "days",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["days"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_exercises_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1070,6 +1295,42 @@ func (ec *executionContext) field_Query_exercises_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["search"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_progressOverTime_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "exerciseId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["exerciseId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "days",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["days"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_volumeTrend_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "days",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["days"] = arg0
 	return args, nil
 }
 
@@ -1092,6 +1353,20 @@ func (ec *executionContext) field_Query_workoutHistory_args(ctx context.Context,
 		return nil, err
 	}
 	args["after"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_workoutProgressUpdated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "workoutId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["workoutId"] = arg0
 	return args, nil
 }
 
@@ -1231,6 +1506,98 @@ func (ec *executionContext) _AuthPayload_refreshToken(ctx context.Context, field
 }
 func (ec *executionContext) fieldContext_AuthPayload_refreshToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("AuthPayload", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _BodyMetric_id(ctx context.Context, field graphql.CollectedField, obj *BodyMetric) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BodyMetric_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v uuid.UUID) graphql.Marshaler {
+			return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BodyMetric_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BodyMetric", field, false, false, errors.New("field of type UUID does not have child fields"))
+}
+
+func (ec *executionContext) _BodyMetric_metricType(ctx context.Context, field graphql.CollectedField, obj *BodyMetric) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BodyMetric_metricType(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MetricType, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BodyMetric_metricType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BodyMetric", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _BodyMetric_value(ctx context.Context, field graphql.CollectedField, obj *BodyMetric) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BodyMetric_value(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Value, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BodyMetric_value(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BodyMetric", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _BodyMetric_recordedAt(ctx context.Context, field graphql.CollectedField, obj *BodyMetric) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BodyMetric_recordedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RecordedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BodyMetric_recordedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BodyMetric", field, false, false, errors.New("field of type Time does not have child fields"))
 }
 
 func (ec *executionContext) _Exercise_id(ctx context.Context, field graphql.CollectedField, obj *Exercise) (ret graphql.Marshaler) {
@@ -1731,6 +2098,50 @@ func (ec *executionContext) fieldContext_Mutation_finishWorkout(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_logBodyMetric(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_logBodyMetric(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().LogBodyMetric(ctx, fc.Args["metricType"].(string), fc.Args["value"].(float64))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *BodyMetric) graphql.Marshaler {
+			return ec.marshalNBodyMetric2ᚖworkouttrackerᚋinternalᚋgraphqlᚐBodyMetric(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_logBodyMetric(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BodyMetric(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_logBodyMetric_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1913,6 +2324,98 @@ func (ec *executionContext) _PersonalRecord_workoutSetId(ctx context.Context, fi
 }
 func (ec *executionContext) fieldContext_PersonalRecord_workoutSetId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("PersonalRecord", field, false, false, errors.New("field of type UUID does not have child fields"))
+}
+
+func (ec *executionContext) _ProgressPoint_day(ctx context.Context, field graphql.CollectedField, obj *ProgressPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgressPoint_day(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Day, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgressPoint_day(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgressPoint", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _ProgressPoint_totalVolume(ctx context.Context, field graphql.CollectedField, obj *ProgressPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgressPoint_totalVolume(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalVolume, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgressPoint_totalVolume(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgressPoint", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ProgressPoint_maxWeight(ctx context.Context, field graphql.CollectedField, obj *ProgressPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgressPoint_maxWeight(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MaxWeight, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgressPoint_maxWeight(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgressPoint", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ProgressPoint_setCount(ctx context.Context, field graphql.CollectedField, obj *ProgressPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgressPoint_setCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SetCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgressPoint_setCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgressPoint", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -2099,6 +2602,138 @@ func (ec *executionContext) fieldContext_Query_personalRecords(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_progressOverTime(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_progressOverTime(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ProgressOverTime(ctx, fc.Args["exerciseId"].(uuid.UUID), fc.Args["days"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ProgressPoint) graphql.Marshaler {
+			return ec.marshalNProgressPoint2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgressPointᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_progressOverTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProgressPoint(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_progressOverTime_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_volumeTrend(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_volumeTrend(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().VolumeTrend(ctx, fc.Args["days"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ProgressPoint) graphql.Marshaler {
+			return ec.marshalNProgressPoint2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgressPointᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_volumeTrend(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProgressPoint(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_volumeTrend_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_bodyMetrics(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_bodyMetrics(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().BodyMetrics(ctx, fc.Args["metricType"].(string), fc.Args["days"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*BodyMetric) graphql.Marshaler {
+			return ec.marshalNBodyMetric2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐBodyMetricᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_bodyMetrics(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BodyMetric(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_bodyMetrics_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2171,6 +2806,50 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields___Schema(ctx, field)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_workoutProgressUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_workoutProgressUpdated(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Subscription().WorkoutProgressUpdated(ctx, fc.Args["workoutId"].(uuid.UUID))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *LogSetResult) graphql.Marshaler {
+			return ec.marshalNLogSetResult2ᚖworkouttrackerᚋinternalᚋgraphqlᚐLogSetResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_workoutProgressUpdated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_LogSetResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_workoutProgressUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -3832,6 +4511,59 @@ func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var bodyMetricImplementors = []string{"BodyMetric"}
+
+func (ec *executionContext) _BodyMetric(ctx context.Context, sel ast.SelectionSet, obj *BodyMetric) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, bodyMetricImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BodyMetric")
+		case "id":
+			out.Values[i] = ec._BodyMetric_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "metricType":
+			out.Values[i] = ec._BodyMetric_metricType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "value":
+			out.Values[i] = ec._BodyMetric_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "recordedAt":
+			out.Values[i] = ec._BodyMetric_recordedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var exerciseImplementors = []string{"Exercise"}
 
 func (ec *executionContext) _Exercise(ctx context.Context, sel ast.SelectionSet, obj *Exercise) graphql.Marshaler {
@@ -4007,6 +4739,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "logBodyMetric":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_logBodyMetric(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4110,6 +4849,59 @@ func (ec *executionContext) _PersonalRecord(ctx context.Context, sel ast.Selecti
 			}
 		case "workoutSetId":
 			out.Values[i] = ec._PersonalRecord_workoutSetId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var progressPointImplementors = []string{"ProgressPoint"}
+
+func (ec *executionContext) _ProgressPoint(ctx context.Context, sel ast.SelectionSet, obj *ProgressPoint) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, progressPointImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProgressPoint")
+		case "day":
+			out.Values[i] = ec._ProgressPoint_day(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalVolume":
+			out.Values[i] = ec._ProgressPoint_totalVolume(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "maxWeight":
+			out.Values[i] = ec._ProgressPoint_maxWeight(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setCount":
+			out.Values[i] = ec._ProgressPoint_setCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -4264,6 +5056,72 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "progressOverTime":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_progressOverTime(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "volumeTrend":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_volumeTrend(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "bodyMetrics":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_bodyMetrics(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -4297,6 +5155,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	})
 
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "workoutProgressUpdated":
+		return ec._Subscription_workoutProgressUpdated(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var userImplementors = []string{"User"}
@@ -4980,6 +5858,36 @@ func (ec *executionContext) marshalNAuthPayload2ᚖworkouttrackerᚋinternalᚋg
 	return ec._AuthPayload(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNBodyMetric2workouttrackerᚋinternalᚋgraphqlᚐBodyMetric(ctx context.Context, sel ast.SelectionSet, v BodyMetric) graphql.Marshaler {
+	return ec._BodyMetric(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNBodyMetric2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐBodyMetricᚄ(ctx context.Context, sel ast.SelectionSet, v []*BodyMetric) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNBodyMetric2ᚖworkouttrackerᚋinternalᚋgraphqlᚐBodyMetric(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNBodyMetric2ᚖworkouttrackerᚋinternalᚋgraphqlᚐBodyMetric(ctx context.Context, sel ast.SelectionSet, v *BodyMetric) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._BodyMetric(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5102,6 +6010,32 @@ func (ec *executionContext) marshalNPersonalRecord2ᚖworkouttrackerᚋinternal�
 		return graphql.Null
 	}
 	return ec._PersonalRecord(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProgressPoint2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgressPointᚄ(ctx context.Context, sel ast.SelectionSet, v []*ProgressPoint) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProgressPoint2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgressPoint(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNProgressPoint2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgressPoint(ctx context.Context, sel ast.SelectionSet, v *ProgressPoint) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProgressPoint(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {

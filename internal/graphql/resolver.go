@@ -7,6 +7,7 @@ import (
 
 	"workouttracker/internal/domain"
 	appmiddleware "workouttracker/internal/middleware"
+	"workouttracker/internal/realtime"
 	"workouttracker/internal/service"
 
 	"github.com/google/uuid"
@@ -16,8 +17,10 @@ import (
 // dependencies and translates GraphQL <-> service calls. No business logic
 // or SQL lives here (Single Responsibility) — that belongs in internal/service.
 type Resolver struct {
-	Auth    *service.AuthService
-	Workout *service.WorkoutService
+	Auth      *service.AuthService
+	Workout   *service.WorkoutService
+	Analytics *service.AnalyticsService
+	Events    *realtime.RedisEventBus
 }
 
 func toUserModel(u *domain.User) *User {
@@ -87,6 +90,32 @@ func toPersonalRecordModel(pr *domain.PersonalRecord) *PersonalRecord {
 		Value:        pr.Value,
 		AchievedAt:   pr.AchievedAt,
 		WorkoutSetID: pr.WorkoutSetID,
+	}
+}
+
+func toLogSetResult(logged *domain.LoggedSet) *LogSetResult {
+	newRecords := make([]*PersonalRecord, len(logged.NewRecords))
+	for i, pr := range logged.NewRecords {
+		newRecords[i] = toPersonalRecordModel(pr)
+	}
+	return &LogSetResult{Set: toWorkoutSetModel(logged.Set), NewRecords: newRecords}
+}
+
+func toProgressPointModel(p *domain.ProgressPoint) *ProgressPoint {
+	return &ProgressPoint{
+		Day:         p.Day,
+		TotalVolume: p.TotalVolume,
+		MaxWeight:   p.MaxWeight,
+		SetCount:    p.SetCount,
+	}
+}
+
+func toBodyMetricModel(m *domain.BodyMetric) *BodyMetric {
+	return &BodyMetric{
+		ID:         m.ID,
+		MetricType: m.MetricType,
+		Value:      m.Value,
+		RecordedAt: m.RecordedAt,
 	}
 }
 
@@ -167,11 +196,7 @@ func (r *mutationResolver) LogSet(ctx context.Context, workoutID uuid.UUID, exer
 	if err != nil {
 		return nil, err
 	}
-	newRecords := make([]*PersonalRecord, len(logged.NewRecords))
-	for i, pr := range logged.NewRecords {
-		newRecords[i] = toPersonalRecordModel(pr)
-	}
-	return &LogSetResult{Set: toWorkoutSetModel(logged.Set), NewRecords: newRecords}, nil
+	return toLogSetResult(logged), nil
 }
 
 // FinishWorkout is the resolver for the finishWorkout field.
@@ -189,6 +214,19 @@ func (r *mutationResolver) FinishWorkout(ctx context.Context, workoutID uuid.UUI
 		return nil, err
 	}
 	return r.toWorkoutModel(ctx, userID, w)
+}
+
+// LogBodyMetric is the resolver for the logBodyMetric field.
+func (r *mutationResolver) LogBodyMetric(ctx context.Context, metricType string, value float64) (*BodyMetric, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	m, err := r.Analytics.LogBodyMetric(ctx, userID, metricType, value)
+	if err != nil {
+		return nil, err
+	}
+	return toBodyMetricModel(m), nil
 }
 
 // Me is the resolver for the me field.
@@ -289,13 +327,109 @@ func (r *queryResolver) PersonalRecords(ctx context.Context) ([]*PersonalRecord,
 	return out, nil
 }
 
+// ProgressOverTime is the resolver for the progressOverTime field.
+func (r *queryResolver) ProgressOverTime(ctx context.Context, exerciseID uuid.UUID, days int) ([]*ProgressPoint, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	points, err := r.Analytics.ProgressOverTime(ctx, userID, exerciseID, days)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*ProgressPoint, len(points))
+	for i, p := range points {
+		out[i] = toProgressPointModel(p)
+	}
+	return out, nil
+}
+
+// VolumeTrend is the resolver for the volumeTrend field.
+func (r *queryResolver) VolumeTrend(ctx context.Context, days int) ([]*ProgressPoint, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	points, err := r.Analytics.VolumeTrend(ctx, userID, days)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*ProgressPoint, len(points))
+	for i, p := range points {
+		out[i] = toProgressPointModel(p)
+	}
+	return out, nil
+}
+
+// BodyMetrics is the resolver for the bodyMetrics field.
+func (r *queryResolver) BodyMetrics(ctx context.Context, metricType string, days int) ([]*BodyMetric, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	metrics, err := r.Analytics.BodyMetrics(ctx, userID, metricType, days)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*BodyMetric, len(metrics))
+	for i, m := range metrics {
+		out[i] = toBodyMetricModel(m)
+	}
+	return out, nil
+}
+
+// WorkoutProgressUpdated is the resolver for the workoutProgressUpdated field.
+func (r *subscriptionResolver) WorkoutProgressUpdated(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	// Verify the caller owns this workout before subscribing — SetsForWorkout
+	// does the same ownership check WorkoutService already applies elsewhere.
+	if _, err := r.Workout.SetsForWorkout(ctx, userID, workoutID); err != nil {
+		return nil, err
+	}
+
+	events, cleanup, err := r.Events.Subscribe(ctx, workoutID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan *LogSetResult)
+	go func() {
+		defer close(out)
+		defer cleanup()
+		for {
+			select {
+			case logged, ok := <-events:
+				if !ok {
+					return
+				}
+				select {
+				case out <- toLogSetResult(logged):
+				case <-ctx.Done():
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return out, nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+// Subscription returns SubscriptionResolver implementation.
+func (r *Resolver) Subscription() SubscriptionResolver { return &subscriptionResolver{r} }
+
 type (
-	mutationResolver struct{ *Resolver }
-	queryResolver    struct{ *Resolver }
+	mutationResolver     struct{ *Resolver }
+	queryResolver        struct{ *Resolver }
+	subscriptionResolver struct{ *Resolver }
 )

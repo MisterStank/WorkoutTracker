@@ -18,6 +18,12 @@ type WorkoutService struct {
 	workouts  domain.WorkoutRepository
 	sets      domain.WorkoutSetRepository
 	records   domain.PersonalRecordRepository
+
+	// analytics and events are optional (nil is fine, e.g. in unit tests):
+	// analytics's cache is invalidated and an event published after a set
+	// is logged, but neither failing should fail the mutation itself.
+	analytics *AnalyticsService
+	events    domain.WorkoutEventPublisher
 }
 
 func NewWorkoutService(
@@ -25,8 +31,13 @@ func NewWorkoutService(
 	workouts domain.WorkoutRepository,
 	sets domain.WorkoutSetRepository,
 	records domain.PersonalRecordRepository,
+	analytics *AnalyticsService,
+	events domain.WorkoutEventPublisher,
 ) *WorkoutService {
-	return &WorkoutService{exercises: exercises, workouts: workouts, sets: sets, records: records}
+	return &WorkoutService{
+		exercises: exercises, workouts: workouts, sets: sets, records: records,
+		analytics: analytics, events: events,
+	}
 }
 
 const defaultHistoryPageSize = 20
@@ -93,7 +104,19 @@ func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exercise
 		WeightKg:   weightKg,
 		RPE:        rpe,
 	}
-	return s.sets.LogSet(ctx, userID, set)
+	logged, err := s.sets.LogSet(ctx, userID, set)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.analytics != nil {
+		s.analytics.InvalidateForSet(ctx, userID, exerciseID)
+	}
+	if s.events != nil {
+		_ = s.events.PublishSetLogged(ctx, workoutID, logged)
+	}
+
+	return logged, nil
 }
 
 func (s *WorkoutService) FinishWorkout(ctx context.Context, userID, workoutID uuid.UUID, notes string) (*domain.Workout, error) {

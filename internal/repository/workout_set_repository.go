@@ -105,6 +105,19 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 		})
 	}
 
+	volume := set.WeightKg * float64(set.Reps)
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO progress_daily_rollup (user_id, exercise_id, day, total_volume, max_weight, set_count)
+		 VALUES ($1, $2, date_trunc('day', $3::timestamptz), $4, $5, 1)
+		 ON CONFLICT (user_id, exercise_id, day) DO UPDATE
+		   SET total_volume = progress_daily_rollup.total_volume + EXCLUDED.total_volume,
+		       max_weight = GREATEST(progress_daily_rollup.max_weight, EXCLUDED.max_weight),
+		       set_count = progress_daily_rollup.set_count + 1`,
+		userID, set.ExerciseID, set.PerformedAt, volume, set.WeightKg,
+	); err != nil {
+		return nil, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}

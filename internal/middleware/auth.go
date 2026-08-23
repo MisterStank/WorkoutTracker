@@ -44,3 +44,10 @@ func FromContext(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(userIDContextKey).(uuid.UUID)
 	return id, ok
 }
+
+// WithUserID injects an authenticated user ID into ctx directly, for
+// transports (e.g. the GraphQL websocket subscription handshake) that
+// authenticate outside the normal HTTP middleware chain.
+func WithUserID(ctx context.Context, userID uuid.UUID) context.Context {
+	return context.WithValue(ctx, userIDContextKey, userID)
+}

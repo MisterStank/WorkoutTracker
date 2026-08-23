@@ -18,6 +18,13 @@ type AuthPayload struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+type BodyMetric struct {
+	ID         uuid.UUID `json:"id"`
+	MetricType string    `json:"metricType"`
+	Value      float64   `json:"value"`
+	RecordedAt time.Time `json:"recordedAt"`
+}
+
 type Exercise struct {
 	ID           uuid.UUID `json:"id"`
 	Name         string    `json:"name"`
@@ -49,7 +56,17 @@ type PersonalRecord struct {
 	WorkoutSetID uuid.UUID `json:"workoutSetId"`
 }
 
+type ProgressPoint struct {
+	Day         time.Time `json:"day"`
+	TotalVolume float64   `json:"totalVolume"`
+	MaxWeight   float64   `json:"maxWeight"`
+	SetCount    int       `json:"setCount"`
+}
+
 type Query struct {
+}
+
+type Subscription struct {
 }
 
 type User struct {

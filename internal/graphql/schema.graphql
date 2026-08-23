@@ -77,12 +77,30 @@ type WorkoutConnection {
   pageInfo: PageInfo!
 }
 
+type ProgressPoint {
+  day: Time!
+  totalVolume: Float!
+  maxWeight: Float!
+  setCount: Int!
+}
+
+type BodyMetric {
+  id: UUID!
+  metricType: String!
+  value: Float!
+  recordedAt: Time!
+}
+
 type Query {
   me: User
   exercises(search: String): [Exercise!]!
   activeWorkout: Workout
   workoutHistory(first: Int!, after: String): WorkoutConnection!
   personalRecords: [PersonalRecord!]!
+
+  progressOverTime(exerciseId: UUID!, days: Int!): [ProgressPoint!]!
+  volumeTrend(days: Int!): [ProgressPoint!]!
+  bodyMetrics(metricType: String!, days: Int!): [BodyMetric!]!
 }
 
 type Mutation {
@@ -94,4 +112,12 @@ type Mutation {
   startWorkout: Workout!
   logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float): LogSetResult!
   finishWorkout(workoutId: UUID!, notes: String): Workout!
+
+  logBodyMetric(metricType: String!, value: Float!): BodyMetric!
+}
+
+type Subscription {
+  # Streams every set logged (and any PRs it broke) to anyone watching this
+  # workout, backed by Redis pub/sub so it fans out across API instances.
+  workoutProgressUpdated(workoutId: UUID!): LogSetResult!
 }
