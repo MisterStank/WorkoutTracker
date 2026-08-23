@@ -33,7 +33,13 @@ func main() {
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, tokens)
 
-	resolver := &graphql.Resolver{Auth: authService}
+	exerciseRepo := repository.NewExerciseRepository(db)
+	workoutRepo := repository.NewWorkoutRepository(db)
+	workoutSetRepo := repository.NewWorkoutSetRepository(db)
+	personalRecordRepo := repository.NewPersonalRecordRepository(db)
+	workoutService := service.NewWorkoutService(exerciseRepo, workoutRepo, workoutSetRepo, personalRecordRepo)
+
+	resolver := &graphql.Resolver{Auth: authService, Workout: workoutService}
 	gqlHandler := gqlgenhandler.NewDefaultServer(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))
 
 	r := chi.NewRouter()

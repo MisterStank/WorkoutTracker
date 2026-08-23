@@ -3,6 +3,10 @@
 package graphql
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +18,35 @@ type AuthPayload struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+type Exercise struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	Category     string    `json:"category"`
+	MuscleGroups []string  `json:"muscleGroups"`
+	Equipment    string    `json:"equipment"`
+	IsCustom     bool      `json:"isCustom"`
+}
+
+type LogSetResult struct {
+	Set        *WorkoutSet       `json:"set"`
+	NewRecords []*PersonalRecord `json:"newRecords"`
+}
+
 type Mutation struct {
+}
+
+type PageInfo struct {
+	HasNextPage bool    `json:"hasNextPage"`
+	EndCursor   *string `json:"endCursor,omitempty"`
+}
+
+type PersonalRecord struct {
+	ID           uuid.UUID `json:"id"`
+	ExerciseID   uuid.UUID `json:"exerciseId"`
+	RecordType   string    `json:"recordType"`
+	Value        float64   `json:"value"`
+	AchievedAt   time.Time `json:"achievedAt"`
+	WorkoutSetID uuid.UUID `json:"workoutSetId"`
 }
 
 type Query struct {
@@ -26,4 +58,88 @@ type User struct {
 	DisplayName string    `json:"displayName"`
 	Timezone    string    `json:"timezone"`
 	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type Workout struct {
+	ID        uuid.UUID     `json:"id"`
+	StartedAt time.Time     `json:"startedAt"`
+	EndedAt   *time.Time    `json:"endedAt,omitempty"`
+	Notes     string        `json:"notes"`
+	Status    WorkoutStatus `json:"status"`
+	Sets      []*WorkoutSet `json:"sets"`
+}
+
+type WorkoutConnection struct {
+	Edges    []*WorkoutEdge `json:"edges"`
+	PageInfo *PageInfo      `json:"pageInfo"`
+}
+
+type WorkoutEdge struct {
+	Cursor string   `json:"cursor"`
+	Node   *Workout `json:"node"`
+}
+
+type WorkoutSet struct {
+	ID          uuid.UUID `json:"id"`
+	ExerciseID  uuid.UUID `json:"exerciseId"`
+	SetNumber   int       `json:"setNumber"`
+	Reps        int       `json:"reps"`
+	WeightKg    float64   `json:"weightKg"`
+	Rpe         *float64  `json:"rpe,omitempty"`
+	PerformedAt time.Time `json:"performedAt"`
+}
+
+type WorkoutStatus string
+
+const (
+	WorkoutStatusInProgress WorkoutStatus = "IN_PROGRESS"
+	WorkoutStatusCompleted  WorkoutStatus = "COMPLETED"
+)
+
+var AllWorkoutStatus = []WorkoutStatus{
+	WorkoutStatusInProgress,
+	WorkoutStatusCompleted,
+}
+
+func (e WorkoutStatus) IsValid() bool {
+	switch e {
+	case WorkoutStatusInProgress, WorkoutStatusCompleted:
+		return true
+	}
+	return false
+}
+
+func (e WorkoutStatus) String() string {
+	return string(e)
+}
+
+func (e *WorkoutStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = WorkoutStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid WorkoutStatus", str)
+	}
+	return nil
+}
+
+func (e WorkoutStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *WorkoutStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e WorkoutStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

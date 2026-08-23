@@ -15,8 +15,74 @@ type AuthPayload {
   refreshToken: String!
 }
 
+enum WorkoutStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+type Exercise {
+  id: UUID!
+  name: String!
+  category: String!
+  muscleGroups: [String!]!
+  equipment: String!
+  isCustom: Boolean!
+}
+
+type WorkoutSet {
+  id: UUID!
+  exerciseId: UUID!
+  setNumber: Int!
+  reps: Int!
+  weightKg: Float!
+  rpe: Float
+  performedAt: Time!
+}
+
+type Workout {
+  id: UUID!
+  startedAt: Time!
+  endedAt: Time
+  notes: String!
+  status: WorkoutStatus!
+  sets: [WorkoutSet!]!
+}
+
+type PersonalRecord {
+  id: UUID!
+  exerciseId: UUID!
+  recordType: String!
+  value: Float!
+  achievedAt: Time!
+  workoutSetId: UUID!
+}
+
+type LogSetResult {
+  set: WorkoutSet!
+  newRecords: [PersonalRecord!]!
+}
+
+type WorkoutEdge {
+  cursor: String!
+  node: Workout!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type WorkoutConnection {
+  edges: [WorkoutEdge!]!
+  pageInfo: PageInfo!
+}
+
 type Query {
   me: User
+  exercises(search: String): [Exercise!]!
+  activeWorkout: Workout
+  workoutHistory(first: Int!, after: String): WorkoutConnection!
+  personalRecords: [PersonalRecord!]!
 }
 
 type Mutation {
@@ -24,4 +90,8 @@ type Mutation {
   login(email: String!, password: String!): AuthPayload!
   refreshToken(refreshToken: String!): AuthPayload!
   logout(refreshToken: String!): Boolean!
+
+  startWorkout: Workout!
+  logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float): LogSetResult!
+  finishWorkout(workoutId: UUID!, notes: String): Workout!
 }
