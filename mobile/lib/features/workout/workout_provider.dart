@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/storage/recent_exercises_storage.dart';
 import '../auth/auth_provider.dart';
 import 'workout_models.dart';
 import 'workout_repository.dart';
@@ -8,6 +10,34 @@ import 'workout_state.dart';
 final workoutRepositoryProvider = Provider<WorkoutRepository>((ref) {
   return WorkoutRepository(ref.watch(graphQLClientProvider));
 });
+
+final recentExercisesStorageProvider = Provider<RecentExercisesStorage>((ref) {
+  return RecentExercisesStorage(const FlutterSecureStorage());
+});
+
+/// The full exercise catalog, fetched once and kept as an id-keyed map so
+/// any screen can resolve a WorkoutSet's exerciseId to a display name
+/// without a network round trip or a per-item dataloader on the client.
+final exerciseCatalogProvider = FutureProvider<Map<String, Exercise>>((ref) async {
+  final exercises = await ref.watch(workoutRepositoryProvider).exercises();
+  return {for (final e in exercises) e.id: e};
+});
+
+final recentExerciseIdsProvider = StateNotifierProvider<RecentExerciseIdsNotifier, List<String>>((ref) {
+  return RecentExerciseIdsNotifier(ref.watch(recentExercisesStorageProvider));
+});
+
+class RecentExerciseIdsNotifier extends StateNotifier<List<String>> {
+  RecentExerciseIdsNotifier(this._storage) : super([]) {
+    _storage.read().then((ids) => state = ids);
+  }
+
+  final RecentExercisesStorage _storage;
+
+  Future<void> recordUse(String exerciseId) async {
+    state = await _storage.recordUse(exerciseId);
+  }
+}
 
 final activeWorkoutProvider = StateNotifierProvider<ActiveWorkoutNotifier, ActiveWorkoutState>((ref) {
   return ActiveWorkoutNotifier(ref.watch(workoutRepositoryProvider));
@@ -19,6 +49,13 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
   }
 
   final WorkoutRepository _repository;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   Future<void> refresh() async {
     state = const ActiveWorkoutLoading();
@@ -61,6 +98,18 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
         sets: updatedSets,
       );
       state = ActiveWorkoutInProgress(updatedWorkout, lastNewRecords: result.newRecords);
+
+      if (result.newRecords.isNotEmpty) {
+        // Auto-dismiss the "new PR" banner rather than leaving it stuck
+        // until the next set is logged.
+        Future.delayed(const Duration(seconds: 4), () {
+          if (_disposed) return;
+          final latest = state;
+          if (latest is ActiveWorkoutInProgress && identical(latest.lastNewRecords, result.newRecords)) {
+            state = ActiveWorkoutInProgress(latest.workout);
+          }
+        });
+      }
     } catch (e) {
       state = ActiveWorkoutError(e.toString());
     }
