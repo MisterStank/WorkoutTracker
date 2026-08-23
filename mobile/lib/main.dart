@@ -5,6 +5,7 @@ import 'package:graphql_flutter/graphql_flutter.dart' show initHiveForFlutter;
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_state.dart';
 import 'features/auth/login_screen.dart';
+import 'features/workout/workout_home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,8 +26,8 @@ class WorkoutTrackerApp extends StatelessWidget {
   }
 }
 
-/// Routes to the login screen or (once Phase 2 lands) the workout home
-/// screen, based purely on authProvider's current state.
+/// Routes to the login screen or the workout home screen, based purely on
+/// authProvider's current state.
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -39,18 +40,7 @@ class AuthGate extends ConsumerWidget {
     }
 
     if (authState is AuthAuthenticated) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Welcome, ${authState.displayName}'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () => ref.read(authProvider.notifier).logout(),
-            ),
-          ],
-        ),
-        body: const Center(child: Text('Workout tracking lands in Phase 2.')),
-      );
+      return const WorkoutHomeScreen();
     }
 
     return const LoginScreen();
