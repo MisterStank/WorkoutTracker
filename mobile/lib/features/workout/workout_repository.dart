@@ -11,8 +11,33 @@ class WorkoutRepository {
 
   static const _workoutFields = '''
     id startedAt endedAt notes status
-    sets { id exerciseId setNumber reps weightKg rpe performedAt }
+    sets { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
   ''';
+
+  /// Streams every set logged to this workout in real time (GraphQL
+  /// subscription over WebSocket, backed by Redis pub/sub server-side) —
+  /// used so a second device/tab watching the same workout updates live.
+  Stream<LogSetResult> watchWorkoutProgress(String workoutId) {
+    final stream = _client.subscribe(SubscriptionOptions(
+      document: gql('''
+        subscription WorkoutProgressUpdated(\$workoutId: UUID!) {
+          workoutProgressUpdated(workoutId: \$workoutId) {
+            set { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
+            newRecords { exerciseId recordType value }
+          }
+        }
+      '''),
+      variables: {'workoutId': workoutId},
+    ));
+
+    return stream.where((result) => !result.hasException && result.data != null).map((result) {
+      final payload = result.data!['workoutProgressUpdated'] as Map<String, dynamic>;
+      final newRecords = (payload['newRecords'] as List<dynamic>)
+          .map((r) => PersonalRecord.fromJson(r as Map<String, dynamic>))
+          .toList();
+      return LogSetResult(set: WorkoutSet.fromJson(payload['set'] as Map<String, dynamic>), newRecords: newRecords);
+    });
+  }
 
   Future<List<Exercise>> exercises({String? search}) async {
     final result = await _client.query(QueryOptions(
@@ -53,12 +78,13 @@ class WorkoutRepository {
     required int reps,
     required double weightKg,
     double? rpe,
+    bool isWarmup = false,
   }) async {
     final result = await _client.mutate(MutationOptions(
       document: gql('''
-        mutation LogSet(\$workoutId: UUID!, \$exerciseId: UUID!, \$reps: Int!, \$weightKg: Float!, \$rpe: Float) {
-          logSet(workoutId: \$workoutId, exerciseId: \$exerciseId, reps: \$reps, weightKg: \$weightKg, rpe: \$rpe) {
-            set { id exerciseId setNumber reps weightKg rpe performedAt }
+        mutation LogSet(\$workoutId: UUID!, \$exerciseId: UUID!, \$reps: Int!, \$weightKg: Float!, \$rpe: Float, \$isWarmup: Boolean) {
+          logSet(workoutId: \$workoutId, exerciseId: \$exerciseId, reps: \$reps, weightKg: \$weightKg, rpe: \$rpe, isWarmup: \$isWarmup) {
+            set { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
             newRecords { exerciseId recordType value }
           }
         }
@@ -69,6 +95,7 @@ class WorkoutRepository {
         'reps': reps,
         'weightKg': weightKg,
         'rpe': rpe,
+        'isWarmup': isWarmup,
       },
     ));
     if (result.hasException) throw Exception(result.exception.toString());
@@ -77,6 +104,24 @@ class WorkoutRepository {
         .map((r) => PersonalRecord.fromJson(r as Map<String, dynamic>))
         .toList();
     return LogSetResult(set: WorkoutSet.fromJson(payload['set'] as Map<String, dynamic>), newRecords: newRecords);
+  }
+
+  /// Fetches the most recent set logged for this exercise (any workout), to
+  /// pre-fill the log-set form with what the user did last time — the
+  /// single biggest speed win for logging sets in the gym.
+  Future<WorkoutSet?> lastSetForExercise(String exerciseId) async {
+    final result = await _client.query(QueryOptions(
+      document: gql('''
+        query LastSetForExercise(\$exerciseId: UUID!) {
+          lastSetForExercise(exerciseId: \$exerciseId) { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
+        }
+      '''),
+      variables: {'exerciseId': exerciseId},
+      fetchPolicy: FetchPolicy.networkOnly,
+    ));
+    if (result.hasException) throw Exception(result.exception.toString());
+    final data = result.data!['lastSetForExercise'] as Map<String, dynamic>?;
+    return data == null ? null : WorkoutSet.fromJson(data);
   }
 
   Future<Workout> finishWorkout({required String workoutId, String? notes}) async {

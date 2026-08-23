@@ -22,7 +22,7 @@ func NewWorkoutSetRepository(db *pgxpool.Pool) *WorkoutSetRepository {
 
 func (r *WorkoutSetRepository) ListForWorkout(ctx context.Context, workoutID uuid.UUID) ([]*domain.WorkoutSet, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, performed_at
+		`SELECT id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, is_warmup, performed_at
 		 FROM workout_sets WHERE workout_id = $1 ORDER BY set_number`, workoutID)
 	if err != nil {
 		return nil, err
@@ -32,12 +32,32 @@ func (r *WorkoutSetRepository) ListForWorkout(ctx context.Context, workoutID uui
 	var sets []*domain.WorkoutSet
 	for rows.Next() {
 		var s domain.WorkoutSet
-		if err := rows.Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.PerformedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.IsWarmup, &s.PerformedAt); err != nil {
 			return nil, err
 		}
 		sets = append(sets, &s)
 	}
 	return sets, rows.Err()
+}
+
+func (r *WorkoutSetRepository) LastForExercise(ctx context.Context, userID, exerciseID uuid.UUID) (*domain.WorkoutSet, error) {
+	var s domain.WorkoutSet
+	err := r.db.QueryRow(ctx,
+		`SELECT ws.id, ws.workout_id, ws.exercise_id, ws.set_number, ws.reps, ws.weight_kg, ws.rpe, ws.is_warmup, ws.performed_at
+		 FROM workout_sets ws
+		 JOIN workouts w ON w.id = ws.workout_id
+		 WHERE w.user_id = $1 AND ws.exercise_id = $2
+		 ORDER BY ws.performed_at DESC
+		 LIMIT 1`,
+		userID, exerciseID,
+	).Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.IsWarmup, &s.PerformedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrWorkoutSetNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 // LogSet inserts a set and atomically upserts any personal records it
@@ -64,11 +84,20 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 	set.PerformedAt = time.Now()
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO workout_sets (id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, performed_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		set.ID, set.WorkoutID, set.ExerciseID, set.SetNumber, set.Reps, set.WeightKg, set.RPE, set.PerformedAt,
+		`INSERT INTO workout_sets (id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, is_warmup, performed_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		set.ID, set.WorkoutID, set.ExerciseID, set.SetNumber, set.Reps, set.WeightKg, set.RPE, set.IsWarmup, set.PerformedAt,
 	); err != nil {
 		return nil, err
+	}
+
+	if set.IsWarmup {
+		// Warm-up sets don't count toward PRs or training-volume rollups —
+		// they'd otherwise pollute progress charts with unrepresentative light sets.
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return &domain.LoggedSet{Set: set}, nil
 	}
 
 	candidates := map[string]float64{

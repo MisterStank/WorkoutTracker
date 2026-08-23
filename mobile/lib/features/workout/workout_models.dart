@@ -20,6 +20,7 @@ class WorkoutSet {
     required this.reps,
     required this.weightKg,
     this.rpe,
+    this.isWarmup = false,
   });
 
   final String id;
@@ -28,6 +29,7 @@ class WorkoutSet {
   final int reps;
   final double weightKg;
   final double? rpe;
+  final bool isWarmup;
 
   factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
         id: json['id'] as String,
@@ -36,6 +38,7 @@ class WorkoutSet {
         reps: json['reps'] as int,
         weightKg: (json['weightKg'] as num).toDouble(),
         rpe: (json['rpe'] as num?)?.toDouble(),
+        isWarmup: json['isWarmup'] as bool? ?? false,
       );
 }
 

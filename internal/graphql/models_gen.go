@@ -103,6 +103,7 @@ type WorkoutSet struct {
 	Reps        int       `json:"reps"`
 	WeightKg    float64   `json:"weightKg"`
 	Rpe         *float64  `json:"rpe,omitempty"`
+	IsWarmup    bool      `json:"isWarmup"`
 	PerformedAt time.Time `json:"performedAt"`
 }
 

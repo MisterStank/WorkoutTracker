@@ -82,7 +82,7 @@ func (s *WorkoutService) ActiveWorkout(ctx context.Context, userID uuid.UUID) (*
 	return w, err
 }
 
-func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64) (*domain.LoggedSet, error) {
+func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, isWarmup bool) (*domain.LoggedSet, error) {
 	workout, err := s.workouts.FindByID(ctx, workoutID)
 	if err != nil {
 		return nil, err
@@ -103,6 +103,7 @@ func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exercise
 		Reps:       reps,
 		WeightKg:   weightKg,
 		RPE:        rpe,
+		IsWarmup:   isWarmup,
 	}
 	logged, err := s.sets.LogSet(ctx, userID, set)
 	if err != nil {
@@ -134,6 +135,17 @@ func (s *WorkoutService) FinishWorkout(ctx context.Context, userID, workoutID uu
 		return nil, err
 	}
 	return s.workouts.FindByID(ctx, workoutID)
+}
+
+// LastSetForExercise powers "pre-fill the log-set form with what you did
+// last time" — returns nil (not an error) if the exercise has never been
+// logged, since that's an expected first-time state, not a failure.
+func (s *WorkoutService) LastSetForExercise(ctx context.Context, userID, exerciseID uuid.UUID) (*domain.WorkoutSet, error) {
+	set, err := s.sets.LastForExercise(ctx, userID, exerciseID)
+	if errors.Is(err, domain.ErrWorkoutSetNotFound) {
+		return nil, nil
+	}
+	return set, err
 }
 
 func (s *WorkoutService) SetsForWorkout(ctx context.Context, userID, workoutID uuid.UUID) ([]*domain.WorkoutSet, error) {

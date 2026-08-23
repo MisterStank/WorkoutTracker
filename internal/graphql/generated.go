@@ -69,7 +69,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		FinishWorkout func(childComplexity int, workoutID uuid.UUID, notes *string) int
 		LogBodyMetric func(childComplexity int, metricType string, value float64) int
-		LogSet        func(childComplexity int, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64) int
+		LogSet        func(childComplexity int, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, isWarmup *bool) int
 		Login         func(childComplexity int, email string, password string) int
 		Logout        func(childComplexity int, refreshToken string) int
 		RefreshToken  func(childComplexity int, refreshToken string) int
@@ -99,14 +99,15 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		ActiveWorkout    func(childComplexity int) int
-		BodyMetrics      func(childComplexity int, metricType string, days int) int
-		Exercises        func(childComplexity int, search *string) int
-		Me               func(childComplexity int) int
-		PersonalRecords  func(childComplexity int) int
-		ProgressOverTime func(childComplexity int, exerciseID uuid.UUID, days int) int
-		VolumeTrend      func(childComplexity int, days int) int
-		WorkoutHistory   func(childComplexity int, first int, after *string) int
+		ActiveWorkout      func(childComplexity int) int
+		BodyMetrics        func(childComplexity int, metricType string, days int) int
+		Exercises          func(childComplexity int, search *string) int
+		LastSetForExercise func(childComplexity int, exerciseID uuid.UUID) int
+		Me                 func(childComplexity int) int
+		PersonalRecords    func(childComplexity int) int
+		ProgressOverTime   func(childComplexity int, exerciseID uuid.UUID, days int) int
+		VolumeTrend        func(childComplexity int, days int) int
+		WorkoutHistory     func(childComplexity int, first int, after *string) int
 	}
 
 	Subscription struct {
@@ -143,6 +144,7 @@ type ComplexityRoot struct {
 	WorkoutSet struct {
 		ExerciseID  func(childComplexity int) int
 		ID          func(childComplexity int) int
+		IsWarmup    func(childComplexity int) int
 		PerformedAt func(childComplexity int) int
 		Reps        func(childComplexity int) int
 		Rpe         func(childComplexity int) int
@@ -161,7 +163,7 @@ type MutationResolver interface {
 	RefreshToken(ctx context.Context, refreshToken string) (*AuthPayload, error)
 	Logout(ctx context.Context, refreshToken string) (bool, error)
 	StartWorkout(ctx context.Context) (*Workout, error)
-	LogSet(ctx context.Context, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64) (*LogSetResult, error)
+	LogSet(ctx context.Context, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, isWarmup *bool) (*LogSetResult, error)
 	FinishWorkout(ctx context.Context, workoutID uuid.UUID, notes *string) (*Workout, error)
 	LogBodyMetric(ctx context.Context, metricType string, value float64) (*BodyMetric, error)
 }
@@ -171,6 +173,7 @@ type QueryResolver interface {
 	ActiveWorkout(ctx context.Context) (*Workout, error)
 	WorkoutHistory(ctx context.Context, first int, after *string) (*WorkoutConnection, error)
 	PersonalRecords(ctx context.Context) ([]*PersonalRecord, error)
+	LastSetForExercise(ctx context.Context, exerciseID uuid.UUID) (*WorkoutSet, error)
 	ProgressOverTime(ctx context.Context, exerciseID uuid.UUID, days int) ([]*ProgressPoint, error)
 	VolumeTrend(ctx context.Context, days int) ([]*ProgressPoint, error)
 	BodyMetrics(ctx context.Context, metricType string, days int) ([]*BodyMetric, error)
@@ -323,7 +326,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.LogSet(childComplexity, args["workoutId"].(uuid.UUID), args["exerciseId"].(uuid.UUID), args["reps"].(int), args["weightKg"].(float64), args["rpe"].(*float64)), true
+		return e.ComplexityRoot.Mutation.LogSet(childComplexity, args["workoutId"].(uuid.UUID), args["exerciseId"].(uuid.UUID), args["reps"].(int), args["weightKg"].(float64), args["rpe"].(*float64), args["isWarmup"].(*bool)), true
 	case "Mutation.login":
 		if e.ComplexityRoot.Mutation.Login == nil {
 			break
@@ -479,6 +482,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Query.Exercises(childComplexity, args["search"].(*string)), true
 
+	case "Query.lastSetForExercise":
+		if e.ComplexityRoot.Query.LastSetForExercise == nil {
+			break
+		}
+
+		args, err := ec.field_Query_lastSetForExercise_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.LastSetForExercise(childComplexity, args["exerciseId"].(uuid.UUID)), true
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
 			break
@@ -643,6 +657,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.WorkoutSet.ID(childComplexity), true
+	case "WorkoutSet.isWarmup":
+		if e.ComplexityRoot.WorkoutSet.IsWarmup == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WorkoutSet.IsWarmup(childComplexity), true
 	case "WorkoutSet.performedAt":
 		if e.ComplexityRoot.WorkoutSet.PerformedAt == nil {
 			break
@@ -956,6 +976,8 @@ func (ec *executionContext) childFields_WorkoutSet(ctx context.Context, field gr
 		return ec.fieldContext_WorkoutSet_weightKg(ctx, field)
 	case "rpe":
 		return ec.fieldContext_WorkoutSet_rpe(ctx, field)
+	case "isWarmup":
+		return ec.fieldContext_WorkoutSet_isWarmup(ctx, field)
 	case "performedAt":
 		return ec.fieldContext_WorkoutSet_performedAt(ctx, field)
 	}
@@ -1165,6 +1187,14 @@ func (ec *executionContext) field_Mutation_logSet_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["rpe"] = arg4
+	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "isWarmup",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["isWarmup"] = arg5
 	return args, nil
 }
 
@@ -1295,6 +1325,20 @@ func (ec *executionContext) field_Query_exercises_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["search"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_lastSetForExercise_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "exerciseId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["exerciseId"] = arg0
 	return args, nil
 }
 
@@ -2020,7 +2064,7 @@ func (ec *executionContext) _Mutation_logSet(ctx context.Context, field graphql.
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().LogSet(ctx, fc.Args["workoutId"].(uuid.UUID), fc.Args["exerciseId"].(uuid.UUID), fc.Args["reps"].(int), fc.Args["weightKg"].(float64), fc.Args["rpe"].(*float64))
+			return ec.Resolvers.Mutation().LogSet(ctx, fc.Args["workoutId"].(uuid.UUID), fc.Args["exerciseId"].(uuid.UUID), fc.Args["reps"].(int), fc.Args["weightKg"].(float64), fc.Args["rpe"].(*float64), fc.Args["isWarmup"].(*bool))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *LogSetResult) graphql.Marshaler {
@@ -2598,6 +2642,50 @@ func (ec *executionContext) fieldContext_Query_personalRecords(_ context.Context
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_PersonalRecord(ctx, field)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_lastSetForExercise(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_lastSetForExercise(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().LastSetForExercise(ctx, fc.Args["exerciseId"].(uuid.UUID))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *WorkoutSet) graphql.Marshaler {
+			return ec.marshalOWorkoutSet2ᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkoutSet(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_lastSetForExercise(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WorkoutSet(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_lastSetForExercise_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -3371,6 +3459,29 @@ func (ec *executionContext) _WorkoutSet_rpe(ctx context.Context, field graphql.C
 }
 func (ec *executionContext) fieldContext_WorkoutSet_rpe(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("WorkoutSet", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _WorkoutSet_isWarmup(ctx context.Context, field graphql.CollectedField, obj *WorkoutSet) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WorkoutSet_isWarmup(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.IsWarmup, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_WorkoutSet_isWarmup(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WorkoutSet", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
 func (ec *executionContext) _WorkoutSet_performedAt(ctx context.Context, field graphql.CollectedField, obj *WorkoutSet) (ret graphql.Marshaler) {
@@ -5056,6 +5167,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "lastSetForExercise":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_lastSetForExercise(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "progressOverTime":
 			field := field
 
@@ -5424,6 +5557,11 @@ func (ec *executionContext) _WorkoutSet(ctx context.Context, sel ast.SelectionSe
 		case "rpe":
 			out.Values[i] = ec._WorkoutSet_rpe(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "isWarmup":
+			out.Values[i] = ec._WorkoutSet_isWarmup(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "performedAt":
@@ -6450,6 +6588,13 @@ func (ec *executionContext) marshalOWorkout2ᚖworkouttrackerᚋinternalᚋgraph
 		return graphql.Null
 	}
 	return ec._Workout(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOWorkoutSet2ᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkoutSet(ctx context.Context, sel ast.SelectionSet, v *WorkoutSet) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._WorkoutSet(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

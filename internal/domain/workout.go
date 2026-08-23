@@ -49,6 +49,7 @@ type WorkoutSet struct {
 	Reps        int
 	WeightKg    float64
 	RPE         *float64
+	IsWarmup    bool
 	PerformedAt time.Time
 }
 
@@ -88,9 +89,14 @@ type WorkoutRepository interface {
 
 type WorkoutSetRepository interface {
 	ListForWorkout(ctx context.Context, workoutID uuid.UUID) ([]*WorkoutSet, error)
-	// LogSet inserts a set and atomically upserts any personal records it
-	// breaks, in the same transaction as the insert.
+	// LogSet inserts a set and, unless it's a warm-up set, atomically upserts
+	// any personal records/rollup it breaks, in the same transaction as the
+	// insert. Warm-up sets are excluded so they don't skew PRs or volume.
 	LogSet(ctx context.Context, userID uuid.UUID, set *WorkoutSet) (*LoggedSet, error)
+	// LastForExercise returns the most recent set logged for this exercise
+	// (any workout), used to pre-fill the log-set form with the weight/reps
+	// the user used last time. Returns ErrWorkoutSetNotFound if never logged.
+	LastForExercise(ctx context.Context, userID, exerciseID uuid.UUID) (*WorkoutSet, error)
 }
 
 type PersonalRecordRepository interface {

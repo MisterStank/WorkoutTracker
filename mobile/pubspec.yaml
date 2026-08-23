@@ -40,6 +40,7 @@ dependencies:
 
   # GraphQL client for talking to the Go/gqlgen backend
   graphql_flutter: ^5.2.0
+  gql: ^1.0.0
 
   # Secure storage for JWT access/refresh tokens
   flutter_secure_storage: ^9.2.2
@@ -51,6 +52,9 @@ dependencies:
   path: ^1.9.0
 
   connectivity_plus: ^6.1.0
+
+  # Progress/volume trend charts (Phase 3 analytics)
+  fl_chart: ^0.69.0
 
 dev_dependencies:
   flutter_test:

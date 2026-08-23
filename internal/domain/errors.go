@@ -13,4 +13,5 @@ var (
 	ErrWorkoutNotOwned      = errors.New("workout does not belong to this user")
 	ErrWorkoutNotActive     = errors.New("workout is not in progress")
 	ErrWorkoutAlreadyActive = errors.New("user already has a workout in progress")
+	ErrWorkoutSetNotFound   = errors.New("workout set not found")
 )

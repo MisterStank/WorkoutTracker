@@ -3,9 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/units/units_provider.dart';
+import '../../core/units/weight_unit.dart';
+import '../analytics/analytics_screen.dart';
 import '../auth/auth_provider.dart';
 import 'exercise_picker_screen.dart';
 import 'log_set_sheet.dart';
+import 'rest_timer_provider.dart';
 import 'workout_history_screen.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
@@ -20,12 +24,21 @@ class WorkoutHomeScreen extends ConsumerWidget {
     );
     if (exercise == null || !context.mounted) return;
 
-    final input = await showLogSetSheet(context, exercise);
+    final unit = ref.read(weightUnitProvider);
+    final lastSet = await ref.read(workoutRepositoryProvider).lastSetForExercise(exercise.id);
+    if (!context.mounted) return;
+
+    final input = await showLogSetSheet(context, exercise, lastSet: lastSet, unit: unit);
     if (input == null) return;
 
-    await ref
-        .read(activeWorkoutProvider.notifier)
-        .logSet(exerciseId: exercise.id, reps: input.reps, weightKg: input.weightKg, rpe: input.rpe);
+    await ref.read(activeWorkoutProvider.notifier).logSet(
+          exerciseId: exercise.id,
+          reps: input.reps,
+          weightKg: input.weightKg,
+          rpe: input.rpe,
+          isWarmup: input.isWarmup,
+        );
+    ref.read(restTimerProvider.notifier).start();
   }
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
@@ -57,11 +70,21 @@ class WorkoutHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(activeWorkoutProvider);
+    final unit = ref.watch(weightUnitProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('WorkoutTracker'),
         actions: [
+          TextButton(
+            onPressed: () => ref.read(weightUnitProvider.notifier).toggle(),
+            child: Text(unit.label.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.show_chart),
+            tooltip: 'Progress',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalyticsScreen())),
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'History',
@@ -187,6 +210,7 @@ class _ActiveWorkoutView extends ConsumerWidget {
           ),
         ),
         if (lastNewRecords.isNotEmpty) _NewRecordBanner(records: lastNewRecords),
+        const _RestTimerBanner(),
         Expanded(
           child: groups.isEmpty
               ? const _EmptyWorkoutHint()
@@ -197,6 +221,7 @@ class _ActiveWorkoutView extends ConsumerWidget {
                     return _ExerciseGroupCard(
                       exerciseName: exercise?.name ?? 'Exercise',
                       sets: entry.value,
+                      unit: ref.watch(weightUnitProvider),
                       onRepeatLast: () {
                         final last = entry.value.last;
                         ref.read(activeWorkoutProvider.notifier).logSet(
@@ -204,7 +229,9 @@ class _ActiveWorkoutView extends ConsumerWidget {
                               reps: last.reps,
                               weightKg: last.weightKg,
                               rpe: last.rpe,
+                              isWarmup: last.isWarmup,
                             );
+                        ref.read(restTimerProvider.notifier).start();
                       },
                     );
                   }).toList(),
@@ -280,11 +307,64 @@ class _NewRecordBanner extends StatelessWidget {
   }
 }
 
+class _RestTimerBanner extends ConsumerWidget {
+  const _RestTimerBanner();
+
+  String _format(Duration d) {
+    final minutes = d.inMinutes;
+    final seconds = d.inSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final timer = ref.watch(restTimerProvider);
+    if (!timer.running) return const SizedBox.shrink();
+
+    final progress = timer.total.inSeconds == 0 ? 0.0 : timer.remaining.inSeconds / timer.total.inSeconds;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: Stack(alignment: Alignment.center, children: [
+              CircularProgressIndicator(value: progress, strokeWidth: 3),
+              const Icon(Icons.timer, size: 14),
+            ]),
+          ),
+          const SizedBox(width: 10),
+          Text('Rest: ${_format(timer.remaining)}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            tooltip: '+15s',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => ref.read(restTimerProvider.notifier).addSeconds(15),
+          ),
+          TextButton(
+            onPressed: () => ref.read(restTimerProvider.notifier).skip(),
+            child: const Text('Skip'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ExerciseGroupCard extends StatelessWidget {
-  const _ExerciseGroupCard({required this.exerciseName, required this.sets, required this.onRepeatLast});
+  const _ExerciseGroupCard({required this.exerciseName, required this.sets, required this.unit, required this.onRepeatLast});
 
   final String exerciseName;
   final List<WorkoutSet> sets;
+  final WeightUnit unit;
   final VoidCallback onRepeatLast;
 
   @override
@@ -312,31 +392,47 @@ class _ExerciseGroupCard extends StatelessWidget {
                 ),
               ],
             ),
-            ...sets.map((set) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        child: Text('${set.setNumber}', style: TextStyle(color: Colors.grey.shade600)),
-                      ),
-                      Text('${set.reps} reps', style: Theme.of(context).textTheme.bodyMedium),
-                      const SizedBox(width: 10),
-                      Text('×', style: TextStyle(color: Colors.grey.shade500)),
-                      const SizedBox(width: 10),
-                      Text('${set.weightKg.toStringAsFixed(set.weightKg.truncateToDouble() == set.weightKg ? 0 : 1)} kg',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
-                      if (set.rpe != null) ...[
-                        const SizedBox(width: 10),
-                        Chip(
-                          label: Text('RPE ${set.rpe}', style: const TextStyle(fontSize: 11)),
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ...sets.map((set) {
+              final displayWeight = unit.fromKg(set.weightKg);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 28,
+                      child: Text('${set.setNumber}', style: TextStyle(color: Colors.grey.shade600)),
+                    ),
+                    Text('${set.reps} reps', style: Theme.of(context).textTheme.bodyMedium),
+                    const SizedBox(width: 10),
+                    Text('×', style: TextStyle(color: Colors.grey.shade500)),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${displayWeight.toStringAsFixed(displayWeight.truncateToDouble() == displayWeight ? 0 : 1)} ${unit.label}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                    ),
+                    if (set.isWarmup) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey.shade100,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                      ],
+                        child: const Text('W', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
                     ],
-                  ),
-                )),
+                    if (set.rpe != null) ...[
+                      const SizedBox(width: 10),
+                      Chip(
+                        label: Text('RPE ${set.rpe}', style: const TextStyle(fontSize: 11)),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),

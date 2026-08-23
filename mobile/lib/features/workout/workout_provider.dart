@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -50,10 +52,13 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
 
   final WorkoutRepository _repository;
   bool _disposed = false;
+  StreamSubscription<LogSetResult>? _liveSub;
+  String? _liveSubWorkoutId;
 
   @override
   void dispose() {
     _disposed = true;
+    _liveSub?.cancel();
     super.dispose();
   }
 
@@ -61,7 +66,13 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     state = const ActiveWorkoutLoading();
     try {
       final workout = await _repository.activeWorkout();
-      state = workout == null ? const ActiveWorkoutNone() : ActiveWorkoutInProgress(workout);
+      if (workout == null) {
+        _stopWatching();
+        state = const ActiveWorkoutNone();
+      } else {
+        state = ActiveWorkoutInProgress(workout);
+        _watch(workout.id);
+      }
     } catch (e) {
       state = ActiveWorkoutError(e.toString());
     }
@@ -72,12 +83,19 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     try {
       final workout = await _repository.startWorkout();
       state = ActiveWorkoutInProgress(workout);
+      _watch(workout.id);
     } catch (e) {
       state = ActiveWorkoutError(e.toString());
     }
   }
 
-  Future<void> logSet({required String exerciseId, required int reps, required double weightKg, double? rpe}) async {
+  Future<void> logSet({
+    required String exerciseId,
+    required int reps,
+    required double weightKg,
+    double? rpe,
+    bool isWarmup = false,
+  }) async {
     final current = state;
     if (current is! ActiveWorkoutInProgress) return;
 
@@ -88,28 +106,9 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
         reps: reps,
         weightKg: weightKg,
         rpe: rpe,
+        isWarmup: isWarmup,
       );
-      final updatedSets = [...current.workout.sets, result.set];
-      final updatedWorkout = Workout(
-        id: current.workout.id,
-        startedAt: current.workout.startedAt,
-        status: current.workout.status,
-        notes: current.workout.notes,
-        sets: updatedSets,
-      );
-      state = ActiveWorkoutInProgress(updatedWorkout, lastNewRecords: result.newRecords);
-
-      if (result.newRecords.isNotEmpty) {
-        // Auto-dismiss the "new PR" banner rather than leaving it stuck
-        // until the next set is logged.
-        Future.delayed(const Duration(seconds: 4), () {
-          if (_disposed) return;
-          final latest = state;
-          if (latest is ActiveWorkoutInProgress && identical(latest.lastNewRecords, result.newRecords)) {
-            state = ActiveWorkoutInProgress(latest.workout);
-          }
-        });
-      }
+      _applyLoggedSet(result);
     } catch (e) {
       state = ActiveWorkoutError(e.toString());
     }
@@ -121,9 +120,57 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
 
     try {
       await _repository.finishWorkout(workoutId: current.workout.id, notes: notes);
+      _stopWatching();
       state = const ActiveWorkoutNone();
     } catch (e) {
       state = ActiveWorkoutError(e.toString());
+    }
+  }
+
+  /// Subscribes to live updates for [workoutId] over the GraphQL websocket
+  /// (Redis pub/sub server-side) so a set logged from another device/tab
+  /// shows up here without polling. Idempotent: re-entering this workout
+  /// (e.g. after `refresh`) won't open a second subscription.
+  void _watch(String workoutId) {
+    if (_liveSubWorkoutId == workoutId) return;
+    _stopWatching();
+    _liveSubWorkoutId = workoutId;
+    _liveSub = _repository.watchWorkoutProgress(workoutId).listen(_applyLoggedSet);
+  }
+
+  void _stopWatching() {
+    _liveSub?.cancel();
+    _liveSub = null;
+    _liveSubWorkoutId = null;
+  }
+
+  /// Applies a logged set whether it came from this device's own mutation
+  /// response or a live subscription event — deduplicated by set id so our
+  /// own optimistic update and the subscription echo of it don't double up.
+  void _applyLoggedSet(LogSetResult result) {
+    final current = state;
+    if (current is! ActiveWorkoutInProgress) return;
+    if (current.workout.sets.any((s) => s.id == result.set.id)) return;
+
+    final updatedWorkout = Workout(
+      id: current.workout.id,
+      startedAt: current.workout.startedAt,
+      status: current.workout.status,
+      notes: current.workout.notes,
+      sets: [...current.workout.sets, result.set],
+    );
+    state = ActiveWorkoutInProgress(updatedWorkout, lastNewRecords: result.newRecords);
+
+    if (result.newRecords.isNotEmpty) {
+      // Auto-dismiss the "new PR" banner rather than leaving it stuck until
+      // the next set is logged.
+      Future.delayed(const Duration(seconds: 4), () {
+        if (_disposed) return;
+        final latest = state;
+        if (latest is ActiveWorkoutInProgress && identical(latest.lastNewRecords, result.newRecords)) {
+          state = ActiveWorkoutInProgress(latest.workout);
+        }
+      });
     }
   }
 }

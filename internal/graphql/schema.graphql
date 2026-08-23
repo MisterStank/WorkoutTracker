@@ -36,6 +36,7 @@ type WorkoutSet {
   reps: Int!
   weightKg: Float!
   rpe: Float
+  isWarmup: Boolean!
   performedAt: Time!
 }
 
@@ -97,6 +98,7 @@ type Query {
   activeWorkout: Workout
   workoutHistory(first: Int!, after: String): WorkoutConnection!
   personalRecords: [PersonalRecord!]!
+  lastSetForExercise(exerciseId: UUID!): WorkoutSet
 
   progressOverTime(exerciseId: UUID!, days: Int!): [ProgressPoint!]!
   volumeTrend(days: Int!): [ProgressPoint!]!
@@ -110,7 +112,7 @@ type Mutation {
   logout(refreshToken: String!): Boolean!
 
   startWorkout: Workout!
-  logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float): LogSetResult!
+  logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float, isWarmup: Boolean): LogSetResult!
   finishWorkout(workoutId: UUID!, notes: String): Workout!
 
   logBodyMetric(metricType: String!, value: Float!): BodyMetric!
