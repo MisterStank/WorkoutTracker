@@ -29,6 +29,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final authState = ref.watch(authProvider);
     final isLoading = authState is AuthAuthenticating;
 
+    // SignupScreen is pushed on top of the LoginScreen route that AuthGate
+    // (the MaterialApp's home) returns. AuthGate swapping to
+    // WorkoutHomeScreen on success only changes what's underneath — this
+    // pushed route has to pop itself, or the user would end up "stuck"
+    // looking at a still-mounted signup form.
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next is AuthAuthenticated && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: const Text('Sign up')),
       body: Padding(
