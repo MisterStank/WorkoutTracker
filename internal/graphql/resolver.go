@@ -55,9 +55,10 @@ func toExerciseModel(e *domain.Exercise) *Exercise {
 	}
 }
 
-// domainSetTypes/graphqlSetTypes map between domain.SetType's lowercase DB
-// values and the GraphQL enum's uppercase ones, rather than relying on
-// string-casing tricks that would break if either side's naming changes.
+// domainToGraphQLSetType/graphqlToDomainSetType map between domain.SetType's
+// lowercase DB values and the GraphQL enum's uppercase ones, rather than
+// relying on string-casing tricks that would break if either side's naming
+// changes.
 var domainToGraphQLSetType = map[domain.SetType]SetType{
 	domain.SetTypeNormal:  SetTypeNormal,
 	domain.SetTypeWarmup:  SetTypeWarmup,
@@ -169,6 +170,26 @@ func toWorkoutTemplateModel(t *domain.WorkoutTemplate) *WorkoutTemplate {
 	}
 }
 
+func toProgressionSuggestionModel(s *service.ProgressionSuggestion) *ProgressionSuggestion {
+	if s == nil {
+		return nil
+	}
+	return &ProgressionSuggestion{
+		SuggestedWeightKg: s.SuggestedWeightKg,
+		SuggestedReps:     s.SuggestedReps,
+		Reasoning:         s.Reasoning,
+		BasedOnRpe:        s.BasedOnRPE,
+	}
+}
+
+func toPlateauStatusModel(s *service.PlateauStatus) *PlateauStatus {
+	return &PlateauStatus{
+		IsPlateaued:   s.IsPlateaued,
+		CurrentBestKg: s.CurrentBestKg,
+		Message:       s.Message,
+	}
+}
+
 // toWorkoutModel fetches the workout's sets to populate the nested field.
 // This is a known N+1 spot if a query fans out over many workouts at once
 // (e.g. workoutHistory); acceptable for now since history is paginated to
@@ -186,6 +207,27 @@ func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *doma
 		Status:     toWorkoutStatus(w.Status),
 		Sets:       toWorkoutSetModels(sets),
 		TemplateID: w.TemplateID,
+		ShareCode:  w.ShareCode,
+	}, nil
+}
+
+// toSharedWorkoutModel is toWorkoutModel's read-only counterpart: no
+// ownership check on the sets fetch, since the caller isn't the owner —
+// they only got here via a valid share code.
+func (r *Resolver) toSharedWorkoutModel(ctx context.Context, w *domain.Workout) (*Workout, error) {
+	sets, err := r.Workout.SetsForSharedWorkout(ctx, w.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &Workout{
+		ID:         w.ID,
+		StartedAt:  w.StartedAt,
+		EndedAt:    w.EndedAt,
+		Notes:      w.Notes,
+		Status:     toWorkoutStatus(w.Status),
+		Sets:       toWorkoutSetModels(sets),
+		TemplateID: w.TemplateID,
+		ShareCode:  w.ShareCode,
 	}, nil
 }
 
@@ -499,6 +541,44 @@ func (r *queryResolver) BodyMetrics(ctx context.Context, metricType string, days
 	return out, nil
 }
 
+// ProgressionSuggestion is the resolver for the progressionSuggestion field.
+func (r *queryResolver) ProgressionSuggestion(ctx context.Context, exerciseID uuid.UUID) (*ProgressionSuggestion, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	suggestion, err := r.Workout.SuggestNextSet(ctx, userID, exerciseID)
+	if err != nil {
+		return nil, err
+	}
+	return toProgressionSuggestionModel(suggestion), nil
+}
+
+// PlateauStatus is the resolver for the plateauStatus field.
+func (r *queryResolver) PlateauStatus(ctx context.Context, exerciseID uuid.UUID) (*PlateauStatus, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	status, err := r.Analytics.DetectPlateau(ctx, userID, exerciseID)
+	if err != nil {
+		return nil, err
+	}
+	return toPlateauStatusModel(status), nil
+}
+
+// SharedWorkout is the resolver for the sharedWorkout field.
+func (r *queryResolver) SharedWorkout(ctx context.Context, code string) (*Workout, error) {
+	if _, ok := appmiddleware.FromContext(ctx); !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	w, err := r.Workout.GetSharedWorkout(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	return r.toSharedWorkoutModel(ctx, w)
+}
+
 // WorkoutProgressUpdated is the resolver for the workoutProgressUpdated field.
 func (r *subscriptionResolver) WorkoutProgressUpdated(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
@@ -510,7 +590,25 @@ func (r *subscriptionResolver) WorkoutProgressUpdated(ctx context.Context, worko
 	if _, err := r.Workout.SetsForWorkout(ctx, userID, workoutID); err != nil {
 		return nil, err
 	}
+	return r.streamWorkoutEvents(ctx, workoutID)
+}
 
+// SharedWorkoutProgressUpdated is the resolver for the sharedWorkoutProgressUpdated field.
+func (r *subscriptionResolver) SharedWorkoutProgressUpdated(ctx context.Context, code string) (<-chan *LogSetResult, error) {
+	if _, ok := appmiddleware.FromContext(ctx); !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	w, err := r.Workout.GetSharedWorkout(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	return r.streamWorkoutEvents(ctx, w.ID)
+}
+
+// streamWorkoutEvents subscribes to one workout's Redis pub/sub channel and
+// re-shapes each event into the GraphQL model, shared by both the
+// owner-only and share-code subscription resolvers.
+func (r *Resolver) streamWorkoutEvents(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
 	events, cleanup, err := r.Events.Subscribe(ctx, workoutID)
 	if err != nil {
 		return nil, err

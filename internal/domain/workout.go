@@ -52,6 +52,10 @@ type Workout struct {
 	Notes      string
 	Status     WorkoutStatus
 	TemplateID *uuid.UUID
+	// ShareCode lets someone else watch this workout live (read-only) via
+	// sharedWorkout/sharedWorkoutProgressUpdated without a friends/follow
+	// system. Only set while the workout is in progress.
+	ShareCode *string
 }
 
 // TemplateExercise is one planned exercise within a WorkoutTemplate, in
@@ -111,9 +115,15 @@ type ExerciseRepository interface {
 }
 
 type WorkoutRepository interface {
+	// Create returns ErrShareCodeTaken if w.ShareCode collides with another
+	// currently-in-progress workout's code — callers should regenerate and
+	// retry rather than treating it as fatal.
 	Create(ctx context.Context, w *Workout) error
 	FindByID(ctx context.Context, id uuid.UUID) (*Workout, error)
 	FindActiveForUser(ctx context.Context, userID uuid.UUID) (*Workout, error)
+	// FindByShareCode only ever returns an in-progress workout — a finished
+	// workout's code is no longer resolvable, even if reused by a new one.
+	FindByShareCode(ctx context.Context, code string) (*Workout, error)
 	Finish(ctx context.Context, id uuid.UUID, endedAt time.Time, notes string) error
 	// ListForUser uses keyset (cursor) pagination on (started_at, id) rather
 	// than OFFSET, so page N stays cheap regardless of how far in the user

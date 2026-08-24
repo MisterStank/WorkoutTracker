@@ -7,8 +7,15 @@ import 'workout_provider.dart';
 /// Search-and-pick screen; pops with the selected Exercise, or null if the
 /// user backs out. Surfaces recently-used exercises first so logging the
 /// next set of an ongoing workout doesn't require typing a search every time.
+///
+/// When [multiSelect] is true, tapping a row toggles a checkbox instead of
+/// popping immediately; a "Done" action pops with a `List<Exercise>` (2+
+/// required) instead of a single `Exercise` — used for grouping an ad-hoc
+/// mid-workout superset.
 class ExercisePickerScreen extends ConsumerStatefulWidget {
-  const ExercisePickerScreen({super.key});
+  const ExercisePickerScreen({super.key, this.multiSelect = false});
+
+  final bool multiSelect;
 
   @override
   ConsumerState<ExercisePickerScreen> createState() => _ExercisePickerScreenState();
@@ -20,6 +27,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   bool _loading = true;
   String? _error;
   bool _searching = false;
+  final Map<String, Exercise> _selected = {};
 
   @override
   void initState() {
@@ -48,8 +56,24 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
   }
 
   void _select(Exercise exercise) {
+    if (widget.multiSelect) {
+      setState(() {
+        if (_selected.remove(exercise.id) == null) {
+          _selected[exercise.id] = exercise;
+        }
+      });
+      return;
+    }
     ref.read(recentExerciseIdsProvider.notifier).recordUse(exercise.id);
     Navigator.of(context).pop(exercise);
+  }
+
+  void _confirmMultiSelect() {
+    if (_selected.length < 2) return;
+    for (final e in _selected.values) {
+      ref.read(recentExerciseIdsProvider.notifier).recordUse(e.id);
+    }
+    Navigator.of(context).pop(_selected.values.toList());
   }
 
   @override
@@ -78,6 +102,17 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
           cursorColor: Colors.white,
           onChanged: _search,
         ),
+        actions: widget.multiSelect
+            ? [
+                TextButton(
+                  onPressed: _selected.length >= 2 ? _confirmMultiSelect : null,
+                  child: Text(
+                    'Done (${_selected.length})',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ]
+            : null,
       ),
       body: Builder(builder: (context) {
         if (_loading) return const Center(child: CircularProgressIndicator());
@@ -90,11 +125,19 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
           children: [
             if (!_searching && recentExercises.isNotEmpty) ...[
               const _SectionHeader('Recent'),
-              ...recentExercises.map((e) => _ExerciseTile(exercise: e, onTap: () => _select(e))),
+              ...recentExercises.map((e) => _ExerciseTile(
+                    exercise: e,
+                    onTap: () => _select(e),
+                    selected: widget.multiSelect ? _selected.containsKey(e.id) : null,
+                  )),
               const Divider(height: 24),
               const _SectionHeader('All exercises'),
             ],
-            ..._exercises.map((e) => _ExerciseTile(exercise: e, onTap: () => _select(e))),
+            ..._exercises.map((e) => _ExerciseTile(
+                  exercise: e,
+                  onTap: () => _select(e),
+                  selected: widget.multiSelect ? _selected.containsKey(e.id) : null,
+                )),
           ],
         );
       }),
@@ -124,10 +167,12 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _ExerciseTile extends StatelessWidget {
-  const _ExerciseTile({required this.exercise, required this.onTap});
+  const _ExerciseTile({required this.exercise, required this.onTap, this.selected});
 
   final Exercise exercise;
   final VoidCallback onTap;
+  // Null when not in multi-select mode (plain chevron row).
+  final bool? selected;
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +183,13 @@ class _ExerciseTile extends StatelessWidget {
       ),
       title: Text(exercise.name),
       subtitle: Text(exercise.category),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: selected == null
+          ? const Icon(Icons.chevron_right)
+          : Icon(
+              selected! ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: selected! ? Theme.of(context).colorScheme.primary : null,
+            ),
+      selected: selected ?? false,
       onTap: onTap,
     );
   }

@@ -5,6 +5,7 @@ import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import '../workout/exercise_picker_screen.dart';
 import '../workout/workout_models.dart';
+import '../workout/workout_provider.dart';
 import 'analytics_models.dart';
 import 'analytics_provider.dart';
 import 'progress_chart.dart';
@@ -88,6 +89,7 @@ class _ExerciseProgressTab extends ConsumerStatefulWidget {
 class _ExerciseProgressTabState extends ConsumerState<_ExerciseProgressTab> {
   Exercise? _selected;
   Future<List<ProgressPoint>>? _future;
+  Future<PlateauStatus>? _plateauFuture;
 
   Future<void> _pickExercise() async {
     final exercise = await Navigator.of(context).push<Exercise>(
@@ -97,6 +99,7 @@ class _ExerciseProgressTabState extends ConsumerState<_ExerciseProgressTab> {
     setState(() {
       _selected = exercise;
       _future = ref.read(analyticsRepositoryProvider).progressOverTime(exerciseId: exercise.id, days: 90);
+      _plateauFuture = ref.read(workoutRepositoryProvider).plateauStatus(exercise.id);
     });
   }
 
@@ -112,6 +115,31 @@ class _ExerciseProgressTabState extends ConsumerState<_ExerciseProgressTab> {
             label: Text(_selected == null ? 'Choose an exercise' : _selected!.name),
           ),
         ),
+        if (_plateauFuture != null)
+          FutureBuilder<PlateauStatus>(
+            future: _plateauFuture,
+            builder: (context, snapshot) {
+              final status = snapshot.data;
+              if (status == null || !status.isPlateaued) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.trending_flat, color: Colors.amber.shade900),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(status.message, style: TextStyle(color: Colors.amber.shade900))),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         Expanded(
           child: _future == null
               ? const _EmptyChartHint(message: 'Pick an exercise to see its heaviest weight over time.')

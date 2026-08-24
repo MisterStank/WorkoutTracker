@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../workout/superset_provider.dart';
 import '../workout/workout_provider.dart';
 import 'create_template_screen.dart';
 import 'template_models.dart';
@@ -41,6 +42,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   }
 
   Future<void> _start(WorkoutTemplate template) async {
+    ref.read(activeSupersetsProvider.notifier).reset();
     await ref.read(activeWorkoutProvider.notifier).start(templateId: template.id);
     if (mounted) Navigator.of(context).pop();
   }

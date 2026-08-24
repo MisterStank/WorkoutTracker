@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"fmt"
+	"math"
 	"time"
 
 	"workouttracker/internal/domain"
@@ -76,17 +79,64 @@ func (s *WorkoutService) StartWorkout(ctx context.Context, userID uuid.UUID, tem
 		}
 	}
 
-	w := &domain.Workout{
-		ID:         uuid.New(),
-		UserID:     userID,
-		StartedAt:  time.Now(),
-		Status:     domain.WorkoutInProgress,
-		TemplateID: templateID,
+	// A handful of retries absorbs the rare share-code collision (birthday
+	// paradox over a 6-char code among currently-active workouts is low
+	// odds, but the unique index means we must handle it, not just hope).
+	const maxShareCodeAttempts = 5
+	var w *domain.Workout
+	for attempt := 0; attempt < maxShareCodeAttempts; attempt++ {
+		code, err := generateShareCode()
+		if err != nil {
+			return nil, err
+		}
+		w = &domain.Workout{
+			ID:         uuid.New(),
+			UserID:     userID,
+			StartedAt:  time.Now(),
+			Status:     domain.WorkoutInProgress,
+			TemplateID: templateID,
+			ShareCode:  &code,
+		}
+		err = s.workouts.Create(ctx, w)
+		if err == nil {
+			return w, nil
+		}
+		if !errors.Is(err, domain.ErrShareCodeTaken) {
+			return nil, err
+		}
 	}
-	if err := s.workouts.Create(ctx, w); err != nil {
-		return nil, err
+	return nil, domain.ErrShareCodeTaken
+}
+
+// shareCodeCharset omits visually-ambiguous characters (0/O, 1/I) since the
+// code is meant to be read off one phone and typed into another.
+const shareCodeCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+func generateShareCode() (string, error) {
+	raw := make([]byte, 6)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
 	}
-	return w, nil
+	code := make([]byte, len(raw))
+	for i, b := range raw {
+		code[i] = shareCodeCharset[int(b)%len(shareCodeCharset)]
+	}
+	return string(code), nil
+}
+
+// GetSharedWorkout looks up an in-progress workout by its share code —
+// deliberately no ownership check, since the whole point is letting someone
+// else watch. SetsForSharedWorkout mirrors that: read-only, no ownership
+// check, callable only once you already have the workout ID from the code.
+func (s *WorkoutService) GetSharedWorkout(ctx context.Context, code string) (*domain.Workout, error) {
+	if code == "" {
+		return nil, domain.ErrWorkoutNotFound
+	}
+	return s.workouts.FindByShareCode(ctx, code)
+}
+
+func (s *WorkoutService) SetsForSharedWorkout(ctx context.Context, workoutID uuid.UUID) ([]*domain.WorkoutSet, error) {
+	return s.sets.ListForWorkout(ctx, workoutID)
 }
 
 func (s *WorkoutService) CreateTemplate(ctx context.Context, userID uuid.UUID, name string, exercises []*domain.TemplateExercise) (*domain.WorkoutTemplate, error) {
@@ -248,4 +298,65 @@ func (s *WorkoutService) WorkoutHistory(ctx context.Context, userID uuid.UUID, f
 
 func (s *WorkoutService) PersonalRecords(ctx context.Context, userID uuid.UUID) ([]*domain.PersonalRecord, error) {
 	return s.records.ListForUser(ctx, userID)
+}
+
+// ProgressionSuggestion is a simple RPE-based autoregulation recommendation
+// for the next time this exercise is trained: how hard the last set felt
+// (not just what it weighed) drives whether to push, hold, or back off.
+type ProgressionSuggestion struct {
+	SuggestedWeightKg float64
+	SuggestedReps     int
+	Reasoning         string
+	BasedOnRPE        *float64
+}
+
+// SuggestNextSet implements straightforward RPE-based autoregulation: an
+// easy last set (RPE <= 7) suggests a small increase, a solid one (RPE
+// 7.5-8.5) suggests repeating the weight for another rep or two, and a
+// near-failure one (RPE > 8.5) suggests backing off slightly rather than
+// grinding through another session at the same intensity. Returns nil (not
+// an error) when there's no prior set to base a suggestion on.
+func (s *WorkoutService) SuggestNextSet(ctx context.Context, userID, exerciseID uuid.UUID) (*ProgressionSuggestion, error) {
+	last, err := s.sets.LastForExercise(ctx, userID, exerciseID)
+	if errors.Is(err, domain.ErrWorkoutSetNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if last.RPE == nil {
+		return &ProgressionSuggestion{
+			SuggestedWeightKg: last.WeightKg,
+			SuggestedReps:     last.Reps,
+			Reasoning:         "No RPE logged last time — repeat the same weight, or log RPE next time for a tailored suggestion.",
+		}, nil
+	}
+
+	rpe := *last.RPE
+	var multiplier float64
+	var reasoning string
+	switch {
+	case rpe <= 7.0:
+		multiplier = 1.025
+		reasoning = fmt.Sprintf("Last set felt easy (RPE %.1f) — try a bit heavier.", rpe)
+	case rpe <= 8.5:
+		multiplier = 1.0
+		reasoning = fmt.Sprintf("Solid effort last time (RPE %.1f) — repeat this weight, aim for an extra rep.", rpe)
+	default:
+		multiplier = 0.95
+		reasoning = fmt.Sprintf("Last set was near failure (RPE %.1f) — consider backing off slightly.", rpe)
+	}
+
+	suggested := roundToNearest(last.WeightKg*multiplier, 1.25)
+	return &ProgressionSuggestion{
+		SuggestedWeightKg: suggested,
+		SuggestedReps:     last.Reps,
+		Reasoning:         reasoning,
+		BasedOnRPE:        last.RPE,
+	}, nil
+}
+
+func roundToNearest(value, step float64) float64 {
+	return math.Round(value/step) * step
 }

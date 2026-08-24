@@ -56,11 +56,24 @@ type PersonalRecord struct {
 	WorkoutSetID uuid.UUID `json:"workoutSetId"`
 }
 
+type PlateauStatus struct {
+	IsPlateaued   bool    `json:"isPlateaued"`
+	CurrentBestKg float64 `json:"currentBestKg"`
+	Message       string  `json:"message"`
+}
+
 type ProgressPoint struct {
 	Day         time.Time `json:"day"`
 	TotalVolume float64   `json:"totalVolume"`
 	MaxWeight   float64   `json:"maxWeight"`
 	SetCount    int       `json:"setCount"`
+}
+
+type ProgressionSuggestion struct {
+	SuggestedWeightKg float64  `json:"suggestedWeightKg"`
+	SuggestedReps     int      `json:"suggestedReps"`
+	Reasoning         string   `json:"reasoning"`
+	BasedOnRpe        *float64 `json:"basedOnRpe,omitempty"`
 }
 
 type Query struct {
@@ -101,6 +114,7 @@ type Workout struct {
 	Status     WorkoutStatus `json:"status"`
 	Sets       []*WorkoutSet `json:"sets"`
 	TemplateID *uuid.UUID    `json:"templateId,omitempty"`
+	ShareCode  *string       `json:"shareCode,omitempty"`
 }
 
 type WorkoutConnection struct {

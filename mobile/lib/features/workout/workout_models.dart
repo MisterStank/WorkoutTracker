@@ -87,6 +87,7 @@ class Workout {
     required this.notes,
     required this.sets,
     this.templateId,
+    this.shareCode,
   });
 
   final String id;
@@ -95,6 +96,7 @@ class Workout {
   final String notes;
   final List<WorkoutSet> sets;
   final String? templateId;
+  final String? shareCode;
 
   factory Workout.fromJson(Map<String, dynamic> json) => Workout(
         id: json['id'] as String,
@@ -102,9 +104,45 @@ class Workout {
         status: json['status'] as String,
         notes: json['notes'] as String,
         templateId: json['templateId'] as String?,
+        shareCode: json['shareCode'] as String?,
         sets: (json['sets'] as List<dynamic>)
             .map((s) => WorkoutSet.fromJson(s as Map<String, dynamic>))
             .toList(),
+      );
+}
+
+class ProgressionSuggestion {
+  const ProgressionSuggestion({
+    required this.suggestedWeightKg,
+    required this.suggestedReps,
+    required this.reasoning,
+    this.basedOnRpe,
+  });
+
+  final double suggestedWeightKg;
+  final int suggestedReps;
+  final String reasoning;
+  final double? basedOnRpe;
+
+  factory ProgressionSuggestion.fromJson(Map<String, dynamic> json) => ProgressionSuggestion(
+        suggestedWeightKg: (json['suggestedWeightKg'] as num).toDouble(),
+        suggestedReps: json['suggestedReps'] as int,
+        reasoning: json['reasoning'] as String,
+        basedOnRpe: (json['basedOnRpe'] as num?)?.toDouble(),
+      );
+}
+
+class PlateauStatus {
+  const PlateauStatus({required this.isPlateaued, required this.currentBestKg, required this.message});
+
+  final bool isPlateaued;
+  final double currentBestKg;
+  final String message;
+
+  factory PlateauStatus.fromJson(Map<String, dynamic> json) => PlateauStatus(
+        isPlateaued: json['isPlateaued'] as bool,
+        currentBestKg: (json['currentBestKg'] as num).toDouble(),
+        message: json['message'] as String,
       );
 }
 

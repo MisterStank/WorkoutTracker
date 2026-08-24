@@ -89,6 +89,17 @@ func (f *fakeWorkoutRepo) FindActiveForUser(ctx context.Context, userID uuid.UUI
 	return f.byID[id], nil
 }
 
+func (f *fakeWorkoutRepo) FindByShareCode(ctx context.Context, code string) (*domain.Workout, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, w := range f.byID {
+		if w.ShareCode != nil && *w.ShareCode == code && w.Status == domain.WorkoutInProgress {
+			return w, nil
+		}
+	}
+	return nil, domain.ErrWorkoutNotFound
+}
+
 func (f *fakeWorkoutRepo) Finish(ctx context.Context, id uuid.UUID, endedAt time.Time, notes string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -535,3 +546,84 @@ func TestDeleteTemplateRejectsUnowned(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
+
+func TestStartWorkoutGeneratesShareCode(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newTestWorkoutService()
+	userID := uuid.New()
+
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+	require.NotNil(t, w.ShareCode)
+	assert.Len(t, *w.ShareCode, 6)
+}
+
+func TestSharedWorkoutIsReadableWithoutOwnership(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Squat"}
+	svc, _ := newTestWorkoutService(exercise)
+	owner := uuid.New()
+	viewer := uuid.New()
+
+	w, err := svc.StartWorkout(ctx, owner, nil)
+	require.NoError(t, err)
+	_, err = svc.LogSet(ctx, owner, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+
+	// A non-owner can't reach this workout through the normal owned path...
+	_, err = svc.SetsForWorkout(ctx, viewer, w.ID)
+	assert.ErrorIs(t, err, domain.ErrWorkoutNotOwned)
+
+	// ...but can via its share code, read-only.
+	shared, err := svc.GetSharedWorkout(ctx, *w.ShareCode)
+	require.NoError(t, err)
+	assert.Equal(t, w.ID, shared.ID)
+
+	sets, err := svc.SetsForSharedWorkout(ctx, shared.ID)
+	require.NoError(t, err)
+	assert.Len(t, sets, 1)
+}
+
+func TestGetSharedWorkoutRejectsUnknownCode(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newTestWorkoutService()
+
+	_, err := svc.GetSharedWorkout(ctx, "NOPE12")
+	assert.ErrorIs(t, err, domain.ErrWorkoutNotFound)
+}
+
+func TestSuggestNextSetWithNoHistory(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Bench Press"}
+	svc, _ := newTestWorkoutService(exercise)
+	userID := uuid.New()
+
+	suggestion, err := svc.SuggestNextSet(ctx, userID, exercise.ID)
+	require.NoError(t, err)
+	assert.Nil(t, suggestion, "no prior set means no suggestion, not an error")
+}
+
+func TestSuggestNextSetAutoregulatesByRPE(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Bench Press"}
+	svc, _ := newTestWorkoutService(exercise)
+	userID := uuid.New()
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+
+	easy := 6.5
+	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, &easy, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	suggestion, err := svc.SuggestNextSet(ctx, userID, exercise.ID)
+	require.NoError(t, err)
+	require.NotNil(t, suggestion)
+	assert.Greater(t, suggestion.SuggestedWeightKg, 100.0, "an easy RPE should suggest going heavier")
+
+	hard := 9.5
+	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, &hard, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	suggestion, err = svc.SuggestNextSet(ctx, userID, exercise.ID)
+	require.NoError(t, err)
+	require.NotNil(t, suggestion)
+	assert.Less(t, suggestion.SuggestedWeightKg, 100.0, "a near-failure RPE should suggest backing off")
+}

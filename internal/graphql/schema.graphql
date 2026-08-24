@@ -56,6 +56,9 @@ type Workout {
   status: WorkoutStatus!
   sets: [WorkoutSet!]!
   templateId: UUID
+  # Only meaningful while status is IN_PROGRESS — lets someone else watch
+  # this workout live via sharedWorkout / sharedWorkoutProgressUpdated.
+  shareCode: String
 }
 
 type TemplateExercise {
@@ -124,6 +127,19 @@ type BodyMetric {
   recordedAt: Time!
 }
 
+type ProgressionSuggestion {
+  suggestedWeightKg: Float!
+  suggestedReps: Int!
+  reasoning: String!
+  basedOnRpe: Float
+}
+
+type PlateauStatus {
+  isPlateaued: Boolean!
+  currentBestKg: Float!
+  message: String!
+}
+
 type Query {
   me: User
   exercises(search: String): [Exercise!]!
@@ -136,6 +152,12 @@ type Query {
   progressOverTime(exerciseId: UUID!, days: Int!): [ProgressPoint!]!
   volumeTrend(days: Int!): [ProgressPoint!]!
   bodyMetrics(metricType: String!, days: Int!): [BodyMetric!]!
+
+  progressionSuggestion(exerciseId: UUID!): ProgressionSuggestion
+  plateauStatus(exerciseId: UUID!): PlateauStatus!
+
+  # Read-only view of someone else's in-progress workout via their share code.
+  sharedWorkout(code: String!): Workout
 }
 
 type Mutation {
@@ -158,4 +180,8 @@ type Subscription {
   # Streams every set logged (and any PRs it broke) to anyone watching this
   # workout, backed by Redis pub/sub so it fans out across API instances.
   workoutProgressUpdated(workoutId: UUID!): LogSetResult!
+
+  # Same fan-out, addressed by share code instead of workout ID + ownership
+  # — how a friend watches your workout live.
+  sharedWorkoutProgressUpdated(code: String!): LogSetResult!
 }

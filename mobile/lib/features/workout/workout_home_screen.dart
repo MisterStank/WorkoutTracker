@@ -15,6 +15,8 @@ import '../templates/templates_screen.dart';
 import 'exercise_picker_screen.dart';
 import 'log_set_sheet.dart';
 import 'rest_timer_provider.dart';
+import 'shared_workout_screen.dart';
+import 'superset_provider.dart';
 import 'workout_history_screen.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
@@ -31,20 +33,47 @@ class WorkoutHomeScreen extends ConsumerWidget {
     await _logSetForExercise(context, ref, exercise);
   }
 
+  /// Lets the user pick two or more exercises to alternate between mid-workout
+  /// (an ad-hoc superset, as opposed to one planned in advance via a
+  /// template). Purely client-side bookkeeping — supersetId is attached to
+  /// each logged set automatically from then on for those exercises.
+  Future<void> _groupSuperset(BuildContext context, WidgetRef ref) async {
+    final selected = await Navigator.of(context).push<List<Exercise>>(
+      MaterialPageRoute(builder: (_) => const ExercisePickerScreen(multiSelect: true)),
+    );
+    if (selected == null || selected.length < 2) return;
+    ref.read(activeSupersetsProvider.notifier).group(selected.map((e) => e.id).toList());
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Grouped ${selected.map((e) => e.name).join(' + ')} as a superset')),
+    );
+  }
+
   static Future<void> _logSetForExercise(BuildContext context, WidgetRef ref, Exercise exercise) async {
     final unit = ref.read(weightUnitProvider);
-    final lastSet = await ref.read(workoutRepositoryProvider).lastSetForExercise(exercise.id);
+    final repository = ref.read(workoutRepositoryProvider);
+    final lastSet = await repository.lastSetForExercise(exercise.id);
+    // RPE-based suggestion only makes sense once there's a prior RPE'd set —
+    // failures here (e.g. offline) just fall back to no suggestion.
+    ProgressionSuggestion? suggestion;
+    try {
+      suggestion = await repository.progressionSuggestion(exercise.id);
+    } catch (_) {
+      suggestion = null;
+    }
     if (!context.mounted) return;
 
-    final input = await showLogSetSheet(context, exercise, lastSet: lastSet, unit: unit);
+    final input = await showLogSetSheet(context, exercise, lastSet: lastSet, unit: unit, suggestion: suggestion);
     if (input == null) return;
 
+    final supersetId = ref.read(activeSupersetsProvider.notifier).supersetIdFor(exercise.id);
     await ref.read(activeWorkoutProvider.notifier).logSet(
           exerciseId: exercise.id,
           reps: input.reps,
           weightKg: input.weightKg,
           rpe: input.rpe,
           setType: input.setType,
+          supersetId: supersetId,
         );
     ref.read(restTimerProvider.notifier).start();
   }
@@ -74,6 +103,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
       ),
     );
     if (choice == 'blank') {
+      ref.read(activeSupersetsProvider.notifier).reset();
       await ref.read(activeWorkoutProvider.notifier).start();
     } else if (choice == 'template') {
       if (context.mounted) {
@@ -106,6 +136,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
     );
     if (notes == null) return;
     await ref.read(activeWorkoutProvider.notifier).finish(notes: notes.isEmpty ? null : notes);
+    ref.read(activeSupersetsProvider.notifier).reset();
   }
 
   @override
@@ -124,6 +155,23 @@ class WorkoutHomeScreen extends ConsumerWidget {
           TextButton(
             onPressed: () => ref.read(weightUnitProvider.notifier).toggle(),
             child: Text(unit.label.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+          if (state is ActiveWorkoutInProgress)
+            IconButton(
+              icon: const Icon(Icons.link),
+              tooltip: 'Group as superset',
+              onPressed: () => _groupSuperset(context, ref),
+            ),
+          if (state is ActiveWorkoutInProgress)
+            IconButton(
+              icon: const Icon(Icons.ios_share),
+              tooltip: 'Share this workout',
+              onPressed: () => showShareCodeDialog(context, state.workout.shareCode),
+            ),
+          IconButton(
+            icon: const Icon(Icons.visibility_outlined),
+            tooltip: 'Watch a shared workout',
+            onPressed: () => showJoinSharedWorkoutDialog(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.show_chart),

@@ -23,10 +23,21 @@ Future<LoggedSetInput?> showLogSetSheet(
   Exercise exercise, {
   WorkoutSet? lastSet,
   required WeightUnit unit,
+  ProgressionSuggestion? suggestion,
 }) {
-  final repsController = TextEditingController(text: lastSet == null ? '' : '${lastSet.reps}');
+  final repsController = TextEditingController(
+    text: suggestion != null
+        ? '${suggestion.suggestedReps}'
+        : lastSet == null
+            ? ''
+            : '${lastSet.reps}',
+  );
   final weightController = TextEditingController(
-    text: lastSet == null ? '' : _formatWeight(unit.fromKg(lastSet.weightKg)),
+    text: suggestion != null
+        ? _formatWeight(unit.fromKg(suggestion.suggestedWeightKg))
+        : lastSet == null
+            ? ''
+            : _formatWeight(unit.fromKg(lastSet.weightKg)),
   );
   final rpeController = TextEditingController();
   final formKey = GlobalKey<FormState>();
@@ -84,6 +95,29 @@ Future<LoggedSetInput?> showLogSetSheet(
                   Text(
                     'Last time: ${lastSet.reps} × ${_formatWeight(unit.fromKg(lastSet.weightKg))} ${unit.label}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ],
+                if (suggestion != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.auto_graph, size: 16, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            suggestion.reasoning,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
                 const SizedBox(height: 20),

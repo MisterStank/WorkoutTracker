@@ -169,3 +169,53 @@ func TestLogAndListBodyMetrics(t *testing.T) {
 	require.Len(t, metrics, 1)
 	assert.Equal(t, 82.5, metrics[0].Value)
 }
+
+func TestDetectPlateauWhenNoImprovement(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	rollup := &fakeProgressRollupRepo{exercisePoints: []*domain.ProgressPoint{
+		// prior 3-week window: best 100kg
+		{Day: now.AddDate(0, 0, -35), TotalVolume: 500, MaxWeight: 100, SetCount: 3},
+		{Day: now.AddDate(0, 0, -28), TotalVolume: 500, MaxWeight: 95, SetCount: 3},
+		// recent 3-week window: never beats 100kg, but still trained
+		{Day: now.AddDate(0, 0, -14), TotalVolume: 480, MaxWeight: 97.5, SetCount: 3},
+		{Day: now.AddDate(0, 0, -7), TotalVolume: 480, MaxWeight: 100, SetCount: 3},
+	}}
+	analytics := service.NewAnalyticsService(rollup, &fakeBodyMetricRepo{}, newFakeAnalyticsCache())
+
+	status, err := analytics.DetectPlateau(ctx, uuid.New(), uuid.New())
+	require.NoError(t, err)
+	assert.True(t, status.IsPlateaued)
+	assert.Equal(t, 100.0, status.CurrentBestKg)
+}
+
+func TestDetectPlateauWhenImproving(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	rollup := &fakeProgressRollupRepo{exercisePoints: []*domain.ProgressPoint{
+		{Day: now.AddDate(0, 0, -35), TotalVolume: 500, MaxWeight: 100, SetCount: 3},
+		{Day: now.AddDate(0, 0, -14), TotalVolume: 500, MaxWeight: 105, SetCount: 3},
+		{Day: now.AddDate(0, 0, -7), TotalVolume: 500, MaxWeight: 110, SetCount: 3},
+	}}
+	analytics := service.NewAnalyticsService(rollup, &fakeBodyMetricRepo{}, newFakeAnalyticsCache())
+
+	status, err := analytics.DetectPlateau(ctx, uuid.New(), uuid.New())
+	require.NoError(t, err)
+	assert.False(t, status.IsPlateaued)
+	assert.Equal(t, 110.0, status.CurrentBestKg)
+}
+
+func TestDetectPlateauNotEnoughRecentData(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	rollup := &fakeProgressRollupRepo{exercisePoints: []*domain.ProgressPoint{
+		{Day: now.AddDate(0, 0, -35), TotalVolume: 500, MaxWeight: 100, SetCount: 3},
+		// Only one recent session — not enough to call it a plateau either way.
+		{Day: now.AddDate(0, 0, -7), TotalVolume: 100, MaxWeight: 90, SetCount: 1},
+	}}
+	analytics := service.NewAnalyticsService(rollup, &fakeBodyMetricRepo{}, newFakeAnalyticsCache())
+
+	status, err := analytics.DetectPlateau(ctx, uuid.New(), uuid.New())
+	require.NoError(t, err)
+	assert.False(t, status.IsPlateaued)
+}

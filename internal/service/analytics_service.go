@@ -128,3 +128,55 @@ func (s *AnalyticsService) BodyMetrics(ctx context.Context, userID uuid.UUID, me
 	}
 	return s.bodyMetrics.ListForUser(ctx, userID, metricType, since)
 }
+
+const plateauWindowDays = 21 // 3 weeks
+
+type PlateauStatus struct {
+	IsPlateaued   bool
+	CurrentBestKg float64
+	Message       string
+}
+
+// DetectPlateau compares the heaviest weight lifted in the last 3 weeks
+// against the 3 weeks before that. A plateau is flagged only if the
+// exercise was actually trained at least twice in the recent window and
+// didn't beat the prior window — training too rarely to have a real
+// comparison isn't the same thing as stalling.
+func (s *AnalyticsService) DetectPlateau(ctx context.Context, userID, exerciseID uuid.UUID) (*PlateauStatus, error) {
+	points, err := s.ProgressOverTime(ctx, userID, exerciseID, 2*plateauWindowDays)
+	if err != nil {
+		return nil, err
+	}
+	if len(points) == 0 {
+		return &PlateauStatus{Message: "Not enough history yet to tell."}, nil
+	}
+
+	now := time.Now()
+	recentCutoff := now.AddDate(0, 0, -plateauWindowDays)
+
+	var recentBest, priorBest, overallBest float64
+	var recentSets int
+	for _, p := range points {
+		if p.MaxWeight > overallBest {
+			overallBest = p.MaxWeight
+		}
+		if p.Day.After(recentCutoff) {
+			recentSets += p.SetCount
+			if p.MaxWeight > recentBest {
+				recentBest = p.MaxWeight
+			}
+		} else if p.MaxWeight > priorBest {
+			priorBest = p.MaxWeight
+		}
+	}
+
+	plateaued := recentSets >= 2 && priorBest > 0 && recentBest <= priorBest
+	message := fmt.Sprintf("Still progressing — current best is %.1fkg.", overallBest)
+	if plateaued {
+		message = fmt.Sprintf("No new best in the last 3 weeks (still %.1fkg) — consider a deload or an exercise variation.", overallBest)
+	} else if recentSets < 2 {
+		message = "Not trained enough recently to tell."
+	}
+
+	return &PlateauStatus{IsPlateaued: plateaued, CurrentBestKg: overallBest, Message: message}, nil
+}
