@@ -9,11 +9,12 @@ Everything the app does, and how to use it. Covers the mobile app end to end, in
 3. [Logging a set](#3-logging-a-set)
 4. [Supersets](#4-supersets)
 5. [Templates](#5-templates)
-6. [Offline logging](#6-offline-logging)
-7. [Progress & records](#7-progress--records)
-8. [Coaching signals](#8-coaching-signals)
-9. [Live sharing](#9-live-sharing)
-10. [Units & settings](#10-units--settings)
+6. [Personalized programs](#6-personalized-programs)
+7. [Offline logging](#7-offline-logging)
+8. [Progress & records](#8-progress--records)
+9. [Coaching signals](#9-coaching-signals)
+10. [Sharing your stats](#10-sharing-your-stats)
+11. [Units & settings](#11-units--settings)
 
 ## 1. Getting started
 
@@ -32,18 +33,20 @@ The app has four main tabs at the bottom of the screen — **Home**, **History**
 From the **Home** tab, tap **Start workout**. You'll be asked to choose:
 
 - **Blank workout** — starts immediately with nothing planned. Add exercises as you go — the natural choice if you're training by feel today.
-- **From a template** — opens your saved templates. Pick one and the app pre-loads its exercises as a checklist you tap through as you train.
+- **From a template** — opens your saved templates. Pick one and the app pre-loads every planned exercise as its own card, ready to log against — no need to add anything before you start.
 
 Once a workout is running, the top bar shows a live elapsed-time clock and your set count for the session. Only one workout can be active at a time — finishing or starting a new one closes out the last.
+
+**Jumping back in**: if you switch to another tab mid-workout, a slim bar appears above the bottom navigation showing your elapsed time and set count. Tap it from anywhere in the app to return straight to your active workout.
 
 **Finishing up**: tap **Finish workout** at the bottom of the screen. You can add optional notes about how the session went before confirming — these are saved with the workout and visible later in your history.
 
 ## 3. Logging a set
 
-Tap **Log set** (the floating button on an active workout) and search for an exercise, or tap one already on screen — either a planned exercise chip or an exercise card you've already started. This opens the set sheet:
+Tap **Log set** (the floating button on an active workout) and search for an exercise, or tap one already on screen — either a planned exercise chip or an exercise card. For a template-based workout, every planned exercise already has a card waiting, even before you've logged anything against it — tap **Add set** on an empty card to get started. Tapping either opens the set sheet:
 
 1. Enter **reps** and **weight**. If you've done this exercise before, both fields pre-fill with your last set — you'll usually just need to confirm or tweak them.
-2. Optionally log **RPE** (rate of perceived exertion, 1–10) — how hard that set felt. This is what powers the coaching suggestions in [Chapter 8](#8-coaching-signals).
+2. Optionally log **RPE** (rate of perceived exertion, 1–10) — how hard that set felt. This is what powers the coaching suggestions in [Chapter 9](#9-coaching-signals).
 3. Choose a **set type**, then tap **Log set**.
 
 ### Set types
@@ -55,7 +58,7 @@ Tap **Log set** (the floating button on an active workout) and search for an exe
 | Drop set | Reduced weight, continued past failure. | Yes |
 | Failure | Taken to muscular failure. | Yes |
 
-Every logged set beyond a warm-up is checked against your history for three kinds of personal record: heaviest weight, best single-set volume (weight × reps), and estimated one-rep max. Beat one and a gold banner appears above your set list naming which record fell.
+Every logged set beyond a warm-up is checked against your history for three kinds of personal record: heaviest weight, best single-set volume (weight × reps), and estimated one-rep max. Beat one and a gold banner appears above your set list naming which record fell — tap the share icon on that banner to post it, see [Chapter 10](#10-sharing-your-stats).
 
 **Plate calculator**: tap the calculator icon in the set sheet to see which plates to load per side of the bar for the weight you've entered — useful mid-set when doing the arithmetic in your head is the last thing you want to do.
 
@@ -79,23 +82,38 @@ A linked-set icon appears next to any set that's part of a superset, so you can 
 Open the **Templates** tab to see everything you've saved. From here:
 
 - **Create one** — tap **New template**, name it, and add exercises with a target set count each. Group any of them into supersets as you go.
+- **Generate a program** — tap the sparkle icon to build a whole set of templates automatically instead of one at a time — see [Chapter 6](#6-personalized-programs).
 - **Start from one** — tap a template to launch a workout pre-loaded with its exercise list.
 - **Delete one** — swipe or use the delete action on a template you no longer use. This doesn't touch any workouts you've already logged from it.
 
-Once a template-based workout is running, its planned exercises appear as a row of chips up top — each shows your progress toward the target set count and turns green when complete, so you always know what's left.
+Once a template-based workout is running, its planned exercises appear both as a row of progress chips up top and as a full card each further down — see [Chapter 2](#2-starting-a-workout).
 
-## 6. Offline logging
+## 6. Personalized programs
+
+Don't want to build templates by hand? Tap the sparkle icon on the **Templates** tab to generate a full multi-day training split from a short questionnaire:
+
+1. **Goal** — strength, hypertrophy, fat loss, or general fitness. This drives the sets, reps, and exercise selection for every day.
+2. **Experience level** — beginner, intermediate, or advanced.
+3. **Days per week** — how many days you can train, from 1 to 6. This decides the split itself: fewer days lean toward full-body sessions, more days split into upper/lower or push/pull/legs.
+4. **Equipment access** — barbell, dumbbell, bodyweight, cable, machine, or any combination. Only exercises you can actually perform are selected.
+5. **Areas to avoid** — any muscle groups to leave out entirely, for working around an injury or a personal preference.
+
+Tap **Generate** and the app builds a named, multi-day program — for example a 4-day Upper/Lower split — with each day saved as its own template under **Templates**, ready to start a workout from exactly like any template you built by hand. If your equipment or avoid-list is restrictive enough that a day can't be filled for a particular muscle group, the program still generates with a note explaining what was skipped, rather than failing outright.
+
+Your answers are remembered — reopening the generator next time pre-fills your last profile, so tweaking and regenerating is quick.
+
+## 7. Offline logging
 
 If a set fails to save because you've got no connection, it isn't lost — it's queued on your device and shown immediately with a small cloud-off icon so you know it hasn't synced yet. The app keeps checking for connectivity in the background and pushes every queued set the moment it's back, swapping the placeholder for the confirmed, PR-checked result automatically.
 
 > Nothing to do here. Log sets exactly as normal, connected or not — the queue and retry are automatic.
 
-## 7. Progress & records
+## 8. Progress & records
 
 Open the **Progress** tab. It has three sub-tabs of its own:
 
 - **Volume** — total weight moved per day across all exercises, over the last 90 days — the highest-level view of whether you're training more or less than you used to.
-- **By exercise** — pick any exercise to chart your heaviest set over time. If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 8](#8-coaching-signals).
+- **By exercise** — pick any exercise to chart your heaviest set over time. If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 9](#9-coaching-signals).
 - **Measurements** — track body weight and five circumference measurements — waist, chest, arms, thighs, hips — each on its own chart. Choose a measurement from the dropdown, tap **Log**, and enter today's reading.
 
 Personal records are tracked per exercise across three categories — heaviest weight, best volume, and estimated one-rep max — and surface automatically as the gold banner described in [Chapter 3](#3-logging-a-set), not as a separate screen you have to check.
@@ -104,7 +122,7 @@ Each entry in the **History** tab also shows that session's total volume, so you
 
 **Deleting a workout**: swipe a card left in the **History** tab and confirm to remove the entire session, including its sets. This can't be undone.
 
-## 8. Coaching signals
+## 9. Coaching signals
 
 ### Next-set suggestions
 
@@ -120,18 +138,18 @@ No RPE logged yet for that exercise? The sheet just pre-fills your last set with
 
 ### Plateau notices
 
-> **No new best in three weeks.** The [By exercise](#7-progress--records) tab shows a banner like this only when you've genuinely trained that lift at least twice recently without progressing — not simply because you haven't touched it lately. Take it as a cue to deload, change rep ranges, or swap in a variation.
+> **No new best in three weeks.** The [By exercise](#8-progress--records) tab shows a banner like this only when you've genuinely trained that lift at least twice recently without progressing — not simply because you haven't touched it lately. Take it as a cue to deload, change rep ranges, or swap in a variation.
 
-## 9. Live sharing
+## 10. Sharing your stats
 
-Let someone watch your session as you log it — no account link-up required.
+WorkoutTracker doesn't do live workout sharing — instead, you get a shareable image any time you hit a milestone worth showing off:
 
-- **Share your workout** — while a workout is active, tap the share icon in the top bar. A six-character code appears — read it out or send it to whoever you want watching.
-- **Watch someone else's** — tap the eye icon, enter the code you were given, and tap **Watch**. Their sets appear live as they log them, for the rest of that session.
+- **A new personal record**: when the gold PR banner appears (see [Chapter 3](#3-logging-a-set)), tap its share icon to preview a card with the exercise, the record you hit, and the new value.
+- **A finished workout**: after tapping **Finish workout**, a **Share** action appears alongside the confirmation — it opens a card summarizing that session's total sets, volume, duration, and exercise list.
 
-The view is read-only and expires with the workout: once it's finished, the code stops working. There's no separate follower or friends list — the code itself is the invitation.
+Either way, you get a preview first — nothing goes out until you tap **Share** on the preview, which hands the image to your device's normal share sheet so you can post it wherever you like (Instagram, messages, etc.). Both cards render with the same fixed dark red-and-black look regardless of your app theme, so the image looks consistent no matter which theme you're using.
 
-## 10. Units & settings
+## 11. Units & settings
 
 Tap the **KG** / **LB** label in the Home tab's top bar to switch your preferred weight unit. This changes how weight is displayed and entered across the entire app — set logging, history, progress charts, and body weight — in one place. Everything is still stored in kilograms behind the scenes, so switching back and forth never loses precision.
 
