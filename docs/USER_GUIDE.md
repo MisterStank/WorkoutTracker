@@ -23,11 +23,13 @@ Create an account with your email, a password, and a display name. Once you're i
 2. Enter your email, a password, and the name you want to appear in the app.
 3. You're dropped straight into the home screen — no separate verification step.
 
-Already have an account? Use **Log in** instead. To sign out at any time, tap the logout icon in the top-right of the home screen.
+Already have an account? Use **Log in** instead. To sign out at any time, open the **⋮** menu on the Home tab and tap **Log out**.
+
+The app has four main tabs at the bottom of the screen — **Home**, **History**, **Templates**, and **Progress** — everything below is organized around them.
 
 ## 2. Starting a workout
 
-From the home screen, tap **Start workout**. You'll be asked to choose:
+From the **Home** tab, tap **Start workout**. You'll be asked to choose:
 
 - **Blank workout** — starts immediately with nothing planned. Add exercises as you go — the natural choice if you're training by feel today.
 - **From a template** — opens your saved templates. Pick one and the app pre-loads its exercises as a checklist you tap through as you train.
@@ -72,7 +74,7 @@ A linked-set icon appears next to any set that's part of a superset, so you can 
 
 ## 5. Templates
 
-Open **Templates** from the home screen's top bar to see everything you've saved. From here:
+Open the **Templates** tab to see everything you've saved. From here:
 
 - **Create one** — tap **New template**, name it, and add exercises with a target set count each. Group any of them into supersets as you go.
 - **Start from one** — tap a template to launch a workout pre-loaded with its exercise list.
@@ -88,13 +90,15 @@ If a set fails to save because you've got no connection, it isn't lost — it's 
 
 ## 7. Progress & records
 
-Reached from the chart icon in the top bar. Three tabs:
+Open the **Progress** tab. It has three sub-tabs of its own:
 
 - **Volume** — total weight moved per day across all exercises, over the last 90 days — the highest-level view of whether you're training more or less than you used to.
 - **By exercise** — pick any exercise to chart your heaviest set over time. If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 8](#8-coaching-signals).
 - **Measurements** — track body weight and five circumference measurements — waist, chest, arms, thighs, hips — each on its own chart. Choose a measurement from the dropdown, tap **Log**, and enter today's reading.
 
 Personal records are tracked per exercise across three categories — heaviest weight, best volume, and estimated one-rep max — and surface automatically as the gold banner described in [Chapter 3](#3-logging-a-set), not as a separate screen you have to check.
+
+Each entry in the **History** tab also shows that session's total volume, so you don't need to open a workout to see roughly how much work it was.
 
 ## 8. Coaching signals
 
@@ -125,7 +129,9 @@ The view is read-only and expires with the workout: once it's finished, the code
 
 ## 10. Units & settings
 
-Tap the **KG** / **LB** label in the home screen's top bar to switch your preferred weight unit. This changes how weight is displayed and entered across the entire app — set logging, history, progress charts, and body weight — in one place. Everything is still stored in kilograms behind the scenes, so switching back and forth never loses precision.
+Tap the **KG** / **LB** label in the Home tab's top bar to switch your preferred weight unit. This changes how weight is displayed and entered across the entire app — set logging, history, progress charts, and body weight — in one place. Everything is still stored in kilograms behind the scenes, so switching back and forth never loses precision.
+
+**Theme**: open the **⋮** menu on the Home tab and choose **System**, **Light**, or **Dark** — System follows your device's setting, and your choice is remembered.
 
 ---
 
