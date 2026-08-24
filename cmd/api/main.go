@@ -67,17 +67,18 @@ func main() {
 	programService := service.NewProgramService(fitnessProfileRepo, programRepo, exerciseRepo, workoutService)
 
 	resolver := &graphql.Resolver{Auth: authService, Workout: workoutService, Analytics: analyticsService, Program: programService, Events: eventBus}
-	gqlHandler := newGraphQLServer(resolver, tokens)
+	gqlHandler := newGraphQLServer(resolver, tokens, cfg.AllowedOrigins)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
-	// Flutter web's dev server runs on a random localhost port each run, so
-	// the origin can't be pinned to one value in local development.
+	// Origins are configurable via ALLOWED_ORIGINS (defaults to local-dev
+	// patterns) since Flutter web's dev server runs on a random localhost
+	// port each run, and production needs the real deployed web origin.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*"},
+		AllowedOrigins:   cfg.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowCredentials: false,
@@ -99,19 +100,21 @@ func main() {
 
 // newGraphQLServer replicates gqlgenhandler.NewDefaultServer's transport
 // setup but with a custom Websocket transport: OriginPatterns matching the
-// same local-dev origins as the HTTP CORS policy (browsers don't apply CORS
-// to WebSocket upgrades, but gqlgen's coder/websocket backend does its own
+// same origins as the HTTP CORS policy (browsers don't apply CORS to
+// WebSocket upgrades, but gqlgen's coder/websocket backend does its own
 // origin check), and an InitFunc that authenticates the subscription from
 // the connection_init payload — a WS handshake can't carry a normal
 // Authorization header the way the HTTP transport's auth middleware expects.
-func newGraphQLServer(resolver *graphql.Resolver, tokens *service.TokenIssuer) *handler.Server {
+func newGraphQLServer(resolver *graphql.Resolver, tokens *service.TokenIssuer, allowedOrigins []string) *handler.Server {
 	srv := handler.New(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))
 
 	srv.AddTransport(transport.Websocket{
 		KeepAlivePingInterval: 10 * time.Second,
 		Implementation: transport.CoderWebsocketImplementation{
 			AcceptOptions: coderws.AcceptOptions{
-				OriginPatterns: []string{"localhost:*", "127.0.0.1:*"},
+				// coder/websocket's OriginPatterns are host:port globs, not
+				// full URLs — strip the scheme CORS origins carry.
+				OriginPatterns: stripSchemes(allowedOrigins),
 			},
 		},
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
@@ -140,4 +143,17 @@ func newGraphQLServer(resolver *graphql.Resolver, tokens *service.TokenIssuer) *
 	})
 
 	return srv
+}
+
+// stripSchemes converts CORS-style origins ("https://example.com") into the
+// host:port glob patterns coder/websocket's OriginPatterns expects
+// ("example.com"), leaving already-bare patterns untouched.
+func stripSchemes(origins []string) []string {
+	out := make([]string, len(origins))
+	for i, o := range origins {
+		o = strings.TrimPrefix(o, "http://")
+		o = strings.TrimPrefix(o, "https://")
+		out[i] = o
+	}
+	return out
 }

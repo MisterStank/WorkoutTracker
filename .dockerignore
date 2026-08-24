@@ -1,0 +1,11 @@
+.git
+.github
+mobile
+docs
+migrations
+*.md
+.env
+.env.*
+!.env.example
+docker-compose*.yml
+fly.toml
