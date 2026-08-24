@@ -10,7 +10,8 @@ Architecture and phased roadmap: see `PLAN.md`. For what the app does and how to
 - **Backend**: Go, gqlgen (GraphQL), sqlc, pgx
 - **Database**: Postgres
 - **Cache / pub-sub**: Redis
-- **CI/CD**: GitHub Actions → GHCR → Fly.io
+- **CI/CD**: GitHub Actions (lint/test) → Render (auto-deploy on push to `main`)
+- **Hosting**: Render (API + Postgres + Redis + web bundle) — see `DEPLOYMENT.md`
 
 ## Backend — local development
 
