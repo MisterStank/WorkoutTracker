@@ -17,32 +17,40 @@ class LoggedSetInput {
 /// Bottom sheet for entering reps/weight/RPE/set-type once an exercise has
 /// been picked. If [lastSet] is given (the user's most recent set for this
 /// exercise), the form pre-fills with those values — the single biggest
-/// speed win for logging sets back-to-back in the gym. Pops with a
+/// speed win for logging sets back-to-back in the gym. If [editing] is
+/// given instead, the form pre-fills with that set's own values and the
+/// sheet becomes a correction ("Save changes") rather than a new log entry
+/// — [lastSet]/[suggestion] are ignored when editing. Pops with a
 /// LoggedSetInput, or null if cancelled.
 Future<LoggedSetInput?> showLogSetSheet(
   BuildContext context,
   Exercise exercise, {
   WorkoutSet? lastSet,
+  WorkoutSet? editing,
   required WeightUnit unit,
   ProgressionSuggestion? suggestion,
 }) {
   final repsController = TextEditingController(
-    text: suggestion != null
-        ? '${suggestion.suggestedReps}'
-        : lastSet == null
-            ? ''
-            : '${lastSet.reps}',
+    text: editing != null
+        ? '${editing.reps}'
+        : suggestion != null
+            ? '${suggestion.suggestedReps}'
+            : lastSet == null
+                ? ''
+                : '${lastSet.reps}',
   );
   final weightController = TextEditingController(
-    text: suggestion != null
-        ? _formatWeight(unit.fromKg(suggestion.suggestedWeightKg))
-        : lastSet == null
-            ? ''
-            : _formatWeight(unit.fromKg(lastSet.weightKg)),
+    text: editing != null
+        ? _formatWeight(unit.fromKg(editing.weightKg))
+        : suggestion != null
+            ? _formatWeight(unit.fromKg(suggestion.suggestedWeightKg))
+            : lastSet == null
+                ? ''
+                : _formatWeight(unit.fromKg(lastSet.weightKg)),
   );
-  final rpeController = TextEditingController();
+  final rpeController = TextEditingController(text: editing?.rpe == null ? '' : '${editing!.rpe}');
   final formKey = GlobalKey<FormState>();
-  SetType setType = SetType.normal;
+  SetType setType = editing?.setType ?? SetType.normal;
 
   return showModalBottomSheet<LoggedSetInput>(
     context: context,
@@ -91,14 +99,14 @@ Future<LoggedSetInput?> showLogSetSheet(
                     ),
                   ],
                 ),
-                if (lastSet != null) ...[
+                if (editing == null && lastSet != null) ...[
                   const SizedBox(height: 6),
                   Text(
                     'Last time: ${lastSet.reps} × ${_formatWeight(unit.fromKg(lastSet.weightKg))} ${unit.label}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
-                if (suggestion != null) ...[
+                if (editing == null && suggestion != null) ...[
                   const SizedBox(height: 8),
                   SemanticBanner.info(context, message: suggestion.reasoning, icon: Icons.auto_graph),
                 ],
@@ -169,7 +177,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                     ));
                   },
                   icon: const Icon(Icons.check),
-                  label: const Text('Log set'),
+                  label: Text(editing == null ? 'Log set' : 'Save changes'),
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
                 ),
               ],

@@ -24,6 +24,7 @@ import 'workout_provider.dart';
 import 'workout_state.dart';
 
 enum _OverflowAction { themeSystem, themeLight, themeDark, logout }
+enum _SetAction { edit, delete }
 
 class WorkoutHomeScreen extends ConsumerWidget {
   const WorkoutHomeScreen({super.key});
@@ -79,6 +80,39 @@ class WorkoutHomeScreen extends ConsumerWidget {
           supersetId: supersetId,
         );
     ref.read(restTimerProvider.notifier).start();
+  }
+
+  static Future<void> _editSet(BuildContext context, WidgetRef ref, Exercise exercise, WorkoutSet set) async {
+    final unit = ref.read(weightUnitProvider);
+    final input = await showLogSetSheet(context, exercise, editing: set, unit: unit);
+    if (input == null) return;
+    await ref.read(activeWorkoutProvider.notifier).editSet(
+          setId: set.id,
+          reps: input.reps,
+          weightKg: input.weightKg,
+          rpe: input.rpe,
+          setType: input.setType,
+        );
+  }
+
+  static Future<void> _deleteSet(BuildContext context, WidgetRef ref, WorkoutSet set) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete set?'),
+        content: Text('This removes set ${set.setNumber} — ${set.reps} reps × ${set.weightKg.toStringAsFixed(set.weightKg.truncateToDouble() == set.weightKg ? 0 : 1)} kg.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(activeWorkoutProvider.notifier).deleteSet(set.id);
   }
 
   Future<void> _startWorkout(BuildContext context, WidgetRef ref) async {
@@ -356,6 +390,8 @@ class _ActiveWorkoutView extends ConsumerWidget {
                             );
                         ref.read(restTimerProvider.notifier).start();
                       },
+                      onEditSet: exercise == null ? (_) {} : (set) => WorkoutHomeScreen._editSet(context, ref, exercise, set),
+                      onDeleteSet: (set) => WorkoutHomeScreen._deleteSet(context, ref, set),
                     );
                   }).toList(),
                 ),
@@ -543,12 +579,21 @@ class _RestTimerBanner extends ConsumerWidget {
 }
 
 class _ExerciseGroupCard extends StatelessWidget {
-  const _ExerciseGroupCard({required this.exerciseName, required this.sets, required this.unit, required this.onRepeatLast});
+  const _ExerciseGroupCard({
+    required this.exerciseName,
+    required this.sets,
+    required this.unit,
+    required this.onRepeatLast,
+    required this.onEditSet,
+    required this.onDeleteSet,
+  });
 
   final String exerciseName;
   final List<WorkoutSet> sets;
   final WeightUnit unit;
   final VoidCallback onRepeatLast;
+  final void Function(WorkoutSet set) onEditSet;
+  final void Function(WorkoutSet set) onDeleteSet;
 
   @override
   Widget build(BuildContext context) {
@@ -623,6 +668,24 @@ class _ExerciseGroupCard extends StatelessWidget {
                         child: Icon(Icons.cloud_off, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ],
+                    const Spacer(),
+                    if (!set.isPending)
+                      PopupMenuButton<_SetAction>(
+                        icon: Icon(Icons.more_vert, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        padding: EdgeInsets.zero,
+                        onSelected: (action) {
+                          switch (action) {
+                            case _SetAction.edit:
+                              onEditSet(set);
+                            case _SetAction.delete:
+                              onDeleteSet(set);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: _SetAction.edit, child: Text('Edit')),
+                          PopupMenuItem(value: _SetAction.delete, child: Text('Delete')),
+                        ],
+                      ),
                   ],
                 ),
               );

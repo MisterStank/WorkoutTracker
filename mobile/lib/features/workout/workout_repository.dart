@@ -113,6 +113,58 @@ class WorkoutRepository {
     return LogSetResult(set: WorkoutSet.fromJson(payload['set'] as Map<String, dynamic>), newRecords: newRecords);
   }
 
+  /// Corrects a mis-logged set's reps/weight/RPE/type after the fact.
+  Future<WorkoutSet> updateSet({
+    required String setId,
+    required int reps,
+    required double weightKg,
+    double? rpe,
+    SetType setType = SetType.normal,
+  }) async {
+    final result = await _client.mutate(MutationOptions(
+      document: gql('''
+        mutation UpdateSet(\$setId: UUID!, \$reps: Int!, \$weightKg: Float!, \$rpe: Float, \$setType: SetType) {
+          updateSet(setId: \$setId, reps: \$reps, weightKg: \$weightKg, rpe: \$rpe, setType: \$setType) {
+            id exerciseId setNumber reps weightKg rpe setType supersetId performedAt
+          }
+        }
+      '''),
+      variables: {
+        'setId': setId,
+        'reps': reps,
+        'weightKg': weightKg,
+        'rpe': rpe,
+        'setType': setType.graphQLValue,
+      },
+    ));
+    if (result.hasException) throw Exception(result.exception.toString());
+    return WorkoutSet.fromJson(result.data!['updateSet'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteSet(String setId) async {
+    final result = await _client.mutate(MutationOptions(
+      document: gql('''
+        mutation DeleteSet(\$setId: UUID!) {
+          deleteSet(setId: \$setId)
+        }
+      '''),
+      variables: {'setId': setId},
+    ));
+    if (result.hasException) throw Exception(result.exception.toString());
+  }
+
+  Future<void> deleteWorkout(String workoutId) async {
+    final result = await _client.mutate(MutationOptions(
+      document: gql('''
+        mutation DeleteWorkout(\$workoutId: UUID!) {
+          deleteWorkout(workoutId: \$workoutId)
+        }
+      '''),
+      variables: {'workoutId': workoutId},
+    ));
+    if (result.hasException) throw Exception(result.exception.toString());
+  }
+
   /// Fetches the most recent set logged for this exercise (any workout), to
   /// pre-fill the log-set form with what the user did last time — the
   /// single biggest speed win for logging sets in the gym.

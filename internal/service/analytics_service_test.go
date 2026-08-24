@@ -43,6 +43,10 @@ func (f *fakeProgressRollupRepo) RangeForUser(ctx context.Context, userID uuid.U
 	return f.userPoints, nil
 }
 
+func (f *fakeProgressRollupRepo) RecomputeDay(ctx context.Context, userID, exerciseID uuid.UUID, day time.Time) error {
+	return nil
+}
+
 type fakeBodyMetricRepo struct {
 	mu      sync.Mutex
 	metrics []*domain.BodyMetric

@@ -60,6 +60,35 @@ func (r *WorkoutSetRepository) LastForExercise(ctx context.Context, userID, exer
 	return &s, nil
 }
 
+func (r *WorkoutSetRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.WorkoutSet, error) {
+	var s domain.WorkoutSet
+	err := r.db.QueryRow(ctx,
+		`SELECT id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, set_type, superset_id, performed_at
+		 FROM workout_sets WHERE id = $1`,
+		id,
+	).Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.SetType, &s.SupersetID, &s.PerformedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrWorkoutSetNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func (r *WorkoutSetRepository) Update(ctx context.Context, set *domain.WorkoutSet) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE workout_sets SET reps = $2, weight_kg = $3, rpe = $4, set_type = $5 WHERE id = $1`,
+		set.ID, set.Reps, set.WeightKg, set.RPE, set.SetType,
+	)
+	return err
+}
+
+func (r *WorkoutSetRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM workout_sets WHERE id = $1`, id)
+	return err
+}
+
 // LogSet inserts a set and, unless it's a warm-up, atomically upserts any
 // personal records it breaks (heaviest weight, best single-set volume,
 // estimated 1RM) in the same transaction, so two concurrent set inserts

@@ -168,7 +168,10 @@ type Mutation {
 
   startWorkout(templateId: UUID): Workout!
   logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float, setType: SetType, supersetId: UUID): LogSetResult!
+  updateSet(setId: UUID!, reps: Int!, weightKg: Float!, rpe: Float, setType: SetType): WorkoutSet!
+  deleteSet(setId: UUID!): Boolean!
   finishWorkout(workoutId: UUID!, notes: String): Workout!
+  deleteWorkout(workoutId: UUID!): Boolean!
 
   createWorkoutTemplate(name: String!, exercises: [TemplateExerciseInput!]!): WorkoutTemplate!
   deleteWorkoutTemplate(templateId: UUID!): Boolean!

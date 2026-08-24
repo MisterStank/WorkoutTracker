@@ -222,6 +222,104 @@ func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exercise
 	return logged, nil
 }
 
+// UpdateSet corrects a mis-logged set's reps/weight/RPE/type after the
+// fact. Recomputes that day's rollup and the exercise's personal records
+// from scratch afterward — a plain in-place edit can silently make a value
+// wrong in either direction (raise it above the current PR, or lower it
+// below one it used to hold).
+func (s *WorkoutService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, reps int, weightKg float64, rpe *float64, setType domain.SetType) (*domain.WorkoutSet, error) {
+	set, err := s.sets.FindByID(ctx, setID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkSetOwnership(ctx, userID, set); err != nil {
+		return nil, err
+	}
+
+	set.Reps = reps
+	set.WeightKg = weightKg
+	set.RPE = rpe
+	if setType == "" {
+		setType = domain.SetTypeNormal
+	}
+	set.SetType = setType
+
+	if err := s.sets.Update(ctx, set); err != nil {
+		return nil, err
+	}
+	s.recomputeAfterSetChange(ctx, userID, set)
+	return set, nil
+}
+
+// DeleteSet removes one logged set and recomputes that day's rollup and
+// the exercise's personal records afterward, in case the deleted set was
+// the one holding either.
+func (s *WorkoutService) DeleteSet(ctx context.Context, userID, setID uuid.UUID) error {
+	set, err := s.sets.FindByID(ctx, setID)
+	if err != nil {
+		return err
+	}
+	if err := s.checkSetOwnership(ctx, userID, set); err != nil {
+		return err
+	}
+	if err := s.sets.Delete(ctx, setID); err != nil {
+		return err
+	}
+	s.recomputeAfterSetChange(ctx, userID, set)
+	return nil
+}
+
+// DeleteWorkout removes an entire workout and recomputes the rollup/records
+// for every exercise+day it touched, since any of its sets could have been
+// holding a personal record. Sets are deleted explicitly rather than left
+// to the database's ON DELETE CASCADE, so this stays correct regardless of
+// what's enforcing referential integrity underneath the repository.
+func (s *WorkoutService) DeleteWorkout(ctx context.Context, userID, workoutID uuid.UUID) error {
+	workout, err := s.workouts.FindByID(ctx, workoutID)
+	if err != nil {
+		return err
+	}
+	if workout.UserID != userID {
+		return domain.ErrWorkoutNotOwned
+	}
+
+	sets, err := s.sets.ListForWorkout(ctx, workoutID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.workouts.Delete(ctx, workoutID); err != nil {
+		return err
+	}
+
+	for _, set := range sets {
+		_ = s.sets.Delete(ctx, set.ID)
+		s.recomputeAfterSetChange(ctx, userID, set)
+	}
+	return nil
+}
+
+func (s *WorkoutService) checkSetOwnership(ctx context.Context, userID uuid.UUID, set *domain.WorkoutSet) error {
+	workout, err := s.workouts.FindByID(ctx, set.WorkoutID)
+	if err != nil {
+		return err
+	}
+	if workout.UserID != userID {
+		return domain.ErrWorkoutNotOwned
+	}
+	return nil
+}
+
+// recomputeAfterSetChange is best-effort, matching LogSet's treatment of
+// analytics: a recompute failure shouldn't fail the edit/delete the user
+// actually asked for.
+func (s *WorkoutService) recomputeAfterSetChange(ctx context.Context, userID uuid.UUID, set *domain.WorkoutSet) {
+	if s.analytics != nil {
+		_ = s.analytics.RecomputeAfterSetChange(ctx, userID, set.ExerciseID, set.PerformedAt)
+	}
+	_ = s.records.Recompute(ctx, userID, set.ExerciseID)
+}
+
 func (s *WorkoutService) FinishWorkout(ctx context.Context, userID, workoutID uuid.UUID, notes string) (*domain.Workout, error) {
 	workout, err := s.workouts.FindByID(ctx, workoutID)
 	if err != nil {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../../core/units/units_provider.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
@@ -35,6 +36,37 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
   void initState() {
     super.initState();
     _loadMore();
+  }
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete workout?'),
+        content: const Text('This removes the whole session and its sets. This can\'t be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _deleteWorkout(Workout workout) async {
+    setState(() => _workouts.removeWhere((w) => w.id == workout.id));
+    try {
+      await ref.read(workoutRepositoryProvider).deleteWorkout(workout.id);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _workouts.add(workout));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not delete: $e')));
+      }
+    }
   }
 
   Future<void> _loadMore() async {
@@ -90,7 +122,24 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
                           child: Center(child: CircularProgressIndicator()),
                         );
                       }
-                      return _WorkoutHistoryCard(workout: _workouts[index], catalog: catalog);
+                      final workout = _workouts[index];
+                      return Dismissible(
+                        key: ValueKey(workout.id),
+                        direction: DismissDirection.endToStart,
+                        confirmDismiss: (_) => _confirmDelete(context),
+                        onDismissed: (_) => _deleteWorkout(workout),
+                        background: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          alignment: Alignment.centerRight,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(appCardRadius),
+                          ),
+                          child: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.onErrorContainer),
+                        ),
+                        child: _WorkoutHistoryCard(workout: workout, catalog: catalog),
+                      );
                     },
                   ),
                 ),

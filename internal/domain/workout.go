@@ -129,6 +129,11 @@ type WorkoutRepository interface {
 	// than OFFSET, so page N stays cheap regardless of how far in the user
 	// has paged.
 	ListForUser(ctx context.Context, userID uuid.UUID, limit int, afterStartedAt *time.Time, afterID *uuid.UUID) ([]*Workout, error)
+	// Delete removes a workout and, via ON DELETE CASCADE, its sets and any
+	// personal_records rows keyed to those sets. Callers are responsible
+	// for recomputing rollups/records afterward — the cascade only cleans
+	// up rows, it doesn't know what should replace a lost personal best.
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type WorkoutTemplateRepository interface {
@@ -150,8 +155,23 @@ type WorkoutSetRepository interface {
 	// (any workout), used to pre-fill the log-set form with the weight/reps
 	// the user used last time. Returns ErrWorkoutSetNotFound if never logged.
 	LastForExercise(ctx context.Context, userID, exerciseID uuid.UUID) (*WorkoutSet, error)
+	// FindByID returns ErrWorkoutSetNotFound if no such set exists — used
+	// by edit/delete to load a set before checking ownership via its
+	// parent workout.
+	FindByID(ctx context.Context, id uuid.UUID) (*WorkoutSet, error)
+	// Update overwrites reps/weightKg/rpe/setType in place, leaving
+	// id/workoutId/exerciseId/setNumber/supersetId/performedAt untouched.
+	Update(ctx context.Context, set *WorkoutSet) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type PersonalRecordRepository interface {
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]*PersonalRecord, error)
+	// Recompute rebuilds all three record types for one user+exercise from
+	// the current workout_sets from scratch (not an incremental "beat the
+	// existing value" check like LogSet's upsert) — the only correct way
+	// to recover the right personal best after the record-setting set
+	// itself was edited or deleted. Removes the row for any record type no
+	// longer held by any set.
+	Recompute(ctx context.Context, userID, exerciseID uuid.UUID) error
 }

@@ -68,6 +68,8 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		CreateWorkoutTemplate func(childComplexity int, name string, exercises []*TemplateExerciseInput) int
+		DeleteSet             func(childComplexity int, setID uuid.UUID) int
+		DeleteWorkout         func(childComplexity int, workoutID uuid.UUID) int
 		DeleteWorkoutTemplate func(childComplexity int, templateID uuid.UUID) int
 		FinishWorkout         func(childComplexity int, workoutID uuid.UUID, notes *string) int
 		LogBodyMetric         func(childComplexity int, metricType string, value float64) int
@@ -77,6 +79,7 @@ type ComplexityRoot struct {
 		RefreshToken          func(childComplexity int, refreshToken string) int
 		Signup                func(childComplexity int, email string, password string, displayName string) int
 		StartWorkout          func(childComplexity int, templateID *uuid.UUID) int
+		UpdateSet             func(childComplexity int, setID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType) int
 	}
 
 	PageInfo struct {
@@ -203,7 +206,10 @@ type MutationResolver interface {
 	Logout(ctx context.Context, refreshToken string) (bool, error)
 	StartWorkout(ctx context.Context, templateID *uuid.UUID) (*Workout, error)
 	LogSet(ctx context.Context, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType, supersetID *uuid.UUID) (*LogSetResult, error)
+	UpdateSet(ctx context.Context, setID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType) (*WorkoutSet, error)
+	DeleteSet(ctx context.Context, setID uuid.UUID) (bool, error)
 	FinishWorkout(ctx context.Context, workoutID uuid.UUID, notes *string) (*Workout, error)
+	DeleteWorkout(ctx context.Context, workoutID uuid.UUID) (bool, error)
 	CreateWorkoutTemplate(ctx context.Context, name string, exercises []*TemplateExerciseInput) (*WorkoutTemplate, error)
 	DeleteWorkoutTemplate(ctx context.Context, templateID uuid.UUID) (bool, error)
 	LogBodyMetric(ctx context.Context, metricType string, value float64) (*BodyMetric, error)
@@ -351,6 +357,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateWorkoutTemplate(childComplexity, args["name"].(string), args["exercises"].([]*TemplateExerciseInput)), true
+	case "Mutation.deleteSet":
+		if e.ComplexityRoot.Mutation.DeleteSet == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteSet_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteSet(childComplexity, args["setId"].(uuid.UUID)), true
+	case "Mutation.deleteWorkout":
+		if e.ComplexityRoot.Mutation.DeleteWorkout == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteWorkout_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteWorkout(childComplexity, args["workoutId"].(uuid.UUID)), true
 	case "Mutation.deleteWorkoutTemplate":
 		if e.ComplexityRoot.Mutation.DeleteWorkoutTemplate == nil {
 			break
@@ -450,6 +478,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.StartWorkout(childComplexity, args["templateId"].(*uuid.UUID)), true
+	case "Mutation.updateSet":
+		if e.ComplexityRoot.Mutation.UpdateSet == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateSet_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateSet(childComplexity, args["setId"].(uuid.UUID), args["reps"].(int), args["weightKg"].(float64), args["rpe"].(*float64), args["setType"].(*SetType)), true
 
 	case "PageInfo.endCursor":
 		if e.ComplexityRoot.PageInfo.EndCursor == nil {
@@ -1435,6 +1474,20 @@ func (ec *executionContext) field_Mutation_createWorkoutTemplate_args(ctx contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteSet_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "setId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["setId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteWorkoutTemplate_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1446,6 +1499,20 @@ func (ec *executionContext) field_Mutation_deleteWorkoutTemplate_args(ctx contex
 		return nil, err
 	}
 	args["templateId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteWorkout_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "workoutId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["workoutId"] = arg0
 	return args, nil
 }
 
@@ -1646,6 +1713,52 @@ func (ec *executionContext) field_Mutation_startWorkout_args(ctx context.Context
 		return nil, err
 	}
 	args["templateId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateSet_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "setId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["setId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "reps",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["reps"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "weightKg",
+		func(ctx context.Context, v any) (float64, error) {
+			return ec.unmarshalNFloat2float64(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["weightKg"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "rpe",
+		func(ctx context.Context, v any) (*float64, error) {
+			return ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["rpe"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "setType",
+		func(ctx context.Context, v any) (*SetType, error) {
+			return ec.unmarshalOSetType2ᚖworkouttrackerᚋinternalᚋgraphqlᚐSetType(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["setType"] = arg4
 	return args, nil
 }
 
@@ -2537,6 +2650,94 @@ func (ec *executionContext) fieldContext_Mutation_logSet(ctx context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_updateSet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateSet(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateSet(ctx, fc.Args["setId"].(uuid.UUID), fc.Args["reps"].(int), fc.Args["weightKg"].(float64), fc.Args["rpe"].(*float64), fc.Args["setType"].(*SetType))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *WorkoutSet) graphql.Marshaler {
+			return ec.marshalNWorkoutSet2ᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkoutSet(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateSet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WorkoutSet(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateSet_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteSet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteSet(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteSet(ctx, fc.Args["setId"].(uuid.UUID))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteSet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteSet_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_finishWorkout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2575,6 +2776,50 @@ func (ec *executionContext) fieldContext_Mutation_finishWorkout(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_finishWorkout_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteWorkout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteWorkout(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteWorkout(ctx, fc.Args["workoutId"].(uuid.UUID))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteWorkout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteWorkout_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6098,9 +6343,30 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateSet":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateSet(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteSet":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteSet(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "finishWorkout":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_finishWorkout(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteWorkout":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteWorkout(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -7975,6 +8241,10 @@ func (ec *executionContext) marshalNWorkoutEdge2ᚖworkouttrackerᚋinternalᚋg
 		return graphql.Null
 	}
 	return ec._WorkoutEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNWorkoutSet2workouttrackerᚋinternalᚋgraphqlᚐWorkoutSet(ctx context.Context, sel ast.SelectionSet, v WorkoutSet) graphql.Marshaler {
+	return ec._WorkoutSet(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNWorkoutSet2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkoutSetᚄ(ctx context.Context, sel ast.SelectionSet, v []*WorkoutSet) graphql.Marshaler {

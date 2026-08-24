@@ -90,6 +90,11 @@ func (r *WorkoutRepository) ListForUser(ctx context.Context, userID uuid.UUID, l
 	return workouts, rows.Err()
 }
 
+func (r *WorkoutRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM workouts WHERE id = $1`, id)
+	return err
+}
+
 func (r *WorkoutRepository) scanWorkout(row pgx.Row) (*domain.Workout, error) {
 	var w domain.Workout
 	err := row.Scan(&w.ID, &w.UserID, &w.StartedAt, &w.EndedAt, &w.Notes, &w.Status, &w.TemplateID, &w.ShareCode)

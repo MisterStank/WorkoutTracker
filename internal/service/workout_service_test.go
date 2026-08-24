@@ -114,6 +114,20 @@ func (f *fakeWorkoutRepo) Finish(ctx context.Context, id uuid.UUID, endedAt time
 	return nil
 }
 
+func (f *fakeWorkoutRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	w, ok := f.byID[id]
+	if !ok {
+		return nil
+	}
+	delete(f.byID, id)
+	if f.activeOf[w.UserID] == id {
+		delete(f.activeOf, w.UserID)
+	}
+	return nil
+}
+
 func (f *fakeWorkoutRepo) ListForUser(ctx context.Context, userID uuid.UUID, limit int, afterStartedAt *time.Time, afterID *uuid.UUID) ([]*domain.Workout, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -150,13 +164,62 @@ func (f *fakeWorkoutRepo) ListForUser(ctx context.Context, userID uuid.UUID, lim
 }
 
 type fakeWorkoutSetRepo struct {
-	mu      sync.Mutex
-	sets    map[uuid.UUID][]*domain.WorkoutSet
-	records map[string]*domain.PersonalRecord // key: userID|exerciseID|recordType
+	mu          sync.Mutex
+	sets        map[uuid.UUID][]*domain.WorkoutSet
+	records     map[string]*domain.PersonalRecord // key: userID|exerciseID|recordType
+	workoutUser map[uuid.UUID]uuid.UUID
 }
 
 func newFakeWorkoutSetRepo() *fakeWorkoutSetRepo {
-	return &fakeWorkoutSetRepo{sets: map[uuid.UUID][]*domain.WorkoutSet{}, records: map[string]*domain.PersonalRecord{}}
+	return &fakeWorkoutSetRepo{
+		sets:        map[uuid.UUID][]*domain.WorkoutSet{},
+		records:     map[string]*domain.PersonalRecord{},
+		workoutUser: map[uuid.UUID]uuid.UUID{},
+	}
+}
+
+func (f *fakeWorkoutSetRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.WorkoutSet, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, sets := range f.sets {
+		for _, s := range sets {
+			if s.ID == id {
+				return s, nil
+			}
+		}
+	}
+	return nil, domain.ErrWorkoutSetNotFound
+}
+
+func (f *fakeWorkoutSetRepo) Update(ctx context.Context, set *domain.WorkoutSet) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, sets := range f.sets {
+		for _, s := range sets {
+			if s.ID == set.ID {
+				s.Reps = set.Reps
+				s.WeightKg = set.WeightKg
+				s.RPE = set.RPE
+				s.SetType = set.SetType
+				return nil
+			}
+		}
+	}
+	return domain.ErrWorkoutSetNotFound
+}
+
+func (f *fakeWorkoutSetRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for workoutID, sets := range f.sets {
+		for i, s := range sets {
+			if s.ID == id {
+				f.sets[workoutID] = append(sets[:i], sets[i+1:]...)
+				return nil
+			}
+		}
+	}
+	return nil
 }
 
 func (f *fakeWorkoutSetRepo) ListForWorkout(ctx context.Context, workoutID uuid.UUID) ([]*domain.WorkoutSet, error) {
@@ -197,6 +260,7 @@ func (f *fakeWorkoutSetRepo) LogSet(ctx context.Context, userID uuid.UUID, set *
 		set.SetType = domain.SetTypeNormal
 	}
 	f.sets[set.WorkoutID] = append(f.sets[set.WorkoutID], set)
+	f.workoutUser[set.WorkoutID] = userID
 
 	if set.SetType == domain.SetTypeWarmup {
 		return &domain.LoggedSet{Set: set}, nil
@@ -238,6 +302,49 @@ func (f *fakePersonalRecordRepo) ListForUser(ctx context.Context, userID uuid.UU
 		}
 	}
 	return out, nil
+}
+
+// Recompute mirrors repository.PersonalRecordRepository.Recompute: rebuild
+// every record type for this user+exercise from scratch by rescanning all
+// non-warmup sets, rather than trusting LogSet's incremental upsert.
+func (f *fakePersonalRecordRepo) Recompute(ctx context.Context, userID, exerciseID uuid.UUID) error {
+	f.sets.mu.Lock()
+	defer f.sets.mu.Unlock()
+
+	best := map[string]*domain.PersonalRecord{}
+	for workoutID, sets := range f.sets.sets {
+		if f.sets.workoutUser[workoutID] != userID {
+			continue
+		}
+		for _, s := range sets {
+			if s.ExerciseID != exerciseID || s.SetType == domain.SetTypeWarmup {
+				continue
+			}
+			candidates := map[string]float64{
+				domain.RecordTypeMaxWeight:    s.WeightKg,
+				domain.RecordTypeMaxVolume:    s.WeightKg * float64(s.Reps),
+				domain.RecordTypeEstimated1RM: s.WeightKg * (1 + float64(s.Reps)/30.0),
+			}
+			for recordType, value := range candidates {
+				if existing, ok := best[recordType]; !ok || value > existing.Value {
+					best[recordType] = &domain.PersonalRecord{
+						ID: uuid.New(), UserID: userID, ExerciseID: exerciseID,
+						RecordType: recordType, Value: value, AchievedAt: s.PerformedAt, WorkoutSetID: s.ID,
+					}
+				}
+			}
+		}
+	}
+
+	for _, recordType := range []string{domain.RecordTypeMaxWeight, domain.RecordTypeMaxVolume, domain.RecordTypeEstimated1RM} {
+		key := userID.String() + "|" + exerciseID.String() + "|" + recordType
+		if pr, ok := best[recordType]; ok {
+			f.sets.records[key] = pr
+		} else {
+			delete(f.sets.records, key)
+		}
+	}
+	return nil
 }
 
 func newTestWorkoutService(exercises ...*domain.Exercise) (*service.WorkoutService, *fakeWorkoutSetRepo) {
@@ -626,4 +733,126 @@ func TestSuggestNextSetAutoregulatesByRPE(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, suggestion)
 	assert.Less(t, suggestion.SuggestedWeightKg, 100.0, "a near-failure RPE should suggest backing off")
+}
+
+func TestUpdateSetChangesValuesAndRecomputesRecords(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Squat"}
+	svc, _ := newTestWorkoutService(exercise)
+	userID := uuid.New()
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+
+	logged, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	require.Len(t, logged.NewRecords, 3, "a first-ever set sets all three record types")
+
+	updated, err := svc.UpdateSet(ctx, userID, logged.Set.ID, 8, 120, nil, domain.SetTypeNormal)
+	require.NoError(t, err)
+	assert.Equal(t, 8, updated.Reps)
+	assert.Equal(t, 120.0, updated.WeightKg)
+
+	records, err := svc.PersonalRecords(ctx, userID)
+	require.NoError(t, err)
+	require.Len(t, records, 3)
+	for _, r := range records {
+		if r.RecordType == domain.RecordTypeMaxWeight {
+			assert.Equal(t, 120.0, r.Value, "PR should reflect the edited weight, not the original")
+		}
+	}
+}
+
+func TestUpdateSetRejectsUnowned(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Squat"}
+	svc, _ := newTestWorkoutService(exercise)
+	owner := uuid.New()
+	intruder := uuid.New()
+	w, err := svc.StartWorkout(ctx, owner, nil)
+	require.NoError(t, err)
+	logged, err := svc.LogSet(ctx, owner, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+
+	_, err = svc.UpdateSet(ctx, intruder, logged.Set.ID, 5, 999, nil, domain.SetTypeNormal)
+	assert.ErrorIs(t, err, domain.ErrWorkoutNotOwned)
+}
+
+func TestDeleteSetRemovesRecordAndFallsBackToNextBest(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Bench Press"}
+	svc, _ := newTestWorkoutService(exercise)
+	userID := uuid.New()
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+
+	lighter, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 80, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	heavier, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, heavier.NewRecords)
+
+	err = svc.DeleteSet(ctx, userID, heavier.Set.ID)
+	require.NoError(t, err)
+
+	sets, err := svc.SetsForWorkout(ctx, userID, w.ID)
+	require.NoError(t, err)
+	require.Len(t, sets, 1, "the deleted set should be gone")
+	assert.Equal(t, lighter.Set.ID, sets[0].ID)
+
+	records, err := svc.PersonalRecords(ctx, userID)
+	require.NoError(t, err)
+	for _, r := range records {
+		if r.RecordType == domain.RecordTypeMaxWeight {
+			assert.Equal(t, 80.0, r.Value, "with the 100kg set gone, the 80kg set should now hold the PR")
+		}
+	}
+}
+
+func TestDeleteSetRejectsUnowned(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Squat"}
+	svc, _ := newTestWorkoutService(exercise)
+	owner := uuid.New()
+	intruder := uuid.New()
+	w, err := svc.StartWorkout(ctx, owner, nil)
+	require.NoError(t, err)
+	logged, err := svc.LogSet(ctx, owner, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+
+	err = svc.DeleteSet(ctx, intruder, logged.Set.ID)
+	assert.ErrorIs(t, err, domain.ErrWorkoutNotOwned)
+}
+
+func TestDeleteWorkoutRemovesItAndItsRecords(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Deadlift"}
+	svc, _ := newTestWorkoutService(exercise)
+	userID := uuid.New()
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+	logged, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 150, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, logged.NewRecords)
+
+	err = svc.DeleteWorkout(ctx, userID, w.ID)
+	require.NoError(t, err)
+
+	_, err = svc.SetsForWorkout(ctx, userID, w.ID)
+	assert.ErrorIs(t, err, domain.ErrWorkoutNotFound)
+
+	records, err := svc.PersonalRecords(ctx, userID)
+	require.NoError(t, err)
+	assert.Empty(t, records, "deleting the only workout should leave no personal records behind")
+}
+
+func TestDeleteWorkoutRejectsUnowned(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newTestWorkoutService()
+	owner := uuid.New()
+	intruder := uuid.New()
+	w, err := svc.StartWorkout(ctx, owner, nil)
+	require.NoError(t, err)
+
+	err = svc.DeleteWorkout(ctx, intruder, w.ID)
+	assert.ErrorIs(t, err, domain.ErrWorkoutNotOwned)
 }

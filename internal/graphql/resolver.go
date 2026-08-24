@@ -4,7 +4,6 @@ package graphql
 
 import (
 	"context"
-
 	"workouttracker/internal/domain"
 	appmiddleware "workouttracker/internal/middleware"
 	"workouttracker/internal/realtime"
@@ -13,9 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Resolver is the composition root for GraphQL: it holds only the service
-// dependencies and translates GraphQL <-> service calls. No business logic
-// or SQL lives here (Single Responsibility) — that belongs in internal/service.
 type Resolver struct {
 	Auth      *service.AuthService
 	Workout   *service.WorkoutService
@@ -190,10 +186,6 @@ func toPlateauStatusModel(s *service.PlateauStatus) *PlateauStatus {
 	}
 }
 
-// toWorkoutModel fetches the workout's sets to populate the nested field.
-// This is a known N+1 spot if a query fans out over many workouts at once
-// (e.g. workoutHistory); acceptable for now since history is paginated to
-// a small page size, but a dataloader would be the fix if that changes.
 func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *domain.Workout) (*Workout, error) {
 	sets, err := r.Workout.SetsForWorkout(ctx, userID, w.ID)
 	if err != nil {
@@ -211,9 +203,6 @@ func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *doma
 	}, nil
 }
 
-// toSharedWorkoutModel is toWorkoutModel's read-only counterpart: no
-// ownership check on the sets fetch, since the caller isn't the owner —
-// they only got here via a valid share code.
 func (r *Resolver) toSharedWorkoutModel(ctx context.Context, w *domain.Workout) (*Workout, error) {
 	sets, err := r.Workout.SetsForSharedWorkout(ctx, w.ID)
 	if err != nil {
@@ -229,6 +218,39 @@ func (r *Resolver) toSharedWorkoutModel(ctx context.Context, w *domain.Workout) 
 		TemplateID: w.TemplateID,
 		ShareCode:  w.ShareCode,
 	}, nil
+}
+
+// streamWorkoutEvents subscribes to one workout's Redis pub/sub channel and
+// re-shapes each event into the GraphQL model, shared by both the
+// owner-only and share-code subscription resolvers.
+func (r *Resolver) streamWorkoutEvents(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
+	events, cleanup, err := r.Events.Subscribe(ctx, workoutID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan *LogSetResult)
+	go func() {
+		defer close(out)
+		defer cleanup()
+		for {
+			select {
+			case logged, ok := <-events:
+				if !ok {
+					return
+				}
+				select {
+				case out <- toLogSetResult(logged):
+				case <-ctx.Done():
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return out, nil
 }
 
 // Signup is the resolver for the signup field.
@@ -298,6 +320,37 @@ func (r *mutationResolver) LogSet(ctx context.Context, workoutID uuid.UUID, exer
 	return toLogSetResult(logged), nil
 }
 
+// UpdateSet is the resolver for the updateSet field.
+func (r *mutationResolver) UpdateSet(ctx context.Context, setID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType) (*WorkoutSet, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	domainSetType := domain.SetTypeNormal
+	if setType != nil {
+		if mapped, ok := graphqlToDomainSetType[*setType]; ok {
+			domainSetType = mapped
+		}
+	}
+	set, err := r.Workout.UpdateSet(ctx, userID, setID, reps, weightKg, rpe, domainSetType)
+	if err != nil {
+		return nil, err
+	}
+	return toWorkoutSetModel(set), nil
+}
+
+// DeleteSet is the resolver for the deleteSet field.
+func (r *mutationResolver) DeleteSet(ctx context.Context, setID uuid.UUID) (bool, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return false, domain.ErrInvalidCredentials
+	}
+	if err := r.Workout.DeleteSet(ctx, userID, setID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // FinishWorkout is the resolver for the finishWorkout field.
 func (r *mutationResolver) FinishWorkout(ctx context.Context, workoutID uuid.UUID, notes *string) (*Workout, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
@@ -313,6 +366,18 @@ func (r *mutationResolver) FinishWorkout(ctx context.Context, workoutID uuid.UUI
 		return nil, err
 	}
 	return r.toWorkoutModel(ctx, userID, w)
+}
+
+// DeleteWorkout is the resolver for the deleteWorkout field.
+func (r *mutationResolver) DeleteWorkout(ctx context.Context, workoutID uuid.UUID) (bool, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return false, domain.ErrInvalidCredentials
+	}
+	if err := r.Workout.DeleteWorkout(ctx, userID, workoutID); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // CreateWorkoutTemplate is the resolver for the createWorkoutTemplate field.
@@ -603,39 +668,6 @@ func (r *subscriptionResolver) SharedWorkoutProgressUpdated(ctx context.Context,
 		return nil, err
 	}
 	return r.streamWorkoutEvents(ctx, w.ID)
-}
-
-// streamWorkoutEvents subscribes to one workout's Redis pub/sub channel and
-// re-shapes each event into the GraphQL model, shared by both the
-// owner-only and share-code subscription resolvers.
-func (r *Resolver) streamWorkoutEvents(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
-	events, cleanup, err := r.Events.Subscribe(ctx, workoutID)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make(chan *LogSetResult)
-	go func() {
-		defer close(out)
-		defer cleanup()
-		for {
-			select {
-			case logged, ok := <-events:
-				if !ok {
-					return
-				}
-				select {
-				case out <- toLogSetResult(logged):
-				case <-ctx.Done():
-					return
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return out, nil
 }
 
 // Mutation returns MutationResolver implementation.

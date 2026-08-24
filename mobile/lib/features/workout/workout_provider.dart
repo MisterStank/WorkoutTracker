@@ -219,6 +219,56 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     }
   }
 
+  /// Corrects a mis-logged set's reps/weight/RPE/type. Updates local state
+  /// from the server's response rather than optimistically, since the
+  /// server also recomputes personal records/rollups that the client has
+  /// no way to predict.
+  Future<void> editSet({
+    required String setId,
+    required int reps,
+    required double weightKg,
+    double? rpe,
+    SetType setType = SetType.normal,
+  }) async {
+    final current = state;
+    if (current is! ActiveWorkoutInProgress) return;
+    try {
+      final updated = await _repository.updateSet(setId: setId, reps: reps, weightKg: weightKg, rpe: rpe, setType: setType);
+      final updatedWorkout = Workout(
+        id: current.workout.id,
+        startedAt: current.workout.startedAt,
+        status: current.workout.status,
+        notes: current.workout.notes,
+        templateId: current.workout.templateId,
+        shareCode: current.workout.shareCode,
+        sets: [for (final s in current.workout.sets) if (s.id == setId) updated else s],
+      );
+      state = ActiveWorkoutInProgress(updatedWorkout);
+    } catch (e) {
+      state = ActiveWorkoutError(e.toString());
+    }
+  }
+
+  Future<void> deleteSet(String setId) async {
+    final current = state;
+    if (current is! ActiveWorkoutInProgress) return;
+    try {
+      await _repository.deleteSet(setId);
+      final updatedWorkout = Workout(
+        id: current.workout.id,
+        startedAt: current.workout.startedAt,
+        status: current.workout.status,
+        notes: current.workout.notes,
+        templateId: current.workout.templateId,
+        shareCode: current.workout.shareCode,
+        sets: current.workout.sets.where((s) => s.id != setId).toList(),
+      );
+      state = ActiveWorkoutInProgress(updatedWorkout);
+    } catch (e) {
+      state = ActiveWorkoutError(e.toString());
+    }
+  }
+
   /// Subscribes to live updates for [workoutId] over the GraphQL websocket
   /// (Redis pub/sub server-side) so a set logged from another device/tab
   /// shows up here without polling. Idempotent: re-entering this workout

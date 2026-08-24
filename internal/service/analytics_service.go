@@ -97,6 +97,18 @@ func filterSince(points []*domain.ProgressPoint, days int) []*domain.ProgressPoi
 	return filtered
 }
 
+// RecomputeAfterSetChange rebuilds the rollup for one user+exercise+day and
+// invalidates the analytics cache — called after a set is edited or
+// deleted, since (unlike a fresh LogSet) there's no running total to
+// incrementally adjust.
+func (s *AnalyticsService) RecomputeAfterSetChange(ctx context.Context, userID, exerciseID uuid.UUID, day time.Time) error {
+	if err := s.rollup.RecomputeDay(ctx, userID, exerciseID, day); err != nil {
+		return err
+	}
+	s.InvalidateForSet(ctx, userID, exerciseID)
+	return nil
+}
+
 // InvalidateForSet is called after a set is logged so the next read of
 // either cache entry recomputes from progress_daily_rollup instead of
 // serving a now-stale cached series.
