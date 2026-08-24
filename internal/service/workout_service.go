@@ -18,6 +18,7 @@ type WorkoutService struct {
 	workouts  domain.WorkoutRepository
 	sets      domain.WorkoutSetRepository
 	records   domain.PersonalRecordRepository
+	templates domain.WorkoutTemplateRepository
 
 	// analytics and events are optional (nil is fine, e.g. in unit tests):
 	// analytics's cache is invalidated and an event published after a set
@@ -31,11 +32,12 @@ func NewWorkoutService(
 	workouts domain.WorkoutRepository,
 	sets domain.WorkoutSetRepository,
 	records domain.PersonalRecordRepository,
+	templates domain.WorkoutTemplateRepository,
 	analytics *AnalyticsService,
 	events domain.WorkoutEventPublisher,
 ) *WorkoutService {
 	return &WorkoutService{
-		exercises: exercises, workouts: workouts, sets: sets, records: records,
+		exercises: exercises, workouts: workouts, sets: sets, records: records, templates: templates,
 		analytics: analytics, events: events,
 	}
 }
@@ -54,24 +56,70 @@ func (s *WorkoutService) ListExercises(ctx context.Context, search string) ([]*d
 
 // StartWorkout is idempotent: if the user already has a workout in
 // progress, it's returned rather than erroring, so a flaky client retry
-// doesn't need special-case handling.
-func (s *WorkoutService) StartWorkout(ctx context.Context, userID uuid.UUID) (*domain.Workout, error) {
+// doesn't need special-case handling. templateID is optional — when set,
+// the workout is linked to that template so the client can show the
+// planned exercise list instead of starting from a blank slate.
+func (s *WorkoutService) StartWorkout(ctx context.Context, userID uuid.UUID, templateID *uuid.UUID) (*domain.Workout, error) {
 	if active, err := s.workouts.FindActiveForUser(ctx, userID); err == nil {
 		return active, nil
 	} else if !errors.Is(err, domain.ErrWorkoutNotFound) {
 		return nil, err
 	}
 
+	if templateID != nil {
+		tmpl, err := s.templates.FindByID(ctx, *templateID)
+		if err != nil {
+			return nil, err
+		}
+		if tmpl.UserID != userID {
+			return nil, domain.ErrTemplateNotOwned
+		}
+	}
+
 	w := &domain.Workout{
-		ID:        uuid.New(),
-		UserID:    userID,
-		StartedAt: time.Now(),
-		Status:    domain.WorkoutInProgress,
+		ID:         uuid.New(),
+		UserID:     userID,
+		StartedAt:  time.Now(),
+		Status:     domain.WorkoutInProgress,
+		TemplateID: templateID,
 	}
 	if err := s.workouts.Create(ctx, w); err != nil {
 		return nil, err
 	}
 	return w, nil
+}
+
+func (s *WorkoutService) CreateTemplate(ctx context.Context, userID uuid.UUID, name string, exercises []*domain.TemplateExercise) (*domain.WorkoutTemplate, error) {
+	for i, ex := range exercises {
+		ex.ID = uuid.New()
+		ex.Position = i
+	}
+	t := &domain.WorkoutTemplate{
+		ID:        uuid.New(),
+		UserID:    userID,
+		Name:      name,
+		CreatedAt: time.Now(),
+		Exercises: exercises,
+	}
+	if err := s.templates.Create(ctx, t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func (s *WorkoutService) ListTemplates(ctx context.Context, userID uuid.UUID) ([]*domain.WorkoutTemplate, error) {
+	return s.templates.ListForUser(ctx, userID)
+}
+
+func (s *WorkoutService) DeleteTemplate(ctx context.Context, userID, templateID uuid.UUID) error {
+	t, err := s.templates.FindByID(ctx, templateID)
+	if err != nil {
+		return err
+	}
+	if t.UserID != userID {
+		return domain.ErrTemplateNotOwned
+	}
+	return s.templates.Delete(ctx, templateID)
 }
 
 func (s *WorkoutService) ActiveWorkout(ctx context.Context, userID uuid.UUID) (*domain.Workout, error) {

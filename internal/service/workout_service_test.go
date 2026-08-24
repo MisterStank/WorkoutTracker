@@ -234,8 +234,69 @@ func newTestWorkoutService(exercises ...*domain.Exercise) (*service.WorkoutServi
 		&fakePersonalRecordRepo{sets: setRepo},
 		nil,
 		nil,
+		nil,
 	)
 	return svc, setRepo
+}
+
+type fakeWorkoutTemplateRepo struct {
+	mu   sync.Mutex
+	byID map[uuid.UUID]*domain.WorkoutTemplate
+}
+
+func newFakeWorkoutTemplateRepo() *fakeWorkoutTemplateRepo {
+	return &fakeWorkoutTemplateRepo{byID: map[uuid.UUID]*domain.WorkoutTemplate{}}
+}
+
+func (f *fakeWorkoutTemplateRepo) Create(ctx context.Context, t *domain.WorkoutTemplate) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.byID[t.ID] = t
+	return nil
+}
+
+func (f *fakeWorkoutTemplateRepo) ListForUser(ctx context.Context, userID uuid.UUID) ([]*domain.WorkoutTemplate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []*domain.WorkoutTemplate
+	for _, t := range f.byID {
+		if t.UserID == userID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeWorkoutTemplateRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.WorkoutTemplate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, ok := f.byID[id]
+	if !ok {
+		return nil, domain.ErrTemplateNotFound
+	}
+	return t, nil
+}
+
+func (f *fakeWorkoutTemplateRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.byID, id)
+	return nil
+}
+
+func newTestWorkoutServiceWithTemplates(exercises ...*domain.Exercise) (*service.WorkoutService, *fakeWorkoutTemplateRepo) {
+	setRepo := newFakeWorkoutSetRepo()
+	templateRepo := newFakeWorkoutTemplateRepo()
+	svc := service.NewWorkoutService(
+		newFakeExerciseRepo(exercises...),
+		newFakeWorkoutRepo(),
+		setRepo,
+		&fakePersonalRecordRepo{sets: setRepo},
+		templateRepo,
+		nil,
+		nil,
+	)
+	return svc, templateRepo
 }
 
 func TestStartWorkoutIsIdempotent(t *testing.T) {
@@ -243,10 +304,10 @@ func TestStartWorkoutIsIdempotent(t *testing.T) {
 	svc, _ := newTestWorkoutService()
 	userID := uuid.New()
 
-	w1, err := svc.StartWorkout(ctx, userID)
+	w1, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 
-	w2, err := svc.StartWorkout(ctx, userID)
+	w2, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 	assert.Equal(t, w1.ID, w2.ID, "starting a workout twice should return the existing in-progress one")
 }
@@ -259,7 +320,7 @@ func TestLogSetRejectsUnownedWorkout(t *testing.T) {
 	owner := uuid.New()
 	attacker := uuid.New()
 
-	w, err := svc.StartWorkout(ctx, owner)
+	w, err := svc.StartWorkout(ctx, owner, nil)
 	require.NoError(t, err)
 
 	_, err = svc.LogSet(ctx, attacker, w.ID, exercise.ID, 5, 100, nil, false)
@@ -272,7 +333,7 @@ func TestLogSetRejectsAfterFinish(t *testing.T) {
 	svc, _ := newTestWorkoutService(exercise)
 	userID := uuid.New()
 
-	w, err := svc.StartWorkout(ctx, userID)
+	w, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 
 	_, err = svc.FinishWorkout(ctx, userID, w.ID, "done")
@@ -288,7 +349,7 @@ func TestLogSetDetectsNewPersonalRecords(t *testing.T) {
 	svc, _ := newTestWorkoutService(exercise)
 	userID := uuid.New()
 
-	w, err := svc.StartWorkout(ctx, userID)
+	w, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 
 	first, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, false)
@@ -315,7 +376,7 @@ func TestWorkoutHistoryPaginates(t *testing.T) {
 	// StartWorkout is idempotent, so simulate 3 separate completed workouts
 	// directly through the repo-backed service calls.
 	for i := 0; i < 3; i++ {
-		w, err := svc.StartWorkout(ctx, userID)
+		w, err := svc.StartWorkout(ctx, userID, nil)
 		require.NoError(t, err)
 		_, err = svc.FinishWorkout(ctx, userID, w.ID, "")
 		require.NoError(t, err)
@@ -339,7 +400,7 @@ func TestWarmupSetsDoNotCountAsRecords(t *testing.T) {
 	svc, _ := newTestWorkoutService(exercise)
 	userID := uuid.New()
 
-	w, err := svc.StartWorkout(ctx, userID)
+	w, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 
 	warmup, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 10, 20, nil, true)
@@ -362,7 +423,7 @@ func TestLastSetForExercise(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, none, "no error and a nil result when the exercise has never been logged")
 
-	w, err := svc.StartWorkout(ctx, userID)
+	w, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 8, 40, nil, false)
 	require.NoError(t, err)
@@ -374,3 +435,59 @@ func TestLastSetForExercise(t *testing.T) {
 	require.NotNil(t, last)
 	assert.Equal(t, 45.0, last.WeightKg, "should return the most recently logged set, not the first")
 }
+
+func TestCreateAndStartWorkoutFromTemplate(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Bench Press"}
+	svc, _ := newTestWorkoutServiceWithTemplates(exercise)
+	userID := uuid.New()
+
+	tmpl, err := svc.CreateTemplate(ctx, userID, "Push Day", []*domain.TemplateExercise{
+		{ExerciseID: exercise.ID, TargetSets: 3, TargetReps: intPtr(8)},
+	})
+	require.NoError(t, err)
+	require.Len(t, tmpl.Exercises, 1)
+	assert.Equal(t, 0, tmpl.Exercises[0].Position)
+
+	templates, err := svc.ListTemplates(ctx, userID)
+	require.NoError(t, err)
+	assert.Len(t, templates, 1)
+
+	w, err := svc.StartWorkout(ctx, userID, &tmpl.ID)
+	require.NoError(t, err)
+	require.NotNil(t, w.TemplateID)
+	assert.Equal(t, tmpl.ID, *w.TemplateID)
+}
+
+func TestStartWorkoutRejectsUnownedTemplate(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newTestWorkoutServiceWithTemplates()
+	owner := uuid.New()
+	attacker := uuid.New()
+
+	tmpl, err := svc.CreateTemplate(ctx, owner, "Leg Day", nil)
+	require.NoError(t, err)
+
+	_, err = svc.StartWorkout(ctx, attacker, &tmpl.ID)
+	assert.ErrorIs(t, err, domain.ErrTemplateNotOwned)
+}
+
+func TestDeleteTemplateRejectsUnowned(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newTestWorkoutServiceWithTemplates()
+	owner := uuid.New()
+	attacker := uuid.New()
+
+	tmpl, err := svc.CreateTemplate(ctx, owner, "Pull Day", nil)
+	require.NoError(t, err)
+
+	err = svc.DeleteTemplate(ctx, attacker, tmpl.ID)
+	assert.ErrorIs(t, err, domain.ErrTemplateNotOwned)
+
+	require.NoError(t, svc.DeleteTemplate(ctx, owner, tmpl.ID))
+	templates, err := svc.ListTemplates(ctx, owner)
+	require.NoError(t, err)
+	assert.Empty(t, templates)
+}
+
+func intPtr(v int) *int { return &v }

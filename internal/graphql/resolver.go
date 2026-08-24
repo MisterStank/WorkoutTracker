@@ -123,6 +123,29 @@ func toBodyMetricModel(m *domain.BodyMetric) *BodyMetric {
 	}
 }
 
+func toTemplateExerciseModel(e *domain.TemplateExercise) *TemplateExercise {
+	return &TemplateExercise{
+		ID:         e.ID,
+		ExerciseID: e.ExerciseID,
+		Position:   e.Position,
+		TargetSets: e.TargetSets,
+		TargetReps: e.TargetReps,
+	}
+}
+
+func toWorkoutTemplateModel(t *domain.WorkoutTemplate) *WorkoutTemplate {
+	exercises := make([]*TemplateExercise, len(t.Exercises))
+	for i, e := range t.Exercises {
+		exercises[i] = toTemplateExerciseModel(e)
+	}
+	return &WorkoutTemplate{
+		ID:        t.ID,
+		Name:      t.Name,
+		CreatedAt: t.CreatedAt,
+		Exercises: exercises,
+	}
+}
+
 // toWorkoutModel fetches the workout's sets to populate the nested field.
 // This is a known N+1 spot if a query fans out over many workouts at once
 // (e.g. workoutHistory); acceptable for now since history is paginated to
@@ -133,12 +156,13 @@ func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *doma
 		return nil, err
 	}
 	return &Workout{
-		ID:        w.ID,
-		StartedAt: w.StartedAt,
-		EndedAt:   w.EndedAt,
-		Notes:     w.Notes,
-		Status:    toWorkoutStatus(w.Status),
-		Sets:      toWorkoutSetModels(sets),
+		ID:         w.ID,
+		StartedAt:  w.StartedAt,
+		EndedAt:    w.EndedAt,
+		Notes:      w.Notes,
+		Status:     toWorkoutStatus(w.Status),
+		Sets:       toWorkoutSetModels(sets),
+		TemplateID: w.TemplateID,
 	}, nil
 }
 
@@ -178,12 +202,12 @@ func (r *mutationResolver) Logout(ctx context.Context, refreshToken string) (boo
 }
 
 // StartWorkout is the resolver for the startWorkout field.
-func (r *mutationResolver) StartWorkout(ctx context.Context) (*Workout, error) {
+func (r *mutationResolver) StartWorkout(ctx context.Context, templateID *uuid.UUID) (*Workout, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
 	if !ok {
 		return nil, domain.ErrInvalidCredentials
 	}
-	w, err := r.Workout.StartWorkout(ctx, userID)
+	w, err := r.Workout.StartWorkout(ctx, userID, templateID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,6 +243,39 @@ func (r *mutationResolver) FinishWorkout(ctx context.Context, workoutID uuid.UUI
 		return nil, err
 	}
 	return r.toWorkoutModel(ctx, userID, w)
+}
+
+// CreateWorkoutTemplate is the resolver for the createWorkoutTemplate field.
+func (r *mutationResolver) CreateWorkoutTemplate(ctx context.Context, name string, exercises []*TemplateExerciseInput) (*WorkoutTemplate, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	domainExercises := make([]*domain.TemplateExercise, len(exercises))
+	for i, e := range exercises {
+		domainExercises[i] = &domain.TemplateExercise{
+			ExerciseID: e.ExerciseID,
+			TargetSets: e.TargetSets,
+			TargetReps: e.TargetReps,
+		}
+	}
+	t, err := r.Workout.CreateTemplate(ctx, userID, name, domainExercises)
+	if err != nil {
+		return nil, err
+	}
+	return toWorkoutTemplateModel(t), nil
+}
+
+// DeleteWorkoutTemplate is the resolver for the deleteWorkoutTemplate field.
+func (r *mutationResolver) DeleteWorkoutTemplate(ctx context.Context, templateID uuid.UUID) (bool, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return false, domain.ErrInvalidCredentials
+	}
+	if err := r.Workout.DeleteTemplate(ctx, userID, templateID); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // LogBodyMetric is the resolver for the logBodyMetric field.
@@ -345,6 +402,23 @@ func (r *queryResolver) LastSetForExercise(ctx context.Context, exerciseID uuid.
 	return toWorkoutSetModel(set), nil
 }
 
+// WorkoutTemplates is the resolver for the workoutTemplates field.
+func (r *queryResolver) WorkoutTemplates(ctx context.Context) ([]*WorkoutTemplate, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	templates, err := r.Workout.ListTemplates(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*WorkoutTemplate, len(templates))
+	for i, t := range templates {
+		out[i] = toWorkoutTemplateModel(t)
+	}
+	return out, nil
+}
+
 // ProgressOverTime is the resolver for the progressOverTime field.
 func (r *queryResolver) ProgressOverTime(ctx context.Context, exerciseID uuid.UUID, days int) ([]*ProgressPoint, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
@@ -451,118 +525,3 @@ type (
 	queryResolver        struct{ *Resolver }
 	subscriptionResolver struct{ *Resolver }
 )
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	type Resolver struct {
-	Auth      *service.AuthService
-	Workout   *service.WorkoutService
-	Analytics *service.AnalyticsService
-	Events    *realtime.RedisEventBus
-}
-func toUserModel(u *domain.User) *User {
-	if u == nil {
-		return nil
-	}
-	return &User{
-		ID:          u.ID,
-		Email:       u.Email,
-		DisplayName: u.DisplayName,
-		Timezone:    u.Timezone,
-		CreatedAt:   u.CreatedAt,
-	}
-}
-func toAuthPayload(res *service.AuthResult) *AuthPayload {
-	return &AuthPayload{
-		User:         toUserModel(res.User),
-		AccessToken:  res.AccessToken,
-		RefreshToken: res.RefreshToken,
-	}
-}
-func toExerciseModel(e *domain.Exercise) *Exercise {
-	return &Exercise{
-		ID:           e.ID,
-		Name:         e.Name,
-		Category:     e.Category,
-		MuscleGroups: e.MuscleGroups,
-		Equipment:    e.Equipment,
-		IsCustom:     e.IsCustom,
-	}
-}
-func toWorkoutSetModel(s *domain.WorkoutSet) *WorkoutSet {
-	return &WorkoutSet{
-		ID:          s.ID,
-		ExerciseID:  s.ExerciseID,
-		SetNumber:   s.SetNumber,
-		Reps:        s.Reps,
-		WeightKg:    s.WeightKg,
-		Rpe:         s.RPE,
-		PerformedAt: s.PerformedAt,
-	}
-}
-func toWorkoutSetModels(sets []*domain.WorkoutSet) []*WorkoutSet {
-	out := make([]*WorkoutSet, len(sets))
-	for i, s := range sets {
-		out[i] = toWorkoutSetModel(s)
-	}
-	return out
-}
-func toWorkoutStatus(s domain.WorkoutStatus) WorkoutStatus {
-	if s == domain.WorkoutCompleted {
-		return WorkoutStatusCompleted
-	}
-	return WorkoutStatusInProgress
-}
-func toPersonalRecordModel(pr *domain.PersonalRecord) *PersonalRecord {
-	return &PersonalRecord{
-		ID:           pr.ID,
-		ExerciseID:   pr.ExerciseID,
-		RecordType:   pr.RecordType,
-		Value:        pr.Value,
-		AchievedAt:   pr.AchievedAt,
-		WorkoutSetID: pr.WorkoutSetID,
-	}
-}
-func toLogSetResult(logged *domain.LoggedSet) *LogSetResult {
-	newRecords := make([]*PersonalRecord, len(logged.NewRecords))
-	for i, pr := range logged.NewRecords {
-		newRecords[i] = toPersonalRecordModel(pr)
-	}
-	return &LogSetResult{Set: toWorkoutSetModel(logged.Set), NewRecords: newRecords}
-}
-func toProgressPointModel(p *domain.ProgressPoint) *ProgressPoint {
-	return &ProgressPoint{
-		Day:         p.Day,
-		TotalVolume: p.TotalVolume,
-		MaxWeight:   p.MaxWeight,
-		SetCount:    p.SetCount,
-	}
-}
-func toBodyMetricModel(m *domain.BodyMetric) *BodyMetric {
-	return &BodyMetric{
-		ID:         m.ID,
-		MetricType: m.MetricType,
-		Value:      m.Value,
-		RecordedAt: m.RecordedAt,
-	}
-}
-func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *domain.Workout) (*Workout, error) {
-	sets, err := r.Workout.SetsForWorkout(ctx, userID, w.ID)
-	if err != nil {
-		return nil, err
-	}
-	return &Workout{
-		ID:        w.ID,
-		StartedAt: w.StartedAt,
-		EndedAt:   w.EndedAt,
-		Notes:     w.Notes,
-		Status:    toWorkoutStatus(w.Status),
-		Sets:      toWorkoutSetModels(sets),
-	}, nil
-}
-*/

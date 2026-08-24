@@ -10,7 +10,7 @@ class WorkoutRepository {
   final GraphQLClient _client;
 
   static const _workoutFields = '''
-    id startedAt endedAt notes status
+    id startedAt endedAt notes status templateId
     sets { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
   ''';
 
@@ -64,9 +64,14 @@ class WorkoutRepository {
     return data == null ? null : Workout.fromJson(data);
   }
 
-  Future<Workout> startWorkout() async {
+  Future<Workout> startWorkout({String? templateId}) async {
     final result = await _client.mutate(MutationOptions(
-      document: gql('mutation StartWorkout { startWorkout { $_workoutFields } }'),
+      document: gql('''
+        mutation StartWorkout(\$templateId: UUID) {
+          startWorkout(templateId: \$templateId) { $_workoutFields }
+        }
+      '''),
+      variables: {'templateId': templateId},
     ));
     if (result.hasException) throw Exception(result.exception.toString());
     return Workout.fromJson(result.data!['startWorkout'] as Map<String, dynamic>);

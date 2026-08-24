@@ -69,6 +69,20 @@ type Query struct {
 type Subscription struct {
 }
 
+type TemplateExercise struct {
+	ID         uuid.UUID `json:"id"`
+	ExerciseID uuid.UUID `json:"exerciseId"`
+	Position   int       `json:"position"`
+	TargetSets int       `json:"targetSets"`
+	TargetReps *int      `json:"targetReps,omitempty"`
+}
+
+type TemplateExerciseInput struct {
+	ExerciseID uuid.UUID `json:"exerciseId"`
+	TargetSets int       `json:"targetSets"`
+	TargetReps *int      `json:"targetReps,omitempty"`
+}
+
 type User struct {
 	ID          uuid.UUID `json:"id"`
 	Email       string    `json:"email"`
@@ -78,12 +92,13 @@ type User struct {
 }
 
 type Workout struct {
-	ID        uuid.UUID     `json:"id"`
-	StartedAt time.Time     `json:"startedAt"`
-	EndedAt   *time.Time    `json:"endedAt,omitempty"`
-	Notes     string        `json:"notes"`
-	Status    WorkoutStatus `json:"status"`
-	Sets      []*WorkoutSet `json:"sets"`
+	ID         uuid.UUID     `json:"id"`
+	StartedAt  time.Time     `json:"startedAt"`
+	EndedAt    *time.Time    `json:"endedAt,omitempty"`
+	Notes      string        `json:"notes"`
+	Status     WorkoutStatus `json:"status"`
+	Sets       []*WorkoutSet `json:"sets"`
+	TemplateID *uuid.UUID    `json:"templateId,omitempty"`
 }
 
 type WorkoutConnection struct {
@@ -105,6 +120,13 @@ type WorkoutSet struct {
 	Rpe         *float64  `json:"rpe,omitempty"`
 	IsWarmup    bool      `json:"isWarmup"`
 	PerformedAt time.Time `json:"performedAt"`
+}
+
+type WorkoutTemplate struct {
+	ID        uuid.UUID           `json:"id"`
+	Name      string              `json:"name"`
+	CreatedAt time.Time           `json:"createdAt"`
+	Exercises []*TemplateExercise `json:"exercises"`
 }
 
 type WorkoutStatus string

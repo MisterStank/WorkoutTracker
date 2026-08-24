@@ -21,6 +21,7 @@ class WorkoutSet {
     required this.weightKg,
     this.rpe,
     this.isWarmup = false,
+    this.isPending = false,
   });
 
   final String id;
@@ -30,6 +31,10 @@ class WorkoutSet {
   final double weightKg;
   final double? rpe;
   final bool isWarmup;
+  // True for a set logged while offline, not yet confirmed by the server —
+  // never comes from the API itself (always false when parsed from JSON),
+  // only set locally by ActiveWorkoutNotifier's optimistic offline path.
+  final bool isPending;
 
   factory WorkoutSet.fromJson(Map<String, dynamic> json) => WorkoutSet(
         id: json['id'] as String,
@@ -49,6 +54,7 @@ class Workout {
     required this.status,
     required this.notes,
     required this.sets,
+    this.templateId,
   });
 
   final String id;
@@ -56,12 +62,14 @@ class Workout {
   final String status; // "IN_PROGRESS" | "COMPLETED"
   final String notes;
   final List<WorkoutSet> sets;
+  final String? templateId;
 
   factory Workout.fromJson(Map<String, dynamic> json) => Workout(
         id: json['id'] as String,
         startedAt: DateTime.parse(json['startedAt'] as String),
         status: json['status'] as String,
         notes: json['notes'] as String,
+        templateId: json['templateId'] as String?,
         sets: (json['sets'] as List<dynamic>)
             .map((s) => WorkoutSet.fromJson(s as Map<String, dynamic>))
             .toList(),

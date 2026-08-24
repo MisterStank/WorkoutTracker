@@ -59,48 +59,94 @@ WorkoutTracker/
 ├── internal/
 │   ├── domain/                    entities + repository interfaces (no framework deps)
 │   │   ├── user.go                User, RefreshToken, UserRepository, RefreshTokenRepository interfaces
-│   │   └── errors.go              sentinel domain errors (ErrEmailTaken, ErrInvalidCredentials, ...)
+│   │   ├── workout.go             Exercise, Workout, WorkoutSet, PersonalRecord, WorkoutTemplate + their repo interfaces
+│   │   ├── analytics.go           ProgressPoint, BodyMetric, ProgressRollupRepository, WorkoutEventPublisher
+│   │   └── errors.go              sentinel domain errors (ErrEmailTaken, ErrWorkoutNotOwned, ErrTemplateNotOwned, ...)
 │   ├── service/                   business logic — depends only on domain interfaces
 │   │   ├── auth_service.go        SignUp / Login / Refresh / Logout / LogoutAllDevices / UserByID
 │   │   ├── auth_service_test.go   unit tests against in-memory fakes (no DB needed)
+│   │   ├── workout_service.go     start/log/finish workout, warm-up sets, templates, cursor-paginated history
+│   │   ├── workout_service_test.go  unit tests against in-memory fakes
+│   │   ├── workout_cursor.go      opaque cursor encode/decode for workoutHistory pagination
+│   │   ├── analytics_service.go   progress/volume trend queries with Redis write-through caching
+│   │   ├── analytics_service_test.go
 │   │   ├── password.go            argon2id hash + verify
 │   │   └── token.go               JWT issue/parse, opaque refresh-token generation + hashing
 │   ├── repository/                Postgres implementations of domain interfaces (pgx)
-│   │   ├── user_repository.go
-│   │   └── refresh_token_repository.go
+│   │   ├── user_repository.go / refresh_token_repository.go
+│   │   ├── exercise_repository.go / workout_repository.go / workout_set_repository.go
+│   │   ├── workout_template_repository.go / personal_record_repository.go
+│   │   ├── progress_rollup_repository.go / body_metric_repository.go
+│   │   └── workout_set_repository.go's LogSet — the one method worth reading closely: inserts a set and,
+│   │       in the SAME transaction, atomically upserts personal_records (ON CONFLICT ... WHERE value <
+│   │       EXCLUDED.value) and progress_daily_rollup — this is how PR/rollup correctness holds up under
+│   │       concurrent writes without a separate lock
 │   ├── graphql/                   gqlgen: schema, generated code, thin resolvers
 │   │   ├── schema.graphql         source of truth — edit this, then regenerate
 │   │   ├── generated.go           gqlgen output — do not hand-edit
 │   │   ├── models_gen.go          gqlgen output — do not hand-edit
-│   │   └── resolver.go            hand-written: translates GraphQL <-> AuthService, no business logic
-│   ├── middleware/
-│   │   └── auth.go                parses Authorization: Bearer, injects user ID into context
+│   │   └── resolver.go            hand-written: translates GraphQL <-> services, no business logic.
+│   │                               NOTE: gqlgen regenerate WIPES the Resolver struct's fields and any
+│   │                               free-standing helper functions (toXModel etc.) on every run, keeping
+│   │                               only recognized resolver methods — always re-paste those back in full
+│   │                               after regenerating, don't try to preserve them via diffing.
+│   ├── middleware/auth.go         parses Authorization: Bearer (HTTP) / connection_init payload (WS),
+│   │                               injects user ID into context; WithUserID() for non-HTTP-middleware paths
+│   ├── cache/redis_cache.go       generic Redis JSON cache (Get/Set/Delete) used by AnalyticsService
+│   ├── realtime/redis_event_bus.go  Redis pub/sub fan-out for the workoutProgressUpdated GraphQL subscription
 │   └── platform/                  cross-cutting infra
 │       ├── config.go              env-driven Config struct
-│       └── db.go                  pgxpool constructor
+│       ├── db.go                  pgxpool constructor
+│       └── redis.go               go-redis client constructor
 │
-├── migrations/
-│   ├── 0001_init_users_and_auth.up.sql     users, refresh_tokens tables + indexes
-│   └── 0001_init_users_and_auth.down.sql
+├── cmd/seed/main.go               `go run ./cmd/seed` — wipes/recreates a demo account
+│                                    (demo@workouttracker.app / demo12345) with 6 weeks of realistic
+│                                    progressive-overload history, so every screen has real data to look at
+│
+├── migrations/                    0001 users/auth · 0002 exercises/workouts/sets/PRs (seeded exercise
+│                                    catalog) · 0003 body_metrics/progress_daily_rollup · 0004 is_warmup
+│                                    flag on workout_sets · 0005 workout_templates + workouts.template_id
 │
 ├── mobile/                        Flutter app (package name: mobile)
 │   ├── lib/
 │   │   ├── main.dart              ProviderScope root, AuthGate (routes login vs. authenticated home)
 │   │   ├── core/
-│   │   │   ├── graphql/graphql_client.dart   builds GraphQLClient, attaches access token per-request
-│   │   │   └── storage/token_storage.dart    flutter_secure_storage wrapper for JWT tokens
-│   │   └── features/auth/
-│   │       ├── auth_state.dart               sealed AuthState (Unauthenticated/Authenticating/Authenticated/Error)
-│   │       ├── auth_repository.dart          raw GraphQL mutations (signup/login/refresh/logout)
-│   │       ├── auth_provider.dart            Riverpod providers + AuthNotifier (StateNotifier)
-│   │       └── login_screen.dart             login UI
-│   ├── test/widget_test.dart      widget test for LoginScreen
-│   └── pubspec.yaml                riverpod, graphql_flutter, flutter_secure_storage, drift, connectivity_plus
+│   │   │   ├── graphql/graphql_client.dart   HttpLink+AuthLink for queries/mutations, split to a
+│   │   │   │                                  WebSocketLink for subscriptions (auth via connection_init,
+│   │   │   │                                  not a header — WS handshakes can't carry one)
+│   │   │   ├── storage/                       token_storage.dart (JWTs), recent_exercises_storage.dart
+│   │   │   ├── units/                          WeightUnit (kg/lb) + persisted preference provider —
+│   │   │   │                                    backend always stores/transmits kg, conversion is client-only
+│   │   │   └── offline/                        Drift-backed outbox for logSet specifically (the one write
+│   │   │       ├── app_database.dart            that actually happens at the gym with bad signal), not a
+│   │   │       ├── connection/                  general offline-first rewrite. `offlineQueueSupported` is
+│   │   │       │   ├── connection_native.dart    false on web (conditional-imported: native.dart needs
+│   │   │       │   └── connection_stub.dart      dart:io, unavailable there) — app_database.g.dart is
+│   │   │       ├── offline_provider.dart         gitignored, regenerate via build_runner (see Run below)
+│   │   │       └── sync_service.dart            drains the outbox on connectivity_plus reconnect events
+│   │   └── features/
+│   │       ├── auth/               signup/login screens, sealed AuthState, AuthNotifier (session restore
+│   │       │                        on launch: try `me`, fall back to one refresh attempt)
+│   │       ├── workout/            WorkoutHomeScreen (active workout: grouped-by-exercise sets, rest timer,
+│   │       │                        PR banner, planned-exercise chips when started from a template),
+│   │       │                        ExercisePickerScreen (search + locally-persisted recents),
+│   │       │                        log_set_sheet.dart (reps/weight/RPE/warm-up, pre-filled from last set),
+│   │       │                        workout_history_screen.dart (cursor-paginated), ActiveWorkoutNotifier
+│   │       │                        (owns the offline-enqueue/reconcile logic + the live-subscription watch)
+│   │       ├── templates/          TemplatesScreen (list/start/delete), CreateTemplateScreen — a workout
+│   │       │                        started from a template carries workout.templateId
+│   │       └── analytics/          AnalyticsScreen tabs: volume trend, per-exercise progress, body weight
+│   │                                (fl_chart), all unit-aware
+│   ├── test/widget_test.dart      widget tests for Login/Signup screens
+│   └── pubspec.yaml                riverpod, graphql_flutter, flutter_secure_storage, drift, drift_dev,
+│                                    connectivity_plus, fl_chart, gql
 │
 └── .github/workflows/
     ├── api.yml                    lint → unit test → integration test (Postgres service container) →
     │                               docker build → push GHCR → deploy staging (Fly.io)
-    └── mobile.yml                 flutter analyze → flutter test → flutter build apk --debug
+    └── mobile.yml                 flutter pub get → dart run build_runner build (Drift codegen, required —
+                                     app_database.g.dart is gitignored) → flutter analyze → flutter test →
+                                     flutter build apk --debug
 ```
 
 ## Setup
@@ -129,6 +175,7 @@ go run ./cmd/api
 Mobile (from `mobile/`):
 ```bash
 flutter pub get
+dart run build_runner build --delete-conflicting-outputs   # regenerates lib/core/offline/app_database.g.dart (Drift, gitignored)
 flutter run --dart-define=API_URL=http://localhost:8080/graphql
 ```
 
@@ -196,8 +243,22 @@ that's already been applied anywhere — add a new one instead.
 
 ## Current status / what's next
 
-Phase 1 (auth) is scaffolded and working end-to-end: signup, login, refresh
-(with rotation), logout, `me`, backed by real Postgres repositories, covered
-by unit tests, with both CI/CD pipelines wired up. Phase 2 (workout tracking:
-exercises, workouts, sets, PR detection) is next — see `PLAN.md` section 11
-for its scope before starting.
+Phases 1–3 from `PLAN.md` are built and verified end-to-end (including on a
+real Android build, not just web): auth; workout tracking with atomic PR
+detection and warm-up-set exclusion; analytics (Redis-cached progress/volume
+trends, live GraphQL subscriptions over Redis pub/sub, body-weight
+tracking). Beyond the original plan, a "make it actually usable" pass added:
+last-weight memory, a rest timer, a kg/lb toggle, workout templates
+(start a workout pre-populated with a planned exercise list), and an
+offline-logging outbox for the log-set write path specifically.
+
+Not yet done:
+- **True offline-first beyond logSet** — starting/finishing a workout,
+  templates, and login still require connectivity; only mid-workout set
+  logging survives a dropped connection.
+- **Differentiator ideas** (not started, discussed but deferred): RPE-based
+  autoregulated progression suggestions, plateau detection, live shared
+  training sessions (the pub/sub infra already exists for this).
+- Verify the offline outbox against a *real* dropped connection (airplane
+  mode on a device) — so far only reasoned through, not device-tested,
+  since simulating true network loss isn't practical from this environment.

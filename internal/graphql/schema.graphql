@@ -47,6 +47,28 @@ type Workout {
   notes: String!
   status: WorkoutStatus!
   sets: [WorkoutSet!]!
+  templateId: UUID
+}
+
+type TemplateExercise {
+  id: UUID!
+  exerciseId: UUID!
+  position: Int!
+  targetSets: Int!
+  targetReps: Int
+}
+
+type WorkoutTemplate {
+  id: UUID!
+  name: String!
+  createdAt: Time!
+  exercises: [TemplateExercise!]!
+}
+
+input TemplateExerciseInput {
+  exerciseId: UUID!
+  targetSets: Int!
+  targetReps: Int
 }
 
 type PersonalRecord {
@@ -99,6 +121,7 @@ type Query {
   workoutHistory(first: Int!, after: String): WorkoutConnection!
   personalRecords: [PersonalRecord!]!
   lastSetForExercise(exerciseId: UUID!): WorkoutSet
+  workoutTemplates: [WorkoutTemplate!]!
 
   progressOverTime(exerciseId: UUID!, days: Int!): [ProgressPoint!]!
   volumeTrend(days: Int!): [ProgressPoint!]!
@@ -111,9 +134,12 @@ type Mutation {
   refreshToken(refreshToken: String!): AuthPayload!
   logout(refreshToken: String!): Boolean!
 
-  startWorkout: Workout!
+  startWorkout(templateId: UUID): Workout!
   logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float, isWarmup: Boolean): LogSetResult!
   finishWorkout(workoutId: UUID!, notes: String): Workout!
+
+  createWorkoutTemplate(name: String!, exercises: [TemplateExerciseInput!]!): WorkoutTemplate!
+  deleteWorkoutTemplate(templateId: UUID!): Boolean!
 
   logBodyMetric(metricType: String!, value: Float!): BodyMetric!
 }

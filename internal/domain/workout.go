@@ -33,12 +33,31 @@ type Exercise struct {
 }
 
 type Workout struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	StartedAt  time.Time
+	EndedAt    *time.Time
+	Notes      string
+	Status     WorkoutStatus
+	TemplateID *uuid.UUID
+}
+
+// TemplateExercise is one planned exercise within a WorkoutTemplate, in
+// display order.
+type TemplateExercise struct {
+	ID         uuid.UUID
+	ExerciseID uuid.UUID
+	Position   int
+	TargetSets int
+	TargetReps *int
+}
+
+type WorkoutTemplate struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
-	StartedAt time.Time
-	EndedAt   *time.Time
-	Notes     string
-	Status    WorkoutStatus
+	Name      string
+	CreatedAt time.Time
+	Exercises []*TemplateExercise
 }
 
 type WorkoutSet struct {
@@ -85,6 +104,13 @@ type WorkoutRepository interface {
 	// than OFFSET, so page N stays cheap regardless of how far in the user
 	// has paged.
 	ListForUser(ctx context.Context, userID uuid.UUID, limit int, afterStartedAt *time.Time, afterID *uuid.UUID) ([]*Workout, error)
+}
+
+type WorkoutTemplateRepository interface {
+	Create(ctx context.Context, t *WorkoutTemplate) error
+	ListForUser(ctx context.Context, userID uuid.UUID) ([]*WorkoutTemplate, error)
+	FindByID(ctx context.Context, id uuid.UUID) (*WorkoutTemplate, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type WorkoutSetRepository interface {

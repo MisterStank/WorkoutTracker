@@ -3,10 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/offline/app_database.dart' show offlineQueueSupported;
+import '../../core/offline/sync_service.dart';
 import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import '../analytics/analytics_screen.dart';
 import '../auth/auth_provider.dart';
+import '../templates/template_models.dart';
+import '../templates/template_provider.dart';
+import '../templates/templates_screen.dart';
 import 'exercise_picker_screen.dart';
 import 'log_set_sheet.dart';
 import 'rest_timer_provider.dart';
@@ -23,7 +28,10 @@ class WorkoutHomeScreen extends ConsumerWidget {
       MaterialPageRoute(builder: (_) => const ExercisePickerScreen()),
     );
     if (exercise == null || !context.mounted) return;
+    await _logSetForExercise(context, ref, exercise);
+  }
 
+  static Future<void> _logSetForExercise(BuildContext context, WidgetRef ref, Exercise exercise) async {
     final unit = ref.read(weightUnitProvider);
     final lastSet = await ref.read(workoutRepositoryProvider).lastSetForExercise(exercise.id);
     if (!context.mounted) return;
@@ -39,6 +47,39 @@ class WorkoutHomeScreen extends ConsumerWidget {
           isWarmup: input.isWarmup,
         );
     ref.read(restTimerProvider.notifier).start();
+  }
+
+  Future<void> _startWorkout(BuildContext context, WidgetRef ref) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.play_arrow),
+              title: const Text('Blank workout'),
+              onTap: () => Navigator.of(context).pop('blank'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.checklist),
+              title: const Text('From a template'),
+              onTap: () => Navigator.of(context).pop('template'),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (choice == 'blank') {
+      await ref.read(activeWorkoutProvider.notifier).start();
+    } else if (choice == 'template') {
+      if (context.mounted) {
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen()));
+      }
+    }
   }
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
@@ -71,6 +112,10 @@ class WorkoutHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(activeWorkoutProvider);
     final unit = ref.watch(weightUnitProvider);
+    // Keeps SyncService alive for as long as the home screen is mounted, so
+    // queued offline sets get pushed as soon as connectivity returns even
+    // if the user never re-opens the active-workout screen themselves.
+    if (offlineQueueSupported) ref.watch(syncServiceProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -84,6 +129,11 @@ class WorkoutHomeScreen extends ConsumerWidget {
             icon: const Icon(Icons.show_chart),
             tooltip: 'Progress',
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalyticsScreen())),
+          ),
+          IconButton(
+            icon: const Icon(Icons.checklist),
+            tooltip: 'Templates',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen())),
           ),
           IconButton(
             icon: const Icon(Icons.history),
@@ -107,7 +157,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
       body: switch (state) {
         ActiveWorkoutLoading() => const Center(child: CircularProgressIndicator()),
         ActiveWorkoutError(:final message) => _ErrorView(message: message),
-        ActiveWorkoutNone() => _StartWorkoutView(onStart: () => ref.read(activeWorkoutProvider.notifier).start()),
+        ActiveWorkoutNone() => _StartWorkoutView(onStart: () => _startWorkout(context, ref)),
         ActiveWorkoutInProgress(:final workout, :final lastNewRecords) => _ActiveWorkoutView(
             workout: workout,
             lastNewRecords: lastNewRecords,
@@ -191,6 +241,11 @@ class _ActiveWorkoutView extends ConsumerWidget {
       groups.putIfAbsent(set.exerciseId, () => []).add(set);
     }
 
+    WorkoutTemplate? template;
+    if (workout.templateId != null) {
+      template = ref.watch(templateCatalogProvider).asData?.value[workout.templateId];
+    }
+
     return Column(
       children: [
         Padding(
@@ -209,6 +264,13 @@ class _ActiveWorkoutView extends ConsumerWidget {
             ],
           ),
         ),
+        if (template != null)
+          _PlannedExercisesRow(
+            template: template,
+            catalog: catalog,
+            loggedCounts: {for (final e in groups.entries) e.key: e.value.where((s) => !s.isWarmup).length},
+            onTapExercise: (exercise) => WorkoutHomeScreen._logSetForExercise(context, ref, exercise),
+          ),
         if (lastNewRecords.isNotEmpty) _NewRecordBanner(records: lastNewRecords),
         const _RestTimerBanner(),
         Expanded(
@@ -250,6 +312,51 @@ class _ActiveWorkoutView extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Quick-tap chips for a workout's planned exercises (from its template),
+/// so the user can jump straight to logging a set for the next planned
+/// exercise without going through the search picker.
+class _PlannedExercisesRow extends StatelessWidget {
+  const _PlannedExercisesRow({
+    required this.template,
+    required this.catalog,
+    required this.loggedCounts,
+    required this.onTapExercise,
+  });
+
+  final WorkoutTemplate template;
+  final Map<String, Exercise> catalog;
+  final Map<String, int> loggedCounts;
+  final void Function(Exercise exercise) onTapExercise;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: SizedBox(
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: template.exercises.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final planned = template.exercises[index];
+            final exercise = catalog[planned.exerciseId];
+            final done = loggedCounts[planned.exerciseId] ?? 0;
+            final complete = done >= planned.targetSets;
+            return ActionChip(
+              avatar: complete
+                  ? const Icon(Icons.check_circle, size: 16, color: Colors.green)
+                  : const Icon(Icons.fitness_center, size: 16),
+              label: Text('${exercise?.name ?? 'Exercise'} $done/${planned.targetSets}'),
+              onPressed: exercise == null ? null : () => onTapExercise(exercise),
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -427,6 +534,13 @@ class _ExerciseGroupCard extends StatelessWidget {
                         label: Text('RPE ${set.rpe}', style: const TextStyle(fontSize: 11)),
                         visualDensity: VisualDensity.compact,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ],
+                    if (set.isPending) ...[
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'Saved offline — will sync when back online',
+                        child: Icon(Icons.cloud_off, size: 14, color: Colors.grey.shade500),
                       ),
                     ],
                   ],

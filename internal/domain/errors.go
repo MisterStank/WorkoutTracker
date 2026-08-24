@@ -14,4 +14,7 @@ var (
 	ErrWorkoutNotActive     = errors.New("workout is not in progress")
 	ErrWorkoutAlreadyActive = errors.New("user already has a workout in progress")
 	ErrWorkoutSetNotFound   = errors.New("workout set not found")
+
+	ErrTemplateNotFound = errors.New("workout template not found")
+	ErrTemplateNotOwned = errors.New("workout template does not belong to this user")
 )
