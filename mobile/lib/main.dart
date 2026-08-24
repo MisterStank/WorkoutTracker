@@ -8,11 +8,19 @@ import 'core/theme/theme_mode_provider.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_state.dart';
 import 'features/auth/login_screen.dart';
+import 'features/onboarding/onboarding_prefs.dart';
+import 'features/onboarding/onboarding_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initHiveForFlutter();
-  runApp(const ProviderScope(child: WorkoutTrackerApp()));
+  final seenOnboarding = await loadOnboardingComplete();
+  runApp(
+    ProviderScope(
+      overrides: [onboardingCompleteProvider.overrideWith((ref) => seenOnboarding)],
+      child: const WorkoutTrackerApp(),
+    ),
+  );
 }
 
 class WorkoutTrackerApp extends ConsumerWidget {
@@ -30,8 +38,9 @@ class WorkoutTrackerApp extends ConsumerWidget {
   }
 }
 
-/// Routes to the login screen or the app's bottom-nav shell, based purely on
-/// authProvider's current state.
+/// Routes to the login screen, the first-run onboarding tutorial, or the
+/// app's bottom-nav shell, based on authProvider's state and whether this
+/// device has completed onboarding yet.
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -44,7 +53,8 @@ class AuthGate extends ConsumerWidget {
     }
 
     if (authState is AuthAuthenticated) {
-      return const AppShell();
+      final onboardingComplete = ref.watch(onboardingCompleteProvider);
+      return onboardingComplete ? const AppShell() : const OnboardingScreen();
     }
 
     return const LoginScreen();

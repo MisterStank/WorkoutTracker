@@ -26,6 +26,8 @@ Create an account with your email, a password, and a display name. Once you're i
 
 Already have an account? Use **Log in** instead. To sign out at any time, open the **⋮** menu on the Home tab and tap **Log out**.
 
+**First-run tour**: the first time you log in on a device, a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Templates** tab.
+
 The app has four main tabs at the bottom of the screen — **Home**, **History**, **Templates**, and **Progress** — everything below is organized around them.
 
 ## 2. Starting a workout
