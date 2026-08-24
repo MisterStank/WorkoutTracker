@@ -130,7 +130,7 @@ func (s *WorkoutService) ActiveWorkout(ctx context.Context, userID uuid.UUID) (*
 	return w, err
 }
 
-func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, isWarmup bool) (*domain.LoggedSet, error) {
+func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, setType domain.SetType, supersetID *uuid.UUID) (*domain.LoggedSet, error) {
 	workout, err := s.workouts.FindByID(ctx, workoutID)
 	if err != nil {
 		return nil, err
@@ -144,6 +144,9 @@ func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exercise
 	if _, err := s.exercises.FindByID(ctx, exerciseID); err != nil {
 		return nil, err
 	}
+	if setType == "" {
+		setType = domain.SetTypeNormal
+	}
 
 	set := &domain.WorkoutSet{
 		WorkoutID:  workoutID,
@@ -151,7 +154,8 @@ func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exercise
 		Reps:       reps,
 		WeightKg:   weightKg,
 		RPE:        rpe,
-		IsWarmup:   isWarmup,
+		SetType:    setType,
+		SupersetID: supersetID,
 	}
 	logged, err := s.sets.LogSet(ctx, userID, set)
 	if err != nil {

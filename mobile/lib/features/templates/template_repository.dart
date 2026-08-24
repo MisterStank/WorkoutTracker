@@ -9,7 +9,7 @@ class TemplateRepository {
 
   static const _templateFields = '''
     id name createdAt
-    exercises { id exerciseId position targetSets targetReps }
+    exercises { id exerciseId position targetSets targetReps supersetGroup }
   ''';
 
   Future<List<WorkoutTemplate>> list() async {
@@ -36,6 +36,7 @@ class TemplateRepository {
                   'exerciseId': e.exerciseId,
                   'targetSets': e.targetSets,
                   'targetReps': e.targetReps,
+                  'supersetGroup': e.supersetGroup,
                 })
             .toList(),
       },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/units/units_provider.dart';
+import '../../core/units/weight_unit.dart';
 import '../workout/exercise_picker_screen.dart';
 import '../workout/workout_models.dart';
 import 'analytics_models.dart';
@@ -21,13 +22,13 @@ class AnalyticsScreen extends StatelessWidget {
           bottom: const TabBar(tabs: [
             Tab(text: 'Volume'),
             Tab(text: 'By exercise'),
-            Tab(text: 'Body weight'),
+            Tab(text: 'Measurements'),
           ]),
         ),
         body: const TabBarView(children: [
           _VolumeTrendTab(),
           _ExerciseProgressTab(),
-          _BodyWeightTab(),
+          _MeasurementsTab(),
         ]),
       ),
     );
@@ -142,14 +143,38 @@ class _ExerciseProgressTabState extends ConsumerState<_ExerciseProgressTab> {
   }
 }
 
-class _BodyWeightTab extends ConsumerStatefulWidget {
-  const _BodyWeightTab();
+/// A trackable body measurement. Only bodyweight uses the kg/lb preference
+/// (`isWeight`) — circumference measurements are logged in cm, matching
+/// what a tape measure actually reads, rather than overloading the weight
+/// unit toggle for an unrelated quantity.
+class MeasurementType {
+  const MeasurementType(this.metricType, this.label, {this.isWeight = false});
 
-  @override
-  ConsumerState<_BodyWeightTab> createState() => _BodyWeightTabState();
+  final String metricType;
+  final String label;
+  final bool isWeight;
+
+  String unitLabel(WeightUnit weightUnit) => isWeight ? weightUnit.label : 'cm';
 }
 
-class _BodyWeightTabState extends ConsumerState<_BodyWeightTab> {
+const _measurementTypes = [
+  MeasurementType('bodyweight_kg', 'Body weight', isWeight: true),
+  MeasurementType('waist_cm', 'Waist'),
+  MeasurementType('chest_cm', 'Chest'),
+  MeasurementType('arm_cm', 'Arms'),
+  MeasurementType('thigh_cm', 'Thighs'),
+  MeasurementType('hip_cm', 'Hips'),
+];
+
+class _MeasurementsTab extends ConsumerStatefulWidget {
+  const _MeasurementsTab();
+
+  @override
+  ConsumerState<_MeasurementsTab> createState() => _MeasurementsTabState();
+}
+
+class _MeasurementsTabState extends ConsumerState<_MeasurementsTab> {
+  MeasurementType _selected = _measurementTypes.first;
   Future<List<BodyMetric>>? _future;
 
   @override
@@ -159,21 +184,22 @@ class _BodyWeightTabState extends ConsumerState<_BodyWeightTab> {
   }
 
   void _reload() {
-    _future = ref.read(analyticsRepositoryProvider).bodyMetrics();
+    _future = ref.read(analyticsRepositoryProvider).bodyMetrics(metricType: _selected.metricType);
   }
 
-  Future<void> _logWeight() async {
-    final unit = ref.read(weightUnitProvider);
+  Future<void> _logMeasurement() async {
+    final weightUnit = ref.read(weightUnitProvider);
+    final unitLabel = _selected.unitLabel(weightUnit);
     final controller = TextEditingController();
     final value = await showDialog<double>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Log body weight'),
+        title: Text('Log ${_selected.label.toLowerCase()}'),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: 'Weight (${unit.label})'),
+          decoration: InputDecoration(labelText: '${_selected.label} ($unitLabel)'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
@@ -185,20 +211,40 @@ class _BodyWeightTabState extends ConsumerState<_BodyWeightTab> {
       ),
     );
     if (value == null) return;
-    await ref.read(analyticsRepositoryProvider).logBodyMetric(value: unit.toKg(value));
+    final stored = _selected.isWeight ? weightUnit.toKg(value) : value;
+    await ref.read(analyticsRepositoryProvider).logBodyMetric(metricType: _selected.metricType, value: stored);
     setState(_reload);
   }
 
   @override
   Widget build(BuildContext context) {
+    final weightUnit = ref.watch(weightUnitProvider);
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: DropdownButtonFormField<MeasurementType>(
+            initialValue: _selected,
+            decoration: const InputDecoration(labelText: 'Measurement', isDense: true),
+            items: _measurementTypes
+                .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                .toList(),
+            onChanged: (t) {
+              if (t == null) return;
+              setState(() {
+                _selected = t;
+                _reload();
+              });
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: FilledButton.icon(
-            onPressed: _logWeight,
+            onPressed: _logMeasurement,
             icon: const Icon(Icons.add),
-            label: const Text('Log weight'),
+            label: Text('Log ${_selected.label.toLowerCase()}'),
           ),
         ),
         Expanded(
@@ -211,18 +257,18 @@ class _BodyWeightTabState extends ConsumerState<_BodyWeightTab> {
               if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
               final metrics = snapshot.data ?? [];
               if (metrics.isEmpty) {
-                return const _EmptyChartHint(message: 'Log your body weight to start tracking it.');
+                return _EmptyChartHint(message: 'Log your ${_selected.label.toLowerCase()} to start tracking it.');
               }
               final points = metrics
                   .map((m) => ProgressPoint(day: m.recordedAt, totalVolume: 0, maxWeight: m.value, setCount: 0))
                   .toList();
-              final unit = ref.watch(weightUnitProvider);
+              final unitLabel = _selected.unitLabel(weightUnit);
               return Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: ProgressChart(
                   points: points,
-                  valueOf: (p) => unit.fromKg(p.maxWeight),
-                  label: 'Body weight (${unit.label})',
+                  valueOf: (p) => _selected.isWeight ? weightUnit.fromKg(p.maxWeight) : p.maxWeight,
+                  label: '${_selected.label} ($unitLabel)',
                 ),
               );
             },

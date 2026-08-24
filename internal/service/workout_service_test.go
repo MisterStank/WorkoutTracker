@@ -182,15 +182,19 @@ func (f *fakeWorkoutSetRepo) LogSet(ctx context.Context, userID uuid.UUID, set *
 	set.ID = uuid.New()
 	set.SetNumber = len(f.sets[set.WorkoutID]) + 1
 	set.PerformedAt = time.Now()
+	if set.SetType == "" {
+		set.SetType = domain.SetTypeNormal
+	}
 	f.sets[set.WorkoutID] = append(f.sets[set.WorkoutID], set)
 
-	if set.IsWarmup {
+	if set.SetType == domain.SetTypeWarmup {
 		return &domain.LoggedSet{Set: set}, nil
 	}
 
 	candidates := map[string]float64{
-		domain.RecordTypeMaxWeight: set.WeightKg,
-		domain.RecordTypeMaxVolume: set.WeightKg * float64(set.Reps),
+		domain.RecordTypeMaxWeight:    set.WeightKg,
+		domain.RecordTypeMaxVolume:    set.WeightKg * float64(set.Reps),
+		domain.RecordTypeEstimated1RM: set.WeightKg * (1 + float64(set.Reps)/30.0),
 	}
 
 	var newRecords []*domain.PersonalRecord
@@ -323,7 +327,7 @@ func TestLogSetRejectsUnownedWorkout(t *testing.T) {
 	w, err := svc.StartWorkout(ctx, owner, nil)
 	require.NoError(t, err)
 
-	_, err = svc.LogSet(ctx, attacker, w.ID, exercise.ID, 5, 100, nil, false)
+	_, err = svc.LogSet(ctx, attacker, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
 	assert.ErrorIs(t, err, domain.ErrWorkoutNotOwned)
 }
 
@@ -339,7 +343,7 @@ func TestLogSetRejectsAfterFinish(t *testing.T) {
 	_, err = svc.FinishWorkout(ctx, userID, w.ID, "done")
 	require.NoError(t, err)
 
-	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, false)
+	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
 	assert.ErrorIs(t, err, domain.ErrWorkoutNotActive)
 }
 
@@ -352,18 +356,21 @@ func TestLogSetDetectsNewPersonalRecords(t *testing.T) {
 	w, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 
-	first, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, false)
+	first, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
-	assert.Len(t, first.NewRecords, 2, "first set at any weight/volume is always a new max_weight and max_volume PR")
+	assert.Len(t, first.NewRecords, 3, "first set at any weight/volume/1RM is always a new PR across all three record types")
 
-	// a heavier set at fewer reps: breaks max_weight, not max_volume (100*5=500 > 110*2=220)
-	second, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 2, 110, nil, false)
+	// a heavier set at fewer reps: breaks max_weight and estimated 1RM
+	// (110*(1+2/30)=117.3 > 100*(1+5/30)=116.7), not max_volume (100*5=500 > 110*2=220)
+	second, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 2, 110, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
-	require.Len(t, second.NewRecords, 1)
-	assert.Equal(t, domain.RecordTypeMaxWeight, second.NewRecords[0].RecordType)
+	require.Len(t, second.NewRecords, 2)
+	gotTypes := []string{second.NewRecords[0].RecordType, second.NewRecords[1].RecordType}
+	assert.Contains(t, gotTypes, domain.RecordTypeMaxWeight)
+	assert.Contains(t, gotTypes, domain.RecordTypeEstimated1RM)
 
 	// a lighter set that doesn't beat either record
-	third, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 3, 90, nil, false)
+	third, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 3, 90, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
 	assert.Empty(t, third.NewRecords)
 }
@@ -403,14 +410,51 @@ func TestWarmupSetsDoNotCountAsRecords(t *testing.T) {
 	w, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
 
-	warmup, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 10, 20, nil, true)
+	warmup, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 10, 20, nil, domain.SetTypeWarmup, nil)
 	require.NoError(t, err)
 	assert.Empty(t, warmup.NewRecords, "a warm-up set should never register a PR")
-	assert.True(t, warmup.Set.IsWarmup)
+	assert.Equal(t, domain.SetTypeWarmup, warmup.Set.SetType)
 
-	working, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 60, nil, false)
+	working, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 60, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
-	assert.Len(t, working.NewRecords, 2, "the first working set should still register both PR types, unaffected by the earlier warm-up")
+	assert.Len(t, working.NewRecords, 3, "the first working set should still register all PR types, unaffected by the earlier warm-up")
+}
+
+func TestDropSetAndFailureSetCountTowardRecords(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Leg Press"}
+	svc, _ := newTestWorkoutService(exercise)
+	userID := uuid.New()
+
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+
+	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 8, 100, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+
+	dropSet, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 12, 120, nil, domain.SetTypeDropset, nil)
+	require.NoError(t, err)
+	assert.NotEmpty(t, dropSet.NewRecords, "a drop set is real working effort and should be able to set a PR")
+
+	failureSet, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 15, 130, nil, domain.SetTypeFailure, nil)
+	require.NoError(t, err)
+	assert.NotEmpty(t, failureSet.NewRecords, "a failure set is real working effort and should be able to set a PR")
+}
+
+func TestSupersetIDPassesThrough(t *testing.T) {
+	ctx := context.Background()
+	exercise := &domain.Exercise{ID: uuid.New(), Name: "Barbell Bench Press"}
+	svc, _ := newTestWorkoutService(exercise)
+	userID := uuid.New()
+
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+
+	supersetID := uuid.New()
+	logged, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 8, 60, nil, domain.SetTypeNormal, &supersetID)
+	require.NoError(t, err)
+	require.NotNil(t, logged.Set.SupersetID)
+	assert.Equal(t, supersetID, *logged.Set.SupersetID)
 }
 
 func TestLastSetForExercise(t *testing.T) {
@@ -425,9 +469,9 @@ func TestLastSetForExercise(t *testing.T) {
 
 	w, err := svc.StartWorkout(ctx, userID, nil)
 	require.NoError(t, err)
-	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 8, 40, nil, false)
+	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 8, 40, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
-	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 6, 45, nil, false)
+	_, err = svc.LogSet(ctx, userID, w.ID, exercise.ID, 6, 45, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
 
 	last, err := svc.LastSetForExercise(ctx, userID, exercise.ID)

@@ -226,10 +226,14 @@ func roundToHalf(v float64) float64 {
 // time.Now().
 func logSeedSet(ctx context.Context, tx pgx.Tx, userID, workoutID, exerciseID uuid.UUID, setNumber, reps int, weightKg float64, rpe *float64, isWarmup bool, performedAt time.Time) error {
 	setID := uuid.New()
+	setType := "normal"
+	if isWarmup {
+		setType = "warmup"
+	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO workout_sets (id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, is_warmup, performed_at)
+		`INSERT INTO workout_sets (id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, set_type, performed_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		setID, workoutID, exerciseID, setNumber, reps, weightKg, rpe, isWarmup, performedAt,
+		setID, workoutID, exerciseID, setNumber, reps, weightKg, rpe, setType, performedAt,
 	); err != nil {
 		return err
 	}
@@ -239,8 +243,9 @@ func logSeedSet(ctx context.Context, tx pgx.Tx, userID, workoutID, exerciseID uu
 	}
 
 	candidates := map[string]float64{
-		"max_weight": weightKg,
-		"max_volume": weightKg * float64(reps),
+		"max_weight":    weightKg,
+		"max_volume":    weightKg * float64(reps),
+		"estimated_1rm": weightKg * (1 + float64(reps)/30.0),
 	}
 	for recordType, value := range candidates {
 		var returnedID uuid.UUID

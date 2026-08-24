@@ -38,13 +38,52 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
     setState(() {
       final current = _exercises[index];
       final next = (current.targetSets + delta).clamp(1, 10);
-      _exercises[index] = TemplateExerciseDraft(
-        exerciseId: current.exerciseId,
-        exerciseName: current.exerciseName,
-        targetSets: next,
-        targetReps: current.targetReps,
-      );
+      _exercises[index] = _copyWith(current, targetSets: next);
     });
+  }
+
+  /// Toggles whether this exercise is grouped as a superset with the one
+  /// directly above it — the natural gesture for "these two alternate
+  /// back-to-back", matching how Hevy lets you pair consecutive exercises.
+  void _toggleSuperset(int index) {
+    if (index == 0) return;
+    setState(() {
+      final current = _exercises[index];
+      final prev = _exercises[index - 1];
+      if (current.supersetGroup != null && current.supersetGroup == prev.supersetGroup) {
+        _exercises[index] = _copyWith(current, clearSupersetGroup: true);
+        return;
+      }
+      final group = prev.supersetGroup ?? _nextSupersetGroup();
+      if (prev.supersetGroup == null) {
+        _exercises[index - 1] = _copyWith(prev, supersetGroup: group);
+      }
+      _exercises[index] = _copyWith(current, supersetGroup: group);
+    });
+  }
+
+  int _nextSupersetGroup() {
+    final used = _exercises.map((e) => e.supersetGroup).whereType<int>().toSet();
+    var group = 1;
+    while (used.contains(group)) {
+      group++;
+    }
+    return group;
+  }
+
+  TemplateExerciseDraft _copyWith(
+    TemplateExerciseDraft d, {
+    int? targetSets,
+    int? supersetGroup,
+    bool clearSupersetGroup = false,
+  }) {
+    return TemplateExerciseDraft(
+      exerciseId: d.exerciseId,
+      exerciseName: d.exerciseName,
+      targetSets: targetSets ?? d.targetSets,
+      targetReps: d.targetReps,
+      supersetGroup: clearSupersetGroup ? null : (supersetGroup ?? d.supersetGroup),
+    );
   }
 
   Future<void> _save() async {
@@ -88,25 +127,54 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
                     itemCount: _exercises.length,
                     itemBuilder: (context, index) {
                       final ex = _exercises[index];
-                      return Card(
-                        elevation: 0,
-                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          title: Text(ex.exerciseName),
-                          subtitle: Text('${ex.targetSets} sets'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => _updateSets(index, -1)),
-                              IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => _updateSets(index, 1)),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => setState(() => _exercises.removeAt(index)),
+                      final grouped = index > 0 && ex.supersetGroup != null && ex.supersetGroup == _exercises[index - 1].supersetGroup;
+                      return Column(
+                        children: [
+                          if (index > 0)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: InkWell(
+                                onTap: () => _toggleSuperset(index),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(width: 28),
+                                    Icon(grouped ? Icons.link : Icons.link_off, size: 16, color: grouped ? Theme.of(context).colorScheme.primary : Colors.grey),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      grouped ? 'Superset' : 'Group as superset',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: grouped ? Theme.of(context).colorScheme.primary : Colors.grey.shade600,
+                                        fontWeight: grouped ? FontWeight.w600 : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ],
+                            ),
+                          Card(
+                            elevation: 0,
+                            color: grouped
+                                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4)
+                                : Theme.of(context).colorScheme.surfaceContainerHigh,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              title: Text(ex.exerciseName),
+                              subtitle: Text('${ex.targetSets} sets'),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => _updateSets(index, -1)),
+                                  IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => _updateSets(index, 1)),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () => setState(() => _exercises.removeAt(index)),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       );
                     },
                   ),

@@ -5,6 +5,7 @@ class TemplateExercise {
     required this.position,
     required this.targetSets,
     this.targetReps,
+    this.supersetGroup,
   });
 
   final String id;
@@ -12,6 +13,7 @@ class TemplateExercise {
   final int position;
   final int targetSets;
   final int? targetReps;
+  final int? supersetGroup;
 
   factory TemplateExercise.fromJson(Map<String, dynamic> json) => TemplateExercise(
         id: json['id'] as String,
@@ -19,6 +21,7 @@ class TemplateExercise {
         position: json['position'] as int,
         targetSets: json['targetSets'] as int,
         targetReps: json['targetReps'] as int?,
+        supersetGroup: json['supersetGroup'] as int?,
       );
 }
 
@@ -41,11 +44,19 @@ class WorkoutTemplate {
 }
 
 /// Input for creating one planned exercise within a new template.
+/// Exercises sharing a non-null [supersetGroup] are planned as a superset.
 class TemplateExerciseDraft {
-  const TemplateExerciseDraft({required this.exerciseId, required this.exerciseName, required this.targetSets, this.targetReps});
+  const TemplateExerciseDraft({
+    required this.exerciseId,
+    required this.exerciseName,
+    required this.targetSets,
+    this.targetReps,
+    this.supersetGroup,
+  });
 
   final String exerciseId;
   final String exerciseName;
   final int targetSets;
   final int? targetReps;
+  final int? supersetGroup;
 }

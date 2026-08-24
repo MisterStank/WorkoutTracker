@@ -12,6 +12,35 @@ class Exercise {
       );
 }
 
+enum SetType {
+  normal,
+  warmup,
+  dropset,
+  failure;
+
+  String get label => switch (this) {
+        SetType.normal => 'Normal',
+        SetType.warmup => 'Warm-up',
+        SetType.dropset => 'Drop set',
+        SetType.failure => 'Failure',
+      };
+
+  // Short badge text shown inline on a logged set row.
+  String get badge => switch (this) {
+        SetType.normal => '',
+        SetType.warmup => 'W',
+        SetType.dropset => 'D',
+        SetType.failure => 'F',
+      };
+
+  String get graphQLValue => name.toUpperCase();
+
+  static SetType fromGraphQL(String? value) => SetType.values.firstWhere(
+        (t) => t.graphQLValue == value,
+        orElse: () => SetType.normal,
+      );
+}
+
 class WorkoutSet {
   const WorkoutSet({
     required this.id,
@@ -20,7 +49,8 @@ class WorkoutSet {
     required this.reps,
     required this.weightKg,
     this.rpe,
-    this.isWarmup = false,
+    this.setType = SetType.normal,
+    this.supersetId,
     this.isPending = false,
   });
 
@@ -30,7 +60,8 @@ class WorkoutSet {
   final int reps;
   final double weightKg;
   final double? rpe;
-  final bool isWarmup;
+  final SetType setType;
+  final String? supersetId;
   // True for a set logged while offline, not yet confirmed by the server —
   // never comes from the API itself (always false when parsed from JSON),
   // only set locally by ActiveWorkoutNotifier's optimistic offline path.
@@ -43,7 +74,8 @@ class WorkoutSet {
         reps: json['reps'] as int,
         weightKg: (json['weightKg'] as num).toDouble(),
         rpe: (json['rpe'] as num?)?.toDouble(),
-        isWarmup: json['isWarmup'] as bool? ?? false,
+        setType: SetType.fromGraphQL(json['setType'] as String?),
+        supersetId: json['supersetId'] as String?,
       );
 }
 

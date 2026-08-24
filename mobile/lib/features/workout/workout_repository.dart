@@ -11,7 +11,7 @@ class WorkoutRepository {
 
   static const _workoutFields = '''
     id startedAt endedAt notes status templateId
-    sets { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
+    sets { id exerciseId setNumber reps weightKg rpe setType supersetId performedAt }
   ''';
 
   /// Streams every set logged to this workout in real time (GraphQL
@@ -22,7 +22,7 @@ class WorkoutRepository {
       document: gql('''
         subscription WorkoutProgressUpdated(\$workoutId: UUID!) {
           workoutProgressUpdated(workoutId: \$workoutId) {
-            set { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
+            set { id exerciseId setNumber reps weightKg rpe setType supersetId performedAt }
             newRecords { exerciseId recordType value }
           }
         }
@@ -83,13 +83,14 @@ class WorkoutRepository {
     required int reps,
     required double weightKg,
     double? rpe,
-    bool isWarmup = false,
+    SetType setType = SetType.normal,
+    String? supersetId,
   }) async {
     final result = await _client.mutate(MutationOptions(
       document: gql('''
-        mutation LogSet(\$workoutId: UUID!, \$exerciseId: UUID!, \$reps: Int!, \$weightKg: Float!, \$rpe: Float, \$isWarmup: Boolean) {
-          logSet(workoutId: \$workoutId, exerciseId: \$exerciseId, reps: \$reps, weightKg: \$weightKg, rpe: \$rpe, isWarmup: \$isWarmup) {
-            set { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
+        mutation LogSet(\$workoutId: UUID!, \$exerciseId: UUID!, \$reps: Int!, \$weightKg: Float!, \$rpe: Float, \$setType: SetType, \$supersetId: UUID) {
+          logSet(workoutId: \$workoutId, exerciseId: \$exerciseId, reps: \$reps, weightKg: \$weightKg, rpe: \$rpe, setType: \$setType, supersetId: \$supersetId) {
+            set { id exerciseId setNumber reps weightKg rpe setType supersetId performedAt }
             newRecords { exerciseId recordType value }
           }
         }
@@ -100,7 +101,8 @@ class WorkoutRepository {
         'reps': reps,
         'weightKg': weightKg,
         'rpe': rpe,
-        'isWarmup': isWarmup,
+        'setType': setType.graphQLValue,
+        'supersetId': supersetId,
       },
     ));
     if (result.hasException) throw Exception(result.exception.toString());
@@ -118,7 +120,7 @@ class WorkoutRepository {
     final result = await _client.query(QueryOptions(
       document: gql('''
         query LastSetForExercise(\$exerciseId: UUID!) {
-          lastSetForExercise(exerciseId: \$exerciseId) { id exerciseId setNumber reps weightKg rpe isWarmup performedAt }
+          lastSetForExercise(exerciseId: \$exerciseId) { id exerciseId setNumber reps weightKg rpe setType supersetId performedAt }
         }
       '''),
       variables: {'exerciseId': exerciseId},

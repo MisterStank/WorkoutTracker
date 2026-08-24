@@ -29,6 +29,13 @@ type Exercise {
   isCustom: Boolean!
 }
 
+enum SetType {
+  NORMAL
+  WARMUP
+  DROPSET
+  FAILURE
+}
+
 type WorkoutSet {
   id: UUID!
   exerciseId: UUID!
@@ -36,7 +43,8 @@ type WorkoutSet {
   reps: Int!
   weightKg: Float!
   rpe: Float
-  isWarmup: Boolean!
+  setType: SetType!
+  supersetId: UUID
   performedAt: Time!
 }
 
@@ -56,6 +64,7 @@ type TemplateExercise {
   position: Int!
   targetSets: Int!
   targetReps: Int
+  supersetGroup: Int
 }
 
 type WorkoutTemplate {
@@ -69,6 +78,7 @@ input TemplateExerciseInput {
   exerciseId: UUID!
   targetSets: Int!
   targetReps: Int
+  supersetGroup: Int
 }
 
 type PersonalRecord {
@@ -135,7 +145,7 @@ type Mutation {
   logout(refreshToken: String!): Boolean!
 
   startWorkout(templateId: UUID): Workout!
-  logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float, isWarmup: Boolean): LogSetResult!
+  logSet(workoutId: UUID!, exerciseId: UUID!, reps: Int!, weightKg: Float!, rpe: Float, setType: SetType, supersetId: UUID): LogSetResult!
   finishWorkout(workoutId: UUID!, notes: String): Workout!
 
   createWorkoutTemplate(name: String!, exercises: [TemplateExerciseInput!]!): WorkoutTemplate!

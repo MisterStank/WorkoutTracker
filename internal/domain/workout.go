@@ -16,10 +16,22 @@ const (
 
 // Record types tracked per exercise. MaxWeight rewards heavier lifts,
 // MaxVolume (weight * reps) rewards a strong single set even at lighter
-// weight — both are computed on every set so neither needs a backfill job.
+// weight, Estimated1RM (Epley formula) estimates a true one-rep max from
+// any rep range — all three are computed on every working set so none
+// needs a backfill job.
 const (
-	RecordTypeMaxWeight = "max_weight"
-	RecordTypeMaxVolume = "max_volume"
+	RecordTypeMaxWeight    = "max_weight"
+	RecordTypeMaxVolume    = "max_volume"
+	RecordTypeEstimated1RM = "estimated_1rm"
+)
+
+type SetType string
+
+const (
+	SetTypeNormal  SetType = "normal"
+	SetTypeWarmup  SetType = "warmup"
+	SetTypeDropset SetType = "dropset"
+	SetTypeFailure SetType = "failure"
 )
 
 type Exercise struct {
@@ -43,13 +55,15 @@ type Workout struct {
 }
 
 // TemplateExercise is one planned exercise within a WorkoutTemplate, in
-// display order.
+// display order. Exercises sharing a non-nil SupersetGroup are planned as
+// one superset (alternated back-to-back with shared rest).
 type TemplateExercise struct {
-	ID         uuid.UUID
-	ExerciseID uuid.UUID
-	Position   int
-	TargetSets int
-	TargetReps *int
+	ID            uuid.UUID
+	ExerciseID    uuid.UUID
+	Position      int
+	TargetSets    int
+	TargetReps    *int
+	SupersetGroup *int
 }
 
 type WorkoutTemplate struct {
@@ -68,7 +82,8 @@ type WorkoutSet struct {
 	Reps        int
 	WeightKg    float64
 	RPE         *float64
-	IsWarmup    bool
+	SetType     SetType
+	SupersetID  *uuid.UUID
 	PerformedAt time.Time
 }
 
@@ -117,7 +132,9 @@ type WorkoutSetRepository interface {
 	ListForWorkout(ctx context.Context, workoutID uuid.UUID) ([]*WorkoutSet, error)
 	// LogSet inserts a set and, unless it's a warm-up set, atomically upserts
 	// any personal records/rollup it breaks, in the same transaction as the
-	// insert. Warm-up sets are excluded so they don't skew PRs or volume.
+	// insert. Warm-up sets are excluded so they don't skew PRs or volume;
+	// drop sets and failure sets are still real working effort and count
+	// normally.
 	LogSet(ctx context.Context, userID uuid.UUID, set *WorkoutSet) (*LoggedSet, error)
 	// LastForExercise returns the most recent set logged for this exercise
 	// (any workout), used to pre-fill the log-set form with the weight/reps

@@ -103,7 +103,8 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     required int reps,
     required double weightKg,
     double? rpe,
-    bool isWarmup = false,
+    SetType setType = SetType.normal,
+    String? supersetId,
   }) async {
     final current = state;
     if (current is! ActiveWorkoutInProgress) return;
@@ -115,7 +116,8 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
         reps: reps,
         weightKg: weightKg,
         rpe: rpe,
-        isWarmup: isWarmup,
+        setType: setType,
+        supersetId: supersetId,
       );
       _applyLoggedSet(result);
     } catch (e) {
@@ -126,7 +128,8 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
           reps: reps,
           weightKg: weightKg,
           rpe: rpe,
-          isWarmup: isWarmup,
+          setType: setType,
+          supersetId: supersetId,
         );
       } else {
         state = ActiveWorkoutError(e.toString());
@@ -140,7 +143,8 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     required int reps,
     required double weightKg,
     double? rpe,
-    required bool isWarmup,
+    required SetType setType,
+    String? supersetId,
   }) async {
     final localId = '${DateTime.now().microsecondsSinceEpoch}_${_localIdCounter++}';
 
@@ -152,7 +156,8 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
       reps: reps,
       weightKg: weightKg,
       rpe: Value(rpe),
-      isWarmup: Value(isWarmup),
+      setType: Value(setType.name),
+      supersetId: Value(supersetId),
       createdAt: DateTime.now(),
     ));
 
@@ -165,7 +170,8 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
       reps: reps,
       weightKg: weightKg,
       rpe: rpe,
-      isWarmup: isWarmup,
+      setType: setType,
+      supersetId: supersetId,
       isPending: true,
     );
     final updatedWorkout = Workout(

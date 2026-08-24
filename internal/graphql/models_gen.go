@@ -70,17 +70,19 @@ type Subscription struct {
 }
 
 type TemplateExercise struct {
-	ID         uuid.UUID `json:"id"`
-	ExerciseID uuid.UUID `json:"exerciseId"`
-	Position   int       `json:"position"`
-	TargetSets int       `json:"targetSets"`
-	TargetReps *int      `json:"targetReps,omitempty"`
+	ID            uuid.UUID `json:"id"`
+	ExerciseID    uuid.UUID `json:"exerciseId"`
+	Position      int       `json:"position"`
+	TargetSets    int       `json:"targetSets"`
+	TargetReps    *int      `json:"targetReps,omitempty"`
+	SupersetGroup *int      `json:"supersetGroup,omitempty"`
 }
 
 type TemplateExerciseInput struct {
-	ExerciseID uuid.UUID `json:"exerciseId"`
-	TargetSets int       `json:"targetSets"`
-	TargetReps *int      `json:"targetReps,omitempty"`
+	ExerciseID    uuid.UUID `json:"exerciseId"`
+	TargetSets    int       `json:"targetSets"`
+	TargetReps    *int      `json:"targetReps,omitempty"`
+	SupersetGroup *int      `json:"supersetGroup,omitempty"`
 }
 
 type User struct {
@@ -112,14 +114,15 @@ type WorkoutEdge struct {
 }
 
 type WorkoutSet struct {
-	ID          uuid.UUID `json:"id"`
-	ExerciseID  uuid.UUID `json:"exerciseId"`
-	SetNumber   int       `json:"setNumber"`
-	Reps        int       `json:"reps"`
-	WeightKg    float64   `json:"weightKg"`
-	Rpe         *float64  `json:"rpe,omitempty"`
-	IsWarmup    bool      `json:"isWarmup"`
-	PerformedAt time.Time `json:"performedAt"`
+	ID          uuid.UUID  `json:"id"`
+	ExerciseID  uuid.UUID  `json:"exerciseId"`
+	SetNumber   int        `json:"setNumber"`
+	Reps        int        `json:"reps"`
+	WeightKg    float64    `json:"weightKg"`
+	Rpe         *float64   `json:"rpe,omitempty"`
+	SetType     SetType    `json:"setType"`
+	SupersetID  *uuid.UUID `json:"supersetId,omitempty"`
+	PerformedAt time.Time  `json:"performedAt"`
 }
 
 type WorkoutTemplate struct {
@@ -127,6 +130,65 @@ type WorkoutTemplate struct {
 	Name      string              `json:"name"`
 	CreatedAt time.Time           `json:"createdAt"`
 	Exercises []*TemplateExercise `json:"exercises"`
+}
+
+type SetType string
+
+const (
+	SetTypeNormal  SetType = "NORMAL"
+	SetTypeWarmup  SetType = "WARMUP"
+	SetTypeDropset SetType = "DROPSET"
+	SetTypeFailure SetType = "FAILURE"
+)
+
+var AllSetType = []SetType{
+	SetTypeNormal,
+	SetTypeWarmup,
+	SetTypeDropset,
+	SetTypeFailure,
+}
+
+func (e SetType) IsValid() bool {
+	switch e {
+	case SetTypeNormal, SetTypeWarmup, SetTypeDropset, SetTypeFailure:
+		return true
+	}
+	return false
+}
+
+func (e SetType) String() string {
+	return string(e)
+}
+
+func (e *SetType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SetType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SetType", str)
+	}
+	return nil
+}
+
+func (e SetType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SetType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SetType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type WorkoutStatus string

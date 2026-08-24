@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/workout/workout_models.dart' show SetType;
 import '../../features/workout/workout_provider.dart';
 import 'app_database.dart';
 import 'offline_provider.dart';
@@ -44,7 +45,8 @@ class SyncService {
             reps: p.reps,
             weightKg: p.weightKg,
             rpe: p.rpe,
-            isWarmup: p.isWarmup,
+            setType: SetType.values.firstWhere((t) => t.name == p.setType, orElse: () => SetType.normal),
+            supersetId: p.supersetId,
           );
           await db.removePending(p.localId);
           _ref.read(activeWorkoutProvider.notifier).reconcilePendingSet(p.localId, result);

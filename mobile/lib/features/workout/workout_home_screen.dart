@@ -44,7 +44,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
           reps: input.reps,
           weightKg: input.weightKg,
           rpe: input.rpe,
-          isWarmup: input.isWarmup,
+          setType: input.setType,
         );
     ref.read(restTimerProvider.notifier).start();
   }
@@ -268,7 +268,7 @@ class _ActiveWorkoutView extends ConsumerWidget {
           _PlannedExercisesRow(
             template: template,
             catalog: catalog,
-            loggedCounts: {for (final e in groups.entries) e.key: e.value.where((s) => !s.isWarmup).length},
+            loggedCounts: {for (final e in groups.entries) e.key: e.value.where((s) => s.setType != SetType.warmup).length},
             onTapExercise: (exercise) => WorkoutHomeScreen._logSetForExercise(context, ref, exercise),
           ),
         if (lastNewRecords.isNotEmpty) _NewRecordBanner(records: lastNewRecords),
@@ -291,7 +291,8 @@ class _ActiveWorkoutView extends ConsumerWidget {
                               reps: last.reps,
                               weightKg: last.weightKg,
                               rpe: last.rpe,
-                              isWarmup: last.isWarmup,
+                              setType: last.setType,
+                              supersetId: last.supersetId,
                             );
                         ref.read(restTimerProvider.notifier).start();
                       },
@@ -341,7 +342,18 @@ class _PlannedExercisesRow extends StatelessWidget {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: template.exercises.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          separatorBuilder: (context, index) {
+            // A link icon between two chips sharing a superset group,
+            // instead of the default gap, visually brackets them together.
+            final a = template.exercises[index];
+            final b = template.exercises[index + 1];
+            final linked = a.supersetGroup != null && a.supersetGroup == b.supersetGroup;
+            if (!linked) return const SizedBox(width: 8);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Icon(Icons.link, size: 14, color: Theme.of(context).colorScheme.primary),
+            );
+          },
           itemBuilder: (context, index) {
             final planned = template.exercises[index];
             final exercise = catalog[planned.exerciseId];
@@ -352,6 +364,7 @@ class _PlannedExercisesRow extends StatelessWidget {
                   ? const Icon(Icons.check_circle, size: 16, color: Colors.green)
                   : const Icon(Icons.fitness_center, size: 16),
               label: Text('${exercise?.name ?? 'Exercise'} $done/${planned.targetSets}'),
+              backgroundColor: planned.supersetGroup != null ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4) : null,
               onPressed: exercise == null ? null : () => onTapExercise(exercise),
             );
           },
@@ -386,7 +399,11 @@ class _NewRecordBanner extends StatelessWidget {
 
   final List<PersonalRecord> records;
 
-  static const _labels = {'max_weight': 'heaviest weight', 'max_volume': 'best volume'};
+  static const _labels = {
+    'max_weight': 'heaviest weight',
+    'max_volume': 'best volume',
+    'estimated_1rm': 'estimated 1RM',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -466,6 +483,13 @@ class _RestTimerBanner extends ConsumerWidget {
   }
 }
 
+Color _setTypeColor(SetType type, BuildContext context) => switch (type) {
+      SetType.warmup => Colors.blueGrey.shade100,
+      SetType.dropset => Colors.orange.shade100,
+      SetType.failure => Colors.red.shade100,
+      SetType.normal => Colors.transparent,
+    };
+
 class _ExerciseGroupCard extends StatelessWidget {
   const _ExerciseGroupCard({required this.exerciseName, required this.sets, required this.unit, required this.onRepeatLast});
 
@@ -517,16 +541,23 @@ class _ExerciseGroupCard extends StatelessWidget {
                       '${displayWeight.toStringAsFixed(displayWeight.truncateToDouble() == displayWeight ? 0 : 1)} ${unit.label}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                     ),
-                    if (set.isWarmup) ...[
+                    if (set.setType != SetType.normal) ...[
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: Colors.blueGrey.shade100,
-                          borderRadius: BorderRadius.circular(4),
+                      Tooltip(
+                        message: set.setType.label,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: _setTypeColor(set.setType, context),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(set.setType.badge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
-                        child: const Text('W', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
+                    ],
+                    if (set.supersetId != null) ...[
+                      const SizedBox(width: 6),
+                      Icon(Icons.link, size: 13, color: Theme.of(context).colorScheme.primary),
                     ],
                     if (set.rpe != null) ...[
                       const SizedBox(width: 10),

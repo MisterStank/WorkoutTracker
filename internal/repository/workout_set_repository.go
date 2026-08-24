@@ -22,7 +22,7 @@ func NewWorkoutSetRepository(db *pgxpool.Pool) *WorkoutSetRepository {
 
 func (r *WorkoutSetRepository) ListForWorkout(ctx context.Context, workoutID uuid.UUID) ([]*domain.WorkoutSet, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, is_warmup, performed_at
+		`SELECT id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, set_type, superset_id, performed_at
 		 FROM workout_sets WHERE workout_id = $1 ORDER BY set_number`, workoutID)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (r *WorkoutSetRepository) ListForWorkout(ctx context.Context, workoutID uui
 	var sets []*domain.WorkoutSet
 	for rows.Next() {
 		var s domain.WorkoutSet
-		if err := rows.Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.IsWarmup, &s.PerformedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.SetType, &s.SupersetID, &s.PerformedAt); err != nil {
 			return nil, err
 		}
 		sets = append(sets, &s)
@@ -43,14 +43,14 @@ func (r *WorkoutSetRepository) ListForWorkout(ctx context.Context, workoutID uui
 func (r *WorkoutSetRepository) LastForExercise(ctx context.Context, userID, exerciseID uuid.UUID) (*domain.WorkoutSet, error) {
 	var s domain.WorkoutSet
 	err := r.db.QueryRow(ctx,
-		`SELECT ws.id, ws.workout_id, ws.exercise_id, ws.set_number, ws.reps, ws.weight_kg, ws.rpe, ws.is_warmup, ws.performed_at
+		`SELECT ws.id, ws.workout_id, ws.exercise_id, ws.set_number, ws.reps, ws.weight_kg, ws.rpe, ws.set_type, ws.superset_id, ws.performed_at
 		 FROM workout_sets ws
 		 JOIN workouts w ON w.id = ws.workout_id
 		 WHERE w.user_id = $1 AND ws.exercise_id = $2
 		 ORDER BY ws.performed_at DESC
 		 LIMIT 1`,
 		userID, exerciseID,
-	).Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.IsWarmup, &s.PerformedAt)
+	).Scan(&s.ID, &s.WorkoutID, &s.ExerciseID, &s.SetNumber, &s.Reps, &s.WeightKg, &s.RPE, &s.SetType, &s.SupersetID, &s.PerformedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrWorkoutSetNotFound
 	}
@@ -60,10 +60,11 @@ func (r *WorkoutSetRepository) LastForExercise(ctx context.Context, userID, exer
 	return &s, nil
 }
 
-// LogSet inserts a set and atomically upserts any personal records it
-// breaks (heaviest weight, best single-set volume) in the same transaction,
-// so two concurrent set inserts can't both "win" the same PR — the row
-// lock taken by the first INSERT ... ON CONFLICT serializes the second.
+// LogSet inserts a set and, unless it's a warm-up, atomically upserts any
+// personal records it breaks (heaviest weight, best single-set volume,
+// estimated 1RM) in the same transaction, so two concurrent set inserts
+// can't both "win" the same PR — the row lock taken by the first
+// INSERT ... ON CONFLICT serializes the second.
 func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set *domain.WorkoutSet) (*domain.LoggedSet, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -82,18 +83,22 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 	set.ID = uuid.New()
 	set.SetNumber = setNumber
 	set.PerformedAt = time.Now()
+	if set.SetType == "" {
+		set.SetType = domain.SetTypeNormal
+	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO workout_sets (id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, is_warmup, performed_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		set.ID, set.WorkoutID, set.ExerciseID, set.SetNumber, set.Reps, set.WeightKg, set.RPE, set.IsWarmup, set.PerformedAt,
+		`INSERT INTO workout_sets (id, workout_id, exercise_id, set_number, reps, weight_kg, rpe, set_type, superset_id, performed_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		set.ID, set.WorkoutID, set.ExerciseID, set.SetNumber, set.Reps, set.WeightKg, set.RPE, set.SetType, set.SupersetID, set.PerformedAt,
 	); err != nil {
 		return nil, err
 	}
 
-	if set.IsWarmup {
+	if set.SetType == domain.SetTypeWarmup {
 		// Warm-up sets don't count toward PRs or training-volume rollups —
-		// they'd otherwise pollute progress charts with unrepresentative light sets.
+		// they'd otherwise pollute progress charts with unrepresentative light
+		// sets. Drop sets and failure sets are real working effort and do count.
 		if err := tx.Commit(ctx); err != nil {
 			return nil, err
 		}
@@ -101,8 +106,9 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 	}
 
 	candidates := map[string]float64{
-		domain.RecordTypeMaxWeight: set.WeightKg,
-		domain.RecordTypeMaxVolume: set.WeightKg * float64(set.Reps),
+		domain.RecordTypeMaxWeight:    set.WeightKg,
+		domain.RecordTypeMaxVolume:    set.WeightKg * float64(set.Reps),
+		domain.RecordTypeEstimated1RM: estimated1RM(set.WeightKg, set.Reps),
 	}
 
 	var newRecords []*domain.PersonalRecord
@@ -151,4 +157,11 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 		return nil, err
 	}
 	return &domain.LoggedSet{Set: set, NewRecords: newRecords}, nil
+}
+
+// estimated1RM uses the Epley formula — the industry-standard estimate for
+// a true one-rep max from a set done at any rep range. Reps of 1 return the
+// weight itself, matching the formula's own behavior at reps=1.
+func estimated1RM(weightKg float64, reps int) float64 {
+	return weightKg * (1 + float64(reps)/30.0)
 }

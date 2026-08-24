@@ -55,9 +55,30 @@ func toExerciseModel(e *domain.Exercise) *Exercise {
 	}
 }
 
+// domainSetTypes/graphqlSetTypes map between domain.SetType's lowercase DB
+// values and the GraphQL enum's uppercase ones, rather than relying on
+// string-casing tricks that would break if either side's naming changes.
+var domainToGraphQLSetType = map[domain.SetType]SetType{
+	domain.SetTypeNormal:  SetTypeNormal,
+	domain.SetTypeWarmup:  SetTypeWarmup,
+	domain.SetTypeDropset: SetTypeDropset,
+	domain.SetTypeFailure: SetTypeFailure,
+}
+
+var graphqlToDomainSetType = map[SetType]domain.SetType{
+	SetTypeNormal:  domain.SetTypeNormal,
+	SetTypeWarmup:  domain.SetTypeWarmup,
+	SetTypeDropset: domain.SetTypeDropset,
+	SetTypeFailure: domain.SetTypeFailure,
+}
+
 func toWorkoutSetModel(s *domain.WorkoutSet) *WorkoutSet {
 	if s == nil {
 		return nil
+	}
+	setType, ok := domainToGraphQLSetType[s.SetType]
+	if !ok {
+		setType = SetTypeNormal
 	}
 	return &WorkoutSet{
 		ID:          s.ID,
@@ -66,7 +87,8 @@ func toWorkoutSetModel(s *domain.WorkoutSet) *WorkoutSet {
 		Reps:        s.Reps,
 		WeightKg:    s.WeightKg,
 		Rpe:         s.RPE,
-		IsWarmup:    s.IsWarmup,
+		SetType:     setType,
+		SupersetID:  s.SupersetID,
 		PerformedAt: s.PerformedAt,
 	}
 }
@@ -125,11 +147,12 @@ func toBodyMetricModel(m *domain.BodyMetric) *BodyMetric {
 
 func toTemplateExerciseModel(e *domain.TemplateExercise) *TemplateExercise {
 	return &TemplateExercise{
-		ID:         e.ID,
-		ExerciseID: e.ExerciseID,
-		Position:   e.Position,
-		TargetSets: e.TargetSets,
-		TargetReps: e.TargetReps,
+		ID:            e.ID,
+		ExerciseID:    e.ExerciseID,
+		Position:      e.Position,
+		TargetSets:    e.TargetSets,
+		TargetReps:    e.TargetReps,
+		SupersetGroup: e.SupersetGroup,
 	}
 }
 
@@ -215,13 +238,18 @@ func (r *mutationResolver) StartWorkout(ctx context.Context, templateID *uuid.UU
 }
 
 // LogSet is the resolver for the logSet field.
-func (r *mutationResolver) LogSet(ctx context.Context, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, isWarmup *bool) (*LogSetResult, error) {
+func (r *mutationResolver) LogSet(ctx context.Context, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType, supersetID *uuid.UUID) (*LogSetResult, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
 	if !ok {
 		return nil, domain.ErrInvalidCredentials
 	}
-	warmup := isWarmup != nil && *isWarmup
-	logged, err := r.Workout.LogSet(ctx, userID, workoutID, exerciseID, reps, weightKg, rpe, warmup)
+	domainSetType := domain.SetTypeNormal
+	if setType != nil {
+		if mapped, ok := graphqlToDomainSetType[*setType]; ok {
+			domainSetType = mapped
+		}
+	}
+	logged, err := r.Workout.LogSet(ctx, userID, workoutID, exerciseID, reps, weightKg, rpe, domainSetType, supersetID)
 	if err != nil {
 		return nil, err
 	}
@@ -254,9 +282,10 @@ func (r *mutationResolver) CreateWorkoutTemplate(ctx context.Context, name strin
 	domainExercises := make([]*domain.TemplateExercise, len(exercises))
 	for i, e := range exercises {
 		domainExercises[i] = &domain.TemplateExercise{
-			ExerciseID: e.ExerciseID,
-			TargetSets: e.TargetSets,
-			TargetReps: e.TargetReps,
+			ExerciseID:    e.ExerciseID,
+			TargetSets:    e.TargetSets,
+			TargetReps:    e.TargetReps,
+			SupersetGroup: e.SupersetGroup,
 		}
 	}
 	t, err := r.Workout.CreateTemplate(ctx, userID, name, domainExercises)

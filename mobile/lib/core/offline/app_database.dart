@@ -22,7 +22,8 @@ class PendingSets extends Table {
   IntColumn get reps => integer()();
   RealColumn get weightKg => real()();
   RealColumn get rpe => real().nullable()();
-  BoolColumn get isWarmup => boolean().withDefault(const Constant(false))();
+  TextColumn get setType => text().withDefault(const Constant('normal'))();
+  TextColumn get supersetId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
@@ -34,7 +35,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(impl.connect());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        // The offline outbox only ever holds transient, not-yet-synced data —
+        // dropping and recreating on a schema bump is safe (nothing is lost
+        // that the server doesn't also have a durable copy of once synced,
+        // and unsynced rows are, by definition, still sitting on the device
+        // that created them and haven't been confirmed anywhere else).
+        onUpgrade: (m, from, to) async {
+          await m.deleteTable(pendingSets.actualTableName);
+          await m.createTable(pendingSets);
+        },
+      );
 
   Future<List<PendingSet>> allPendingOldestFirst() =>
       (select(pendingSets)..orderBy([(t) => OrderingTerm.asc(t.createdAt)])).get();

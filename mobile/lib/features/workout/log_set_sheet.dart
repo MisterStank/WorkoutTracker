@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../core/units/weight_unit.dart';
+import 'plate_calculator.dart';
 import 'workout_models.dart';
 
 class LoggedSetInput {
-  const LoggedSetInput({required this.reps, required this.weightKg, this.rpe, this.isWarmup = false});
+  const LoggedSetInput({required this.reps, required this.weightKg, this.rpe, this.setType = SetType.normal});
 
   final int reps;
   final double weightKg;
   final double? rpe;
-  final bool isWarmup;
+  final SetType setType;
 }
 
-/// Bottom sheet for entering reps/weight/RPE once an exercise has been
-/// picked. If [lastSet] is given (the user's most recent set for this
+/// Bottom sheet for entering reps/weight/RPE/set-type once an exercise has
+/// been picked. If [lastSet] is given (the user's most recent set for this
 /// exercise), the form pre-fills with those values — the single biggest
 /// speed win for logging sets back-to-back in the gym. Pops with a
 /// LoggedSetInput, or null if cancelled.
@@ -29,7 +30,7 @@ Future<LoggedSetInput?> showLogSetSheet(
   );
   final rpeController = TextEditingController();
   final formKey = GlobalKey<FormState>();
-  bool isWarmup = false;
+  SetType setType = SetType.normal;
 
   return showModalBottomSheet<LoggedSetInput>(
     context: context,
@@ -67,6 +68,14 @@ Future<LoggedSetInput?> showLogSetSheet(
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(exercise.name, style: Theme.of(context).textTheme.titleLarge),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.calculate_outlined),
+                      tooltip: 'Plate calculator',
+                      onPressed: () {
+                        final target = double.tryParse(weightController.text);
+                        showPlateCalculatorDialog(context, targetWeight: target ?? 0, unit: unit);
+                      },
                     ),
                   ],
                 ),
@@ -106,15 +115,33 @@ Future<LoggedSetInput?> showLogSetSheet(
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'RPE (optional)', prefixIcon: Icon(Icons.speed)),
                 ),
-                const SizedBox(height: 4),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Warm-up set'),
-                  subtitle: const Text("Won't count toward PRs or volume"),
-                  value: isWarmup,
-                  onChanged: (v) => setSheetState(() => isWarmup = v),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Set type', style: Theme.of(context).textTheme.labelLarge),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                SegmentedButton<SetType>(
+                  segments: const [
+                    ButtonSegment(value: SetType.normal, label: Text('Normal')),
+                    ButtonSegment(value: SetType.warmup, label: Text('Warm-up')),
+                    ButtonSegment(value: SetType.dropset, label: Text('Drop')),
+                    ButtonSegment(value: SetType.failure, label: Text('Failure')),
+                  ],
+                  selected: {setType},
+                  onSelectionChanged: (selection) => setSheetState(() => setType = selection.first),
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                ),
+                if (setType == SetType.warmup)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      "Won't count toward PRs or volume",
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                    ),
+                  ),
+                const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () {
                     if (!formKey.currentState!.validate()) return;
@@ -122,7 +149,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                       reps: int.parse(repsController.text),
                       weightKg: unit.toKg(double.parse(weightController.text)),
                       rpe: rpeController.text.isEmpty ? null : double.tryParse(rpeController.text),
-                      isWarmup: isWarmup,
+                      setType: setType,
                     ));
                   },
                   icon: const Icon(Icons.check),

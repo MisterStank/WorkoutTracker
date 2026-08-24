@@ -35,9 +35,9 @@ func (r *WorkoutTemplateRepository) Create(ctx context.Context, t *domain.Workou
 
 	for _, ex := range t.Exercises {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO workout_template_exercises (id, template_id, exercise_id, position, target_sets, target_reps)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			ex.ID, t.ID, ex.ExerciseID, ex.Position, ex.TargetSets, ex.TargetReps,
+			`INSERT INTO workout_template_exercises (id, template_id, exercise_id, position, target_sets, target_reps, superset_group)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			ex.ID, t.ID, ex.ExerciseID, ex.Position, ex.TargetSets, ex.TargetReps, ex.SupersetGroup,
 		); err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func (r *WorkoutTemplateRepository) Delete(ctx context.Context, id uuid.UUID) er
 
 func (r *WorkoutTemplateRepository) exercisesForTemplate(ctx context.Context, templateID uuid.UUID) ([]*domain.TemplateExercise, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, exercise_id, position, target_sets, target_reps
+		`SELECT id, exercise_id, position, target_sets, target_reps, superset_group
 		 FROM workout_template_exercises WHERE template_id = $1 ORDER BY position`,
 		templateID,
 	)
@@ -117,7 +117,7 @@ func (r *WorkoutTemplateRepository) exercisesForTemplate(ctx context.Context, te
 	var exercises []*domain.TemplateExercise
 	for rows.Next() {
 		var e domain.TemplateExercise
-		if err := rows.Scan(&e.ID, &e.ExerciseID, &e.Position, &e.TargetSets, &e.TargetReps); err != nil {
+		if err := rows.Scan(&e.ID, &e.ExerciseID, &e.Position, &e.TargetSets, &e.TargetReps, &e.SupersetGroup); err != nil {
 			return nil, err
 		}
 		exercises = append(exercises, &e)
