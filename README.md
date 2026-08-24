@@ -2,7 +2,7 @@
 
 A workout tracker that adapts to user progress. Flutter mobile client, Go/GraphQL backend, Postgres, Redis.
 
-Architecture and phased roadmap: see `PLAN.md`.
+Architecture and phased roadmap: see `PLAN.md`. For what the app does and how to use it, see [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## Stack
 
