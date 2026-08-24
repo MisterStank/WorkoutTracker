@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
+import '../../core/widgets/semantic_banner.dart';
 import '../workout/exercise_picker_screen.dart';
 import '../workout/workout_models.dart';
 import '../workout/workout_provider.dart';
@@ -123,20 +124,7 @@ class _ExerciseProgressTabState extends ConsumerState<_ExerciseProgressTab> {
               if (status == null || !status.isPlateaued) return const SizedBox.shrink();
               return Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.trending_flat, color: Colors.amber.shade900),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(status.message, style: TextStyle(color: Colors.amber.shade900))),
-                    ],
-                  ),
-                ),
+                child: SemanticBanner.warning(context, message: status.message),
               );
             },
           ),
@@ -320,9 +308,9 @@ class _EmptyChartHint extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.show_chart, size: 48, color: Colors.grey.shade400),
+            Icon(Icons.show_chart, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600)),
+            Text(message, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
       ),

@@ -56,7 +56,7 @@ Future<void> showPlateCalculatorDialog(BuildContext context, {required double ta
             if (plates.isEmpty)
               Text(
                 targetWeight <= bar ? 'Target is at or below the bar weight.' : "Can't be made with standard plates.",
-                style: TextStyle(color: Colors.grey.shade600),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               )
             else ...[
               Text('Per side:', style: Theme.of(context).textTheme.labelLarge),

@@ -71,12 +71,12 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.checklist, size: 48, color: Colors.grey.shade400),
+                    Icon(Icons.checklist, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(height: 12),
                     Text(
                       'No templates yet. Save a plan once and start\nfrom it instead of picking exercises every time.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -89,8 +89,6 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
             itemBuilder: (context, index) {
               final t = templates[index];
               return Card(
-                elevation: 0,
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
                   title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w600)),

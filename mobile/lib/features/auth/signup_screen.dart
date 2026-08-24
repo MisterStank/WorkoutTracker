@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_provider.dart';
+import 'auth_scaffold.dart';
 import 'auth_state.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -40,47 +41,53 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign up')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _displayNameController,
-              decoration: const InputDecoration(labelText: 'Display name'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
-            ),
-            const SizedBox(height: 24),
-            if (authState is AuthError)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(authState.message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+    return AuthScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Create an account', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _displayNameController,
+            decoration: const InputDecoration(labelText: 'Display name', prefixIcon: Icon(Icons.person_outline)),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline)),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
+          ),
+          const SizedBox(height: 24),
+          if (authState is AuthError)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 18, color: Theme.of(context).colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(authState.message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  ),
+                ],
               ),
-            FilledButton(
-              onPressed: isLoading
-                  ? null
-                  : () => ref.read(authProvider.notifier).signup(
-                        email: _emailController.text.trim(),
-                        password: _passwordController.text,
-                        displayName: _displayNameController.text.trim(),
-                      ),
-              child: isLoading ? const CircularProgressIndicator() : const Text('Sign up'),
             ),
-          ],
-        ),
+          FilledButton(
+            onPressed: isLoading
+                ? null
+                : () => ref.read(authProvider.notifier).signup(
+                      email: _emailController.text.trim(),
+                      password: _passwordController.text,
+                      displayName: _displayNameController.text.trim(),
+                    ),
+            child: isLoading ? const AuthButtonSpinner() : const Text('Sign up'),
+          ),
+        ],
       ),
     );
   }

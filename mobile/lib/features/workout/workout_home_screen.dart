@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/offline/app_database.dart' show offlineQueueSupported;
 import '../../core/offline/sync_service.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/theme_mode_provider.dart';
 import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
-import '../analytics/analytics_screen.dart';
+import '../../core/widgets/semantic_banner.dart';
 import '../auth/auth_provider.dart';
 import '../templates/template_models.dart';
 import '../templates/template_provider.dart';
@@ -17,10 +19,11 @@ import 'log_set_sheet.dart';
 import 'rest_timer_provider.dart';
 import 'shared_workout_screen.dart';
 import 'superset_provider.dart';
-import 'workout_history_screen.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 import 'workout_state.dart';
+
+enum _OverflowAction { themeSystem, themeLight, themeDark, logout }
 
 class WorkoutHomeScreen extends ConsumerWidget {
   const WorkoutHomeScreen({super.key});
@@ -139,6 +142,19 @@ class WorkoutHomeScreen extends ConsumerWidget {
     ref.read(activeSupersetsProvider.notifier).reset();
   }
 
+  void _handleOverflowAction(BuildContext context, WidgetRef ref, _OverflowAction action) {
+    switch (action) {
+      case _OverflowAction.themeSystem:
+        ref.read(themeModeProvider.notifier).setMode(ThemeMode.system);
+      case _OverflowAction.themeLight:
+        ref.read(themeModeProvider.notifier).setMode(ThemeMode.light);
+      case _OverflowAction.themeDark:
+        ref.read(themeModeProvider.notifier).setMode(ThemeMode.dark);
+      case _OverflowAction.logout:
+        ref.read(authProvider.notifier).logout();
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(activeWorkoutProvider);
@@ -154,7 +170,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => ref.read(weightUnitProvider.notifier).toggle(),
-            child: Text(unit.label.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(unit.label.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
           if (state is ActiveWorkoutInProgress)
             IconButton(
@@ -173,25 +189,21 @@ class WorkoutHomeScreen extends ConsumerWidget {
             tooltip: 'Watch a shared workout',
             onPressed: () => showJoinSharedWorkoutDialog(context, ref),
           ),
-          IconButton(
-            icon: const Icon(Icons.show_chart),
-            tooltip: 'Progress',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalyticsScreen())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.checklist),
-            tooltip: 'Templates',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'History',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WorkoutHistoryScreen())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log out',
-            onPressed: () => ref.read(authProvider.notifier).logout(),
+          PopupMenuButton<_OverflowAction>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More',
+            onSelected: (action) => _handleOverflowAction(context, ref, action),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Text('Theme', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ),
+              const PopupMenuItem(value: _OverflowAction.themeSystem, child: Text('System')),
+              const PopupMenuItem(value: _OverflowAction.themeLight, child: Text('Light')),
+              const PopupMenuItem(value: _OverflowAction.themeDark, child: Text('Dark')),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: _OverflowAction.logout, child: Text('Log out')),
+            ],
           ),
         ],
       ),
@@ -258,7 +270,7 @@ class _StartWorkoutView extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Start a session to begin logging sets.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -409,7 +421,7 @@ class _PlannedExercisesRow extends StatelessWidget {
             final complete = done >= planned.targetSets;
             return ActionChip(
               avatar: complete
-                  ? const Icon(Icons.check_circle, size: 16, color: Colors.green)
+                  ? Icon(Icons.check_circle, size: 16, color: context.semanticColors.success)
                   : const Icon(Icons.fitness_center, size: 16),
               label: Text('${exercise?.name ?? 'Exercise'} $done/${planned.targetSets}'),
               backgroundColor: planned.supersetGroup != null ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4) : null,
@@ -427,15 +439,16 @@ class _EmptyWorkoutHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.playlist_add, size: 48, color: Colors.grey.shade400),
+          Icon(Icons.playlist_add, size: 48, color: muted),
           const SizedBox(height: 8),
           const Text('No sets logged yet'),
           const SizedBox(height: 4),
-          Text('Tap "Log set" to add your first one.', style: TextStyle(color: Colors.grey.shade600)),
+          Text('Tap "Log set" to add your first one.', style: TextStyle(color: muted)),
         ],
       ),
     );
@@ -456,25 +469,9 @@ class _NewRecordBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = records.map((r) => _labels[r.recordType] ?? r.recordType).join(' & ');
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [Colors.amber.shade400, Colors.orange.shade400]),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.emoji_events, color: Colors.white),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'New personal record — $labels!',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: SemanticBanner.success(context, message: 'New personal record — $labels!'),
     );
   }
 }
@@ -494,12 +491,13 @@ class _RestTimerBanner extends ConsumerWidget {
     if (!timer.running) return const SizedBox.shrink();
 
     final progress = timer.total.inSeconds == 0 ? 0.0 : timer.remaining.inSeconds / timer.total.inSeconds;
+    final semantic = context.semanticColors;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondaryContainer,
+        color: semantic.infoContainer,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -508,12 +506,15 @@ class _RestTimerBanner extends ConsumerWidget {
             width: 28,
             height: 28,
             child: Stack(alignment: Alignment.center, children: [
-              CircularProgressIndicator(value: progress, strokeWidth: 3),
-              const Icon(Icons.timer, size: 14),
+              CircularProgressIndicator(value: progress, strokeWidth: 3, color: semantic.info),
+              Icon(Icons.timer, size: 14, color: semantic.onInfoContainer),
             ]),
           ),
           const SizedBox(width: 10),
-          Text('Rest: ${_format(timer.remaining)}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            'Rest: ${_format(timer.remaining)}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: semantic.onInfoContainer),
+          ),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.add, size: 18),
@@ -531,12 +532,15 @@ class _RestTimerBanner extends ConsumerWidget {
   }
 }
 
-Color _setTypeColor(SetType type, BuildContext context) => switch (type) {
-      SetType.warmup => Colors.blueGrey.shade100,
-      SetType.dropset => Colors.orange.shade100,
-      SetType.failure => Colors.red.shade100,
-      SetType.normal => Colors.transparent,
-    };
+(Color, Color) _setTypeColors(SetType type, BuildContext context) {
+  final semantic = context.semanticColors;
+  return switch (type) {
+    SetType.warmup => (semantic.setWarmupContainer, semantic.onSetWarmupContainer),
+    SetType.dropset => (semantic.setDropsetContainer, semantic.onSetDropsetContainer),
+    SetType.failure => (semantic.setFailureContainer, semantic.onSetFailureContainer),
+    SetType.normal => (Colors.transparent, Theme.of(context).colorScheme.onSurface),
+  };
+}
 
 class _ExerciseGroupCard extends StatelessWidget {
   const _ExerciseGroupCard({required this.exerciseName, required this.sets, required this.unit, required this.onRepeatLast});
@@ -550,9 +554,6 @@ class _ExerciseGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
         child: Column(
@@ -579,11 +580,11 @@ class _ExerciseGroupCard extends StatelessWidget {
                   children: [
                     SizedBox(
                       width: 28,
-                      child: Text('${set.setNumber}', style: TextStyle(color: Colors.grey.shade600)),
+                      child: Text('${set.setNumber}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     ),
                     Text('${set.reps} reps', style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(width: 10),
-                    Text('×', style: TextStyle(color: Colors.grey.shade500)),
+                    Text('×', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 10),
                     Text(
                       '${displayWeight.toStringAsFixed(displayWeight.truncateToDouble() == displayWeight ? 0 : 1)} ${unit.label}',
@@ -591,17 +592,17 @@ class _ExerciseGroupCard extends StatelessWidget {
                     ),
                     if (set.setType != SetType.normal) ...[
                       const SizedBox(width: 8),
-                      Tooltip(
-                        message: set.setType.label,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: _setTypeColor(set.setType, context),
-                            borderRadius: BorderRadius.circular(4),
+                      Builder(builder: (context) {
+                        final (bg, fg) = _setTypeColors(set.setType, context);
+                        return Tooltip(
+                          message: set.setType.label,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
+                            child: Text(set.setType.badge, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg)),
                           ),
-                          child: Text(set.setType.badge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
+                        );
+                      }),
                     ],
                     if (set.supersetId != null) ...[
                       const SizedBox(width: 6),
@@ -619,7 +620,7 @@ class _ExerciseGroupCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Tooltip(
                         message: 'Saved offline — will sync when back online',
-                        child: Icon(Icons.cloud_off, size: 14, color: Colors.grey.shade500),
+                        child: Icon(Icons.cloud_off, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ],

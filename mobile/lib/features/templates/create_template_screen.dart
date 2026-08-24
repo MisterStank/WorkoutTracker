@@ -120,7 +120,7 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
           Expanded(
             child: _exercises.isEmpty
                 ? Center(
-                    child: Text('Add exercises to this plan', style: TextStyle(color: Colors.grey.shade600)),
+                    child: Text('Add exercises to this plan', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -138,13 +138,17 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
                                 child: Row(
                                   children: [
                                     const SizedBox(width: 28),
-                                    Icon(grouped ? Icons.link : Icons.link_off, size: 16, color: grouped ? Theme.of(context).colorScheme.primary : Colors.grey),
+                                    Icon(
+                                      grouped ? Icons.link : Icons.link_off,
+                                      size: 16,
+                                      color: grouped ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       grouped ? 'Superset' : 'Group as superset',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: grouped ? Theme.of(context).colorScheme.primary : Colors.grey.shade600,
+                                        color: grouped ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
                                         fontWeight: grouped ? FontWeight.w600 : FontWeight.normal,
                                       ),
                                     ),
@@ -187,13 +191,17 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
                   onPressed: _addExercise,
                   icon: const Icon(Icons.add),
                   label: const Text('Add exercise'),
-                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
                 ),
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: canSave ? _save : null,
-                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-                  child: _saving ? const CircularProgressIndicator() : const Text('Save template'),
+                  child: _saving
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Theme.of(context).colorScheme.onPrimary),
+                        )
+                      : const Text('Save template'),
                 ),
               ],
             ),

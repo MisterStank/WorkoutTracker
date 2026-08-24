@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/units/weight_unit.dart';
+import '../../core/widgets/semantic_banner.dart';
 import 'plate_calculator.dart';
 import 'workout_models.dart';
 
@@ -67,7 +68,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                     width: 36,
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.outlineVariant, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
                 Row(
@@ -94,31 +95,12 @@ Future<LoggedSetInput?> showLogSetSheet(
                   const SizedBox(height: 6),
                   Text(
                     'Last time: ${lastSet.reps} × ${_formatWeight(unit.fromKg(lastSet.weightKg))} ${unit.label}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
                 if (suggestion != null) ...[
                   const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.auto_graph, size: 16, color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            suggestion.reasoning,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  SemanticBanner.info(context, message: suggestion.reasoning, icon: Icons.auto_graph),
                 ],
                 const SizedBox(height: 20),
                 Row(
@@ -172,7 +154,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
                       "Won't count toward PRs or volume",
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ),
                 const SizedBox(height: 16),

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphql_flutter/graphql_flutter.dart' show initHiveForFlutter;
 
+import 'core/navigation/app_shell.dart';
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode_provider.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_state.dart';
 import 'features/auth/login_screen.dart';
-import 'features/workout/workout_home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,39 +15,22 @@ Future<void> main() async {
   runApp(const ProviderScope(child: WorkoutTrackerApp()));
 }
 
-class WorkoutTrackerApp extends StatelessWidget {
+class WorkoutTrackerApp extends ConsumerWidget {
   const WorkoutTrackerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.fromSeed(seedColor: Colors.deepPurple);
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'WorkoutTracker',
-      theme: ThemeData(
-        colorScheme: colorScheme,
-        useMaterial3: true,
-        appBarTheme: AppBarTheme(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          centerTitle: false,
-          elevation: 0,
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-        ),
-      ),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ref.watch(themeModeProvider),
       home: const AuthGate(),
     );
   }
 }
 
-/// Routes to the login screen or the workout home screen, based purely on
+/// Routes to the login screen or the app's bottom-nav shell, based purely on
 /// authProvider's current state.
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
@@ -59,7 +44,7 @@ class AuthGate extends ConsumerWidget {
     }
 
     if (authState is AuthAuthenticated) {
-      return const WorkoutHomeScreen();
+      return const AppShell();
     }
 
     return const LoginScreen();

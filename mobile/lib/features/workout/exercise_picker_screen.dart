@@ -88,28 +88,26 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     final byId = {for (final e in _exercises) e.id: e};
     final recentExercises = recentIds.map((id) => byId[id]).whereType<Exercise>().toList();
 
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: TextField(
           controller: _searchController,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Search exercises…',
             border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.white70),
+            hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
           ),
-          style: const TextStyle(color: Colors.white),
-          cursorColor: Colors.white,
+          style: TextStyle(color: colorScheme.onSurface),
+          cursorColor: colorScheme.primary,
           onChanged: _search,
         ),
         actions: widget.multiSelect
             ? [
                 TextButton(
                   onPressed: _selected.length >= 2 ? _confirmMultiSelect : null,
-                  child: Text(
-                    'Done (${_selected.length})',
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                  child: Text('Done (${_selected.length})'),
                 ),
               ]
             : null,

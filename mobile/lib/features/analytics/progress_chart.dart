@@ -58,8 +58,9 @@ class ProgressChart extends StatelessWidget {
               ),
               lineTouchData: LineTouchData(
                 touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) => Theme.of(context).colorScheme.inverseSurface,
                   getTooltipItems: (touchedSpots) => touchedSpots
-                      .map((s) => LineTooltipItem(s.y.toStringAsFixed(1), const TextStyle(color: Colors.white)))
+                      .map((s) => LineTooltipItem(s.y.toStringAsFixed(1), TextStyle(color: Theme.of(context).colorScheme.onInverseSurface)))
                       .toList(),
                 ),
               ),

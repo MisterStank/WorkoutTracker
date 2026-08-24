@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/units/units_provider.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 
@@ -68,7 +69,7 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.history, size: 48, color: Colors.grey.shade400),
+                      Icon(Icons.history, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       const SizedBox(height: 8),
                       const Text('No workouts yet'),
                     ],
@@ -97,23 +98,26 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
   }
 }
 
-class _WorkoutHistoryCard extends StatelessWidget {
+class _WorkoutHistoryCard extends ConsumerWidget {
   const _WorkoutHistoryCard({required this.workout, required this.catalog});
 
   final Workout workout;
   final Map<String, Exercise> catalog;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final exerciseNames = {
       for (final set in workout.sets) catalog[set.exerciseId]?.name ?? 'Exercise',
     }.toList();
+    final unit = ref.watch(weightUnitProvider);
+    final totalVolumeKg = workout.sets
+        .where((s) => s.setType != SetType.warmup)
+        .fold<double>(0, (sum, s) => sum + s.weightKg * s.reps);
+    final displayVolume = unit.fromKg(totalVolumeKg);
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -143,9 +147,16 @@ class _WorkoutHistoryCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 exerciseNames.join(' · '),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: muted),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            if (totalVolumeKg > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Volume: ${displayVolume.toStringAsFixed(0)} ${unit.label}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: muted),
               ),
             ],
             if (workout.notes.isNotEmpty) ...[
