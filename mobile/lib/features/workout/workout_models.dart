@@ -87,24 +87,24 @@ class Workout {
     required this.notes,
     required this.sets,
     this.templateId,
-    this.shareCode,
+    this.endedAt,
   });
 
   final String id;
   final DateTime startedAt;
+  final DateTime? endedAt;
   final String status; // "IN_PROGRESS" | "COMPLETED"
   final String notes;
   final List<WorkoutSet> sets;
   final String? templateId;
-  final String? shareCode;
 
   factory Workout.fromJson(Map<String, dynamic> json) => Workout(
         id: json['id'] as String,
         startedAt: DateTime.parse(json['startedAt'] as String),
+        endedAt: json['endedAt'] == null ? null : DateTime.parse(json['endedAt'] as String),
         status: json['status'] as String,
         notes: json['notes'] as String,
         templateId: json['templateId'] as String?,
-        shareCode: json['shareCode'] as String?,
         sets: (json['sets'] as List<dynamic>)
             .map((s) => WorkoutSet.fromJson(s as Map<String, dynamic>))
             .toList(),
@@ -145,6 +145,14 @@ class PlateauStatus {
         message: json['message'] as String,
       );
 }
+
+/// Human-readable labels for PersonalRecord.recordType, shared between the
+/// in-app new-record banner and the shareable PR card.
+const recordTypeLabels = {
+  'max_weight': 'heaviest weight',
+  'max_volume': 'best volume',
+  'estimated_1rm': 'estimated 1RM',
+};
 
 class PersonalRecord {
   const PersonalRecord({required this.exerciseId, required this.recordType, required this.value});

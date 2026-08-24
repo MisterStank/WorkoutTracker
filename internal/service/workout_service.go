@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"math"
@@ -79,64 +78,17 @@ func (s *WorkoutService) StartWorkout(ctx context.Context, userID uuid.UUID, tem
 		}
 	}
 
-	// A handful of retries absorbs the rare share-code collision (birthday
-	// paradox over a 6-char code among currently-active workouts is low
-	// odds, but the unique index means we must handle it, not just hope).
-	const maxShareCodeAttempts = 5
-	var w *domain.Workout
-	for attempt := 0; attempt < maxShareCodeAttempts; attempt++ {
-		code, err := generateShareCode()
-		if err != nil {
-			return nil, err
-		}
-		w = &domain.Workout{
-			ID:         uuid.New(),
-			UserID:     userID,
-			StartedAt:  time.Now(),
-			Status:     domain.WorkoutInProgress,
-			TemplateID: templateID,
-			ShareCode:  &code,
-		}
-		err = s.workouts.Create(ctx, w)
-		if err == nil {
-			return w, nil
-		}
-		if !errors.Is(err, domain.ErrShareCodeTaken) {
-			return nil, err
-		}
+	w := &domain.Workout{
+		ID:         uuid.New(),
+		UserID:     userID,
+		StartedAt:  time.Now(),
+		Status:     domain.WorkoutInProgress,
+		TemplateID: templateID,
 	}
-	return nil, domain.ErrShareCodeTaken
-}
-
-// shareCodeCharset omits visually-ambiguous characters (0/O, 1/I) since the
-// code is meant to be read off one phone and typed into another.
-const shareCodeCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-
-func generateShareCode() (string, error) {
-	raw := make([]byte, 6)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
+	if err := s.workouts.Create(ctx, w); err != nil {
+		return nil, err
 	}
-	code := make([]byte, len(raw))
-	for i, b := range raw {
-		code[i] = shareCodeCharset[int(b)%len(shareCodeCharset)]
-	}
-	return string(code), nil
-}
-
-// GetSharedWorkout looks up an in-progress workout by its share code —
-// deliberately no ownership check, since the whole point is letting someone
-// else watch. SetsForSharedWorkout mirrors that: read-only, no ownership
-// check, callable only once you already have the workout ID from the code.
-func (s *WorkoutService) GetSharedWorkout(ctx context.Context, code string) (*domain.Workout, error) {
-	if code == "" {
-		return nil, domain.ErrWorkoutNotFound
-	}
-	return s.workouts.FindByShareCode(ctx, code)
-}
-
-func (s *WorkoutService) SetsForSharedWorkout(ctx context.Context, workoutID uuid.UUID) ([]*domain.WorkoutSet, error) {
-	return s.sets.ListForWorkout(ctx, workoutID)
+	return w, nil
 }
 
 func (s *WorkoutService) CreateTemplate(ctx context.Context, userID uuid.UUID, name string, exercises []*domain.TemplateExercise) (*domain.WorkoutTemplate, error) {

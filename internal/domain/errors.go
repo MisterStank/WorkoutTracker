@@ -18,5 +18,7 @@ var (
 	ErrTemplateNotFound = errors.New("workout template not found")
 	ErrTemplateNotOwned = errors.New("workout template does not belong to this user")
 
-	ErrShareCodeTaken = errors.New("share code already in use")
+	ErrFitnessProfileNotFound = errors.New("fitness profile not found")
+	ErrProgramNotFound        = errors.New("program not found")
+	ErrProgramNotOwned        = errors.New("program does not belong to this user")
 )

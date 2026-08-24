@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../programs/fitness_profile_screen.dart';
 import '../workout/superset_provider.dart';
 import '../workout/workout_provider.dart';
 import 'create_template_screen.dart';
@@ -50,7 +51,19 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Templates')),
+      appBar: AppBar(
+        title: const Text('Templates'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Generate a program',
+            onPressed: () async {
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FitnessProfileScreen()));
+              setState(_reload);
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
         icon: const Icon(Icons.add),

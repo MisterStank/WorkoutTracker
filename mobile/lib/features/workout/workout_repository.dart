@@ -10,7 +10,7 @@ class WorkoutRepository {
   final GraphQLClient _client;
 
   static const _workoutFields = '''
-    id startedAt endedAt notes status templateId shareCode
+    id startedAt endedAt notes status templateId
     sets { id exerciseId setNumber reps weightKg rpe setType supersetId performedAt }
   ''';
 
@@ -260,44 +260,5 @@ class WorkoutRepository {
     ));
     if (result.hasException) throw Exception(result.exception.toString());
     return PlateauStatus.fromJson(result.data!['plateauStatus'] as Map<String, dynamic>);
-  }
-
-  /// Read-only view of someone else's in-progress workout via their share
-  /// code — null if the code doesn't match a currently-active workout.
-  Future<Workout?> sharedWorkout(String code) async {
-    final result = await _client.query(QueryOptions(
-      document: gql('''
-        query SharedWorkout(\$code: String!) {
-          sharedWorkout(code: \$code) { $_workoutFields }
-        }
-      '''),
-      variables: {'code': code},
-      fetchPolicy: FetchPolicy.networkOnly,
-    ));
-    if (result.hasException) throw Exception(result.exception.toString());
-    final data = result.data!['sharedWorkout'] as Map<String, dynamic>?;
-    return data == null ? null : Workout.fromJson(data);
-  }
-
-  Stream<LogSetResult> watchSharedWorkoutProgress(String code) {
-    final stream = _client.subscribe(SubscriptionOptions(
-      document: gql('''
-        subscription SharedWorkoutProgressUpdated(\$code: String!) {
-          sharedWorkoutProgressUpdated(code: \$code) {
-            set { id exerciseId setNumber reps weightKg rpe setType supersetId performedAt }
-            newRecords { exerciseId recordType value }
-          }
-        }
-      '''),
-      variables: {'code': code},
-    ));
-
-    return stream.where((result) => !result.hasException && result.data != null).map((result) {
-      final payload = result.data!['sharedWorkoutProgressUpdated'] as Map<String, dynamic>;
-      final newRecords = (payload['newRecords'] as List<dynamic>)
-          .map((r) => PersonalRecord.fromJson(r as Map<String, dynamic>))
-          .toList();
-      return LogSetResult(set: WorkoutSet.fromJson(payload['set'] as Map<String, dynamic>), newRecords: newRecords);
-    });
   }
 }

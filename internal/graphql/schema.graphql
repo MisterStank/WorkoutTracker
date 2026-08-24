@@ -56,9 +56,6 @@ type Workout {
   status: WorkoutStatus!
   sets: [WorkoutSet!]!
   templateId: UUID
-  # Only meaningful while status is IN_PROGRESS — lets someone else watch
-  # this workout live via sharedWorkout / sharedWorkoutProgressUpdated.
-  shareCode: String
 }
 
 type TemplateExercise {
@@ -140,6 +137,53 @@ type PlateauStatus {
   message: String!
 }
 
+enum FitnessGoal {
+  STRENGTH
+  HYPERTROPHY
+  FAT_LOSS
+  GENERAL_FITNESS
+}
+
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+type UserFitnessProfile {
+  goal: FitnessGoal!
+  experienceLevel: ExperienceLevel!
+  daysPerWeek: Int!
+  equipmentAccess: [String!]!
+  avoidMuscleGroups: [String!]!
+  updatedAt: Time!
+}
+
+input FitnessProfileInput {
+  goal: FitnessGoal!
+  experienceLevel: ExperienceLevel!
+  daysPerWeek: Int!
+  equipmentAccess: [String!]!
+  avoidMuscleGroups: [String!]!
+}
+
+type ProgramDay {
+  id: UUID!
+  dayLabel: String!
+  position: Int!
+  template: WorkoutTemplate!
+}
+
+type Program {
+  id: UUID!
+  name: String!
+  goal: FitnessGoal!
+  daysPerWeek: Int!
+  notes: String!
+  createdAt: Time!
+  days: [ProgramDay!]!
+}
+
 type Query {
   me: User
   exercises(search: String): [Exercise!]!
@@ -156,8 +200,8 @@ type Query {
   progressionSuggestion(exerciseId: UUID!): ProgressionSuggestion
   plateauStatus(exerciseId: UUID!): PlateauStatus!
 
-  # Read-only view of someone else's in-progress workout via their share code.
-  sharedWorkout(code: String!): Workout
+  myFitnessProfile: UserFitnessProfile
+  myPrograms: [Program!]!
 }
 
 type Mutation {
@@ -177,14 +221,13 @@ type Mutation {
   deleteWorkoutTemplate(templateId: UUID!): Boolean!
 
   logBodyMetric(metricType: String!, value: Float!): BodyMetric!
+
+  saveFitnessProfile(input: FitnessProfileInput!): UserFitnessProfile!
+  generateProgram: Program!
 }
 
 type Subscription {
   # Streams every set logged (and any PRs it broke) to anyone watching this
   # workout, backed by Redis pub/sub so it fans out across API instances.
   workoutProgressUpdated(workoutId: UUID!): LogSetResult!
-
-  # Same fan-out, addressed by share code instead of workout ID + ownership
-  # — how a friend watches your workout live.
-  sharedWorkoutProgressUpdated(code: String!): LogSetResult!
 }

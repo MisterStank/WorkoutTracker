@@ -51,6 +51,47 @@ func (f *fakeExerciseRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.
 	return e, nil
 }
 
+// ListFiltered mirrors repository.ExerciseRepository.ListFiltered's
+// semantics: equipment empty matches any, excludeMuscleGroups skips any
+// exercise touching one of them, category empty matches any. Sorted by
+// name so callers relying on deterministic "first match" selection (the
+// program generator) behave the same as against the real DB.
+func (f *fakeExerciseRepo) ListFiltered(ctx context.Context, equipment []string, excludeMuscleGroups []string, category string) ([]*domain.Exercise, error) {
+	var out []*domain.Exercise
+	for _, e := range f.byID {
+		if category != "" && e.Category != category {
+			continue
+		}
+		if len(equipment) > 0 && !contains(equipment, e.Equipment) {
+			continue
+		}
+		if overlaps(e.MuscleGroups, excludeMuscleGroups) {
+			continue
+		}
+		out = append(out, e)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+func contains(list []string, s string) bool {
+	for _, item := range list {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func overlaps(a, b []string) bool {
+	for _, x := range a {
+		if contains(b, x) {
+			return true
+		}
+	}
+	return false
+}
+
 type fakeWorkoutRepo struct {
 	mu       sync.Mutex
 	byID     map[uuid.UUID]*domain.Workout
@@ -87,17 +128,6 @@ func (f *fakeWorkoutRepo) FindActiveForUser(ctx context.Context, userID uuid.UUI
 		return nil, domain.ErrWorkoutNotFound
 	}
 	return f.byID[id], nil
-}
-
-func (f *fakeWorkoutRepo) FindByShareCode(ctx context.Context, code string) (*domain.Workout, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for _, w := range f.byID {
-		if w.ShareCode != nil && *w.ShareCode == code && w.Status == domain.WorkoutInProgress {
-			return w, nil
-		}
-	}
-	return nil, domain.ErrWorkoutNotFound
 }
 
 func (f *fakeWorkoutRepo) Finish(ctx context.Context, id uuid.UUID, endedAt time.Time, notes string) error {
@@ -653,51 +683,6 @@ func TestDeleteTemplateRejectsUnowned(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
-
-func TestStartWorkoutGeneratesShareCode(t *testing.T) {
-	ctx := context.Background()
-	svc, _ := newTestWorkoutService()
-	userID := uuid.New()
-
-	w, err := svc.StartWorkout(ctx, userID, nil)
-	require.NoError(t, err)
-	require.NotNil(t, w.ShareCode)
-	assert.Len(t, *w.ShareCode, 6)
-}
-
-func TestSharedWorkoutIsReadableWithoutOwnership(t *testing.T) {
-	ctx := context.Background()
-	exercise := &domain.Exercise{ID: uuid.New(), Name: "Squat"}
-	svc, _ := newTestWorkoutService(exercise)
-	owner := uuid.New()
-	viewer := uuid.New()
-
-	w, err := svc.StartWorkout(ctx, owner, nil)
-	require.NoError(t, err)
-	_, err = svc.LogSet(ctx, owner, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
-	require.NoError(t, err)
-
-	// A non-owner can't reach this workout through the normal owned path...
-	_, err = svc.SetsForWorkout(ctx, viewer, w.ID)
-	assert.ErrorIs(t, err, domain.ErrWorkoutNotOwned)
-
-	// ...but can via its share code, read-only.
-	shared, err := svc.GetSharedWorkout(ctx, *w.ShareCode)
-	require.NoError(t, err)
-	assert.Equal(t, w.ID, shared.ID)
-
-	sets, err := svc.SetsForSharedWorkout(ctx, shared.ID)
-	require.NoError(t, err)
-	assert.Len(t, sets, 1)
-}
-
-func TestGetSharedWorkoutRejectsUnknownCode(t *testing.T) {
-	ctx := context.Background()
-	svc, _ := newTestWorkoutService()
-
-	_, err := svc.GetSharedWorkout(ctx, "NOPE12")
-	assert.ErrorIs(t, err, domain.ErrWorkoutNotFound)
-}
 
 func TestSuggestNextSetWithNoHistory(t *testing.T) {
 	ctx := context.Background()

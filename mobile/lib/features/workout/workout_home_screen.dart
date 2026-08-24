@@ -1,23 +1,25 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/offline/app_database.dart' show offlineQueueSupported;
 import '../../core/offline/sync_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart' show appCardRadius;
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import '../../core/widgets/semantic_banner.dart';
 import '../auth/auth_provider.dart';
+import '../sharing/pr_share_card.dart';
+import '../sharing/share_preview_sheet.dart';
+import '../sharing/workout_summary_share_card.dart';
 import '../templates/template_models.dart';
 import '../templates/template_provider.dart';
 import '../templates/templates_screen.dart';
+import 'elapsed_time_text.dart';
 import 'exercise_picker_screen.dart';
 import 'log_set_sheet.dart';
 import 'rest_timer_provider.dart';
-import 'shared_workout_screen.dart';
 import 'superset_provider.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
@@ -172,8 +174,35 @@ class WorkoutHomeScreen extends ConsumerWidget {
       },
     );
     if (notes == null) return;
+
+    // Snapshot the workout before finishing — state flips to
+    // ActiveWorkoutNone right after, so this is the last point it's
+    // available for the post-finish share prompt.
+    final preFinishState = ref.read(activeWorkoutProvider);
+    final finishedWorkout = preFinishState is ActiveWorkoutInProgress ? preFinishState.workout : null;
+
     await ref.read(activeWorkoutProvider.notifier).finish(notes: notes.isEmpty ? null : notes);
     ref.read(activeSupersetsProvider.notifier).reset();
+
+    if (finishedWorkout == null || finishedWorkout.sets.isEmpty || !context.mounted) return;
+    final catalog = ref.read(exerciseCatalogProvider).asData?.value ?? const {};
+    final unit = ref.read(weightUnitProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Workout saved'),
+        action: SnackBarAction(
+          label: 'Share',
+          onPressed: () {
+            final exerciseNames = {for (final s in finishedWorkout.sets) catalog[s.exerciseId]?.name ?? 'Exercise'}.toList();
+            showSharePreview(
+              context,
+              card: WorkoutSummaryShareCard(workout: finishedWorkout, exerciseNames: exerciseNames, unit: unit),
+              filename: 'workout_${finishedWorkout.id}',
+            );
+          },
+        ),
+      ),
+    );
   }
 
   void _handleOverflowAction(BuildContext context, WidgetRef ref, _OverflowAction action) {
@@ -212,17 +241,6 @@ class WorkoutHomeScreen extends ConsumerWidget {
               tooltip: 'Group as superset',
               onPressed: () => _groupSuperset(context, ref),
             ),
-          if (state is ActiveWorkoutInProgress)
-            IconButton(
-              icon: const Icon(Icons.ios_share),
-              tooltip: 'Share this workout',
-              onPressed: () => showShareCodeDialog(context, state.workout.shareCode),
-            ),
-          IconButton(
-            icon: const Icon(Icons.visibility_outlined),
-            tooltip: 'Watch a shared workout',
-            onPressed: () => showJoinSharedWorkoutDialog(context, ref),
-          ),
           PopupMenuButton<_OverflowAction>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'More',
@@ -340,6 +358,23 @@ class _ActiveWorkoutView extends ConsumerWidget {
       template = ref.watch(templateCatalogProvider).asData?.value[workout.templateId];
     }
 
+    // Template-based workouts show every planned exercise as a card right
+    // away (empty until logged), not just once a set exists — closer to how
+    // Hevy shows the whole plan up front rather than building it up
+    // set-by-set. A blank workout has no plan to pre-populate from, so it
+    // keeps the old behavior: cards only appear once something's logged.
+    final cardExerciseIds = <String>[];
+    if (template != null) {
+      for (final te in template.exercises) {
+        cardExerciseIds.add(te.exerciseId);
+      }
+      for (final exerciseId in groups.keys) {
+        if (!cardExerciseIds.contains(exerciseId)) cardExerciseIds.add(exerciseId);
+      }
+    } else {
+      cardExerciseIds.addAll(groups.keys);
+    }
+
     return Column(
       children: [
         Padding(
@@ -351,7 +386,7 @@ class _ActiveWorkoutView extends ConsumerWidget {
                 children: [
                   Icon(Icons.timer_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 6),
-                  _ElapsedTimeText(startedAt: workout.startedAt),
+                  ElapsedTimeText(startedAt: workout.startedAt),
                 ],
               ),
               Text('${workout.sets.length} set${workout.sets.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall),
@@ -365,31 +400,40 @@ class _ActiveWorkoutView extends ConsumerWidget {
             loggedCounts: {for (final e in groups.entries) e.key: e.value.where((s) => s.setType != SetType.warmup).length},
             onTapExercise: (exercise) => WorkoutHomeScreen._logSetForExercise(context, ref, exercise),
           ),
-        if (lastNewRecords.isNotEmpty) _NewRecordBanner(records: lastNewRecords),
+        if (lastNewRecords.isNotEmpty)
+          _NewRecordBanner(
+            records: lastNewRecords,
+            exerciseName: catalog[lastNewRecords.first.exerciseId]?.name ?? 'Exercise',
+            unit: ref.watch(weightUnitProvider),
+          ),
         const _RestTimerBanner(),
         Expanded(
-          child: groups.isEmpty
+          child: cardExerciseIds.isEmpty
               ? const _EmptyWorkoutHint()
               : ListView(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-                  children: groups.entries.map((entry) {
-                    final exercise = catalog[entry.key];
+                  children: cardExerciseIds.map((exerciseId) {
+                    final sets = groups[exerciseId] ?? const <WorkoutSet>[];
+                    final exercise = catalog[exerciseId];
                     return _ExerciseGroupCard(
                       exerciseName: exercise?.name ?? 'Exercise',
-                      sets: entry.value,
+                      sets: sets,
                       unit: ref.watch(weightUnitProvider),
-                      onRepeatLast: () {
-                        final last = entry.value.last;
-                        ref.read(activeWorkoutProvider.notifier).logSet(
-                              exerciseId: last.exerciseId,
-                              reps: last.reps,
-                              weightKg: last.weightKg,
-                              rpe: last.rpe,
-                              setType: last.setType,
-                              supersetId: last.supersetId,
-                            );
-                        ref.read(restTimerProvider.notifier).start();
-                      },
+                      onAddSet: exercise == null ? null : () => WorkoutHomeScreen._logSetForExercise(context, ref, exercise),
+                      onRepeatLast: sets.isEmpty
+                          ? null
+                          : () {
+                              final last = sets.last;
+                              ref.read(activeWorkoutProvider.notifier).logSet(
+                                    exerciseId: last.exerciseId,
+                                    reps: last.reps,
+                                    weightKg: last.weightKg,
+                                    rpe: last.rpe,
+                                    setType: last.setType,
+                                    supersetId: last.supersetId,
+                                  );
+                              ref.read(restTimerProvider.notifier).start();
+                            },
                       onEditSet: exercise == null ? (_) {} : (set) => WorkoutHomeScreen._editSet(context, ref, exercise, set),
                       onDeleteSet: (set) => WorkoutHomeScreen._deleteSet(context, ref, set),
                     );
@@ -492,22 +536,30 @@ class _EmptyWorkoutHint extends StatelessWidget {
 }
 
 class _NewRecordBanner extends StatelessWidget {
-  const _NewRecordBanner({required this.records});
+  const _NewRecordBanner({required this.records, required this.exerciseName, required this.unit});
 
   final List<PersonalRecord> records;
-
-  static const _labels = {
-    'max_weight': 'heaviest weight',
-    'max_volume': 'best volume',
-    'estimated_1rm': 'estimated 1RM',
-  };
+  final String exerciseName;
+  final WeightUnit unit;
 
   @override
   Widget build(BuildContext context) {
-    final labels = records.map((r) => _labels[r.recordType] ?? r.recordType).join(' & ');
+    final labels = records.map((r) => recordTypeLabels[r.recordType] ?? r.recordType).join(' & ');
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: SemanticBanner.success(context, message: 'New personal record — $labels!'),
+      child: SemanticBanner.success(
+        context,
+        message: 'New personal record — $labels!',
+        trailing: IconButton(
+          icon: const Icon(Icons.ios_share, size: 18),
+          tooltip: 'Share',
+          onPressed: () => showSharePreview(
+            context,
+            card: PrShareCard(exerciseName: exerciseName, records: records, unit: unit),
+            filename: 'pr_$exerciseName',
+          ),
+        ),
+      ),
     );
   }
 }
@@ -584,6 +636,7 @@ class _ExerciseGroupCard extends StatelessWidget {
     required this.sets,
     required this.unit,
     required this.onRepeatLast,
+    required this.onAddSet,
     required this.onEditSet,
     required this.onDeleteSet,
   });
@@ -591,13 +644,17 @@ class _ExerciseGroupCard extends StatelessWidget {
   final String exerciseName;
   final List<WorkoutSet> sets;
   final WeightUnit unit;
-  final VoidCallback onRepeatLast;
+  // Null when there's no prior set to repeat (the card is still empty).
+  final VoidCallback? onRepeatLast;
+  // Null only if the exercise isn't in the catalog yet (shouldn't normally
+  // happen) — logs the exercise's first set via the usual set sheet.
+  final VoidCallback? onAddSet;
   final void Function(WorkoutSet set) onEditSet;
   final void Function(WorkoutSet set) onDeleteSet;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final card = Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
@@ -610,13 +667,27 @@ class _ExerciseGroupCard extends StatelessWidget {
                 Expanded(
                   child: Text(exerciseName, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                 ),
-                TextButton.icon(
-                  onPressed: onRepeatLast,
-                  icon: const Icon(Icons.replay, size: 18),
-                  label: const Text('Repeat last'),
-                ),
+                sets.isEmpty
+                    ? TextButton.icon(
+                        onPressed: onAddSet,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add set'),
+                      )
+                    : TextButton.icon(
+                        onPressed: onRepeatLast,
+                        icon: const Icon(Icons.replay, size: 18),
+                        label: const Text('Repeat last'),
+                      ),
               ],
             ),
+            if (sets.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 4),
+                child: Text(
+                  'No sets logged yet',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ),
             ...sets.map((set) {
               final displayWeight = unit.fromKg(set.weightKg);
               return Padding(
@@ -694,38 +765,14 @@ class _ExerciseGroupCard extends StatelessWidget {
         ),
       ),
     );
+
+    if (sets.isEmpty && onAddSet != null) {
+      // The whole card is a tap target while it's still empty — matches the
+      // chip-row's existing behavior and avoids making "Add set" the only
+      // way in.
+      return InkWell(borderRadius: BorderRadius.circular(appCardRadius), onTap: onAddSet, child: card);
+    }
+    return card;
   }
 }
 
-class _ElapsedTimeText extends StatefulWidget {
-  const _ElapsedTimeText({required this.startedAt});
-
-  final DateTime startedAt;
-
-  @override
-  State<_ElapsedTimeText> createState() => _ElapsedTimeTextState();
-}
-
-class _ElapsedTimeTextState extends State<_ElapsedTimeText> {
-  late Timer _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final elapsed = DateTime.now().difference(widget.startedAt);
-    final minutes = elapsed.inMinutes;
-    final text = minutes < 1 ? 'Just started' : '$minutes min';
-    return Text(text, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600));
-  }
-}

@@ -240,7 +240,6 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
         status: current.workout.status,
         notes: current.workout.notes,
         templateId: current.workout.templateId,
-        shareCode: current.workout.shareCode,
         sets: [for (final s in current.workout.sets) if (s.id == setId) updated else s],
       );
       state = ActiveWorkoutInProgress(updatedWorkout);
@@ -260,7 +259,6 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
         status: current.workout.status,
         notes: current.workout.notes,
         templateId: current.workout.templateId,
-        shareCode: current.workout.shareCode,
         sets: current.workout.sets.where((s) => s.id != setId).toList(),
       );
       state = ActiveWorkoutInProgress(updatedWorkout);

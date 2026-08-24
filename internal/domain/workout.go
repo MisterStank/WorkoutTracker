@@ -52,10 +52,6 @@ type Workout struct {
 	Notes      string
 	Status     WorkoutStatus
 	TemplateID *uuid.UUID
-	// ShareCode lets someone else watch this workout live (read-only) via
-	// sharedWorkout/sharedWorkoutProgressUpdated without a friends/follow
-	// system. Only set while the workout is in progress.
-	ShareCode *string
 }
 
 // TemplateExercise is one planned exercise within a WorkoutTemplate, in
@@ -76,6 +72,34 @@ type WorkoutTemplate struct {
 	Name      string
 	CreatedAt time.Time
 	Exercises []*TemplateExercise
+}
+
+// ProgramDay is one day of a Program, pointing at an ordinary
+// WorkoutTemplate — a program doesn't duplicate the template concept, it
+// just names and orders a set of them. Template is populated by the
+// repository for convenience; nil if not hydrated.
+type ProgramDay struct {
+	ID         uuid.UUID
+	ProgramID  uuid.UUID
+	DayLabel   string
+	Position   int
+	TemplateID uuid.UUID
+	Template   *WorkoutTemplate
+}
+
+// Program is a generated (or, in principle, hand-built) multi-day split.
+// Notes carries any skipped-muscle-group explanations from generation
+// (e.g. "no eligible chest exercises for your equipment") rather than
+// failing outright — see PersonalizationService.
+type Program struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Name        string
+	Goal        Goal
+	DaysPerWeek int
+	Notes       string
+	CreatedAt   time.Time
+	Days        []*ProgramDay
 }
 
 type WorkoutSet struct {
@@ -112,18 +136,17 @@ type LoggedSet struct {
 type ExerciseRepository interface {
 	List(ctx context.Context, search string) ([]*Exercise, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Exercise, error)
+	// ListFiltered is the program generator's exercise picker: equipment
+	// (empty = any), excludeMuscleGroups (skips any exercise touching one
+	// of these), and category (empty = any). Ordered by name so the
+	// generator's "pick the first N" selection is deterministic.
+	ListFiltered(ctx context.Context, equipment []string, excludeMuscleGroups []string, category string) ([]*Exercise, error)
 }
 
 type WorkoutRepository interface {
-	// Create returns ErrShareCodeTaken if w.ShareCode collides with another
-	// currently-in-progress workout's code — callers should regenerate and
-	// retry rather than treating it as fatal.
 	Create(ctx context.Context, w *Workout) error
 	FindByID(ctx context.Context, id uuid.UUID) (*Workout, error)
 	FindActiveForUser(ctx context.Context, userID uuid.UUID) (*Workout, error)
-	// FindByShareCode only ever returns an in-progress workout — a finished
-	// workout's code is no longer resolvable, even if reused by a new one.
-	FindByShareCode(ctx context.Context, code string) (*Workout, error)
 	Finish(ctx context.Context, id uuid.UUID, endedAt time.Time, notes string) error
 	// ListForUser uses keyset (cursor) pagination on (started_at, id) rather
 	// than OFFSET, so page N stays cheap regardless of how far in the user
@@ -162,6 +185,13 @@ type WorkoutSetRepository interface {
 	// Update overwrites reps/weightKg/rpe/setType in place, leaving
 	// id/workoutId/exerciseId/setNumber/supersetId/performedAt untouched.
 	Update(ctx context.Context, set *WorkoutSet) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type ProgramRepository interface {
+	Create(ctx context.Context, p *Program) error
+	ListForUser(ctx context.Context, userID uuid.UUID) ([]*Program, error)
+	FindByID(ctx context.Context, id uuid.UUID) (*Program, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 

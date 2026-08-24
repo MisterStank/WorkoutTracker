@@ -62,7 +62,11 @@ func main() {
 	templateRepo := repository.NewWorkoutTemplateRepository(db)
 	workoutService := service.NewWorkoutService(exerciseRepo, workoutRepo, workoutSetRepo, personalRecordRepo, templateRepo, analyticsService, eventBus)
 
-	resolver := &graphql.Resolver{Auth: authService, Workout: workoutService, Analytics: analyticsService, Events: eventBus}
+	fitnessProfileRepo := repository.NewFitnessProfileRepository(db)
+	programRepo := repository.NewProgramRepository(db, templateRepo)
+	programService := service.NewProgramService(fitnessProfileRepo, programRepo, exerciseRepo, workoutService)
+
+	resolver := &graphql.Resolver{Auth: authService, Workout: workoutService, Analytics: analyticsService, Program: programService, Events: eventBus}
 	gqlHandler := newGraphQLServer(resolver, tokens)
 
 	r := chi.NewRouter()

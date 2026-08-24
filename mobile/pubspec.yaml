@@ -56,6 +56,9 @@ dependencies:
   # Progress/volume trend charts (Phase 3 analytics)
   fl_chart: ^0.69.0
 
+  # Native OS share sheet, for sharing a PR/workout-summary image
+  share_plus: ^10.1.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -16,6 +16,7 @@ type Resolver struct {
 	Auth      *service.AuthService
 	Workout   *service.WorkoutService
 	Analytics *service.AnalyticsService
+	Program   *service.ProgramService
 	Events    *realtime.RedisEventBus
 }
 
@@ -67,6 +68,35 @@ var graphqlToDomainSetType = map[SetType]domain.SetType{
 	SetTypeWarmup:  domain.SetTypeWarmup,
 	SetTypeDropset: domain.SetTypeDropset,
 	SetTypeFailure: domain.SetTypeFailure,
+}
+
+// domainToGraphQLGoal/graphqlToDomainGoal and their ExperienceLevel
+// counterparts mirror the SetType maps above — domain values are
+// lowercase/snake_case, GraphQL enum values are UPPER_SNAKE.
+var domainToGraphQLGoal = map[domain.Goal]FitnessGoal{
+	domain.GoalStrength:       FitnessGoalStrength,
+	domain.GoalHypertrophy:    FitnessGoalHypertrophy,
+	domain.GoalFatLoss:        FitnessGoalFatLoss,
+	domain.GoalGeneralFitness: FitnessGoalGeneralFitness,
+}
+
+var graphqlToDomainGoal = map[FitnessGoal]domain.Goal{
+	FitnessGoalStrength:       domain.GoalStrength,
+	FitnessGoalHypertrophy:    domain.GoalHypertrophy,
+	FitnessGoalFatLoss:        domain.GoalFatLoss,
+	FitnessGoalGeneralFitness: domain.GoalGeneralFitness,
+}
+
+var graphqlToDomainExperience = map[ExperienceLevel]domain.ExperienceLevel{
+	ExperienceLevelBeginner:     domain.ExperienceBeginner,
+	ExperienceLevelIntermediate: domain.ExperienceIntermediate,
+	ExperienceLevelAdvanced:     domain.ExperienceAdvanced,
+}
+
+var domainToGraphQLExperience = map[domain.ExperienceLevel]ExperienceLevel{
+	domain.ExperienceBeginner:     ExperienceLevelBeginner,
+	domain.ExperienceIntermediate: ExperienceLevelIntermediate,
+	domain.ExperienceAdvanced:     ExperienceLevelAdvanced,
 }
 
 func toWorkoutSetModel(s *domain.WorkoutSet) *WorkoutSet {
@@ -186,6 +216,57 @@ func toPlateauStatusModel(s *service.PlateauStatus) *PlateauStatus {
 	}
 }
 
+func toFitnessProfileModel(p *domain.UserFitnessProfile) *UserFitnessProfile {
+	if p == nil {
+		return nil
+	}
+	goal, ok := domainToGraphQLGoal[p.Goal]
+	if !ok {
+		goal = FitnessGoalGeneralFitness
+	}
+	experience, ok := domainToGraphQLExperience[p.ExperienceLevel]
+	if !ok {
+		experience = ExperienceLevelBeginner
+	}
+	return &UserFitnessProfile{
+		Goal:              goal,
+		ExperienceLevel:   experience,
+		DaysPerWeek:       p.DaysPerWeek,
+		EquipmentAccess:   p.EquipmentAccess,
+		AvoidMuscleGroups: p.AvoidMuscleGroups,
+		UpdatedAt:         p.UpdatedAt,
+	}
+}
+
+func toProgramDayModel(d *domain.ProgramDay) *ProgramDay {
+	return &ProgramDay{
+		ID:       d.ID,
+		DayLabel: d.DayLabel,
+		Position: d.Position,
+		Template: toWorkoutTemplateModel(d.Template),
+	}
+}
+
+func toProgramModel(p *domain.Program) *Program {
+	goal, ok := domainToGraphQLGoal[p.Goal]
+	if !ok {
+		goal = FitnessGoalGeneralFitness
+	}
+	days := make([]*ProgramDay, len(p.Days))
+	for i, d := range p.Days {
+		days[i] = toProgramDayModel(d)
+	}
+	return &Program{
+		ID:          p.ID,
+		Name:        p.Name,
+		Goal:        goal,
+		DaysPerWeek: p.DaysPerWeek,
+		Notes:       p.Notes,
+		CreatedAt:   p.CreatedAt,
+		Days:        days,
+	}
+}
+
 func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *domain.Workout) (*Workout, error) {
 	sets, err := r.Workout.SetsForWorkout(ctx, userID, w.ID)
 	if err != nil {
@@ -199,30 +280,11 @@ func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *doma
 		Status:     toWorkoutStatus(w.Status),
 		Sets:       toWorkoutSetModels(sets),
 		TemplateID: w.TemplateID,
-		ShareCode:  w.ShareCode,
-	}, nil
-}
-
-func (r *Resolver) toSharedWorkoutModel(ctx context.Context, w *domain.Workout) (*Workout, error) {
-	sets, err := r.Workout.SetsForSharedWorkout(ctx, w.ID)
-	if err != nil {
-		return nil, err
-	}
-	return &Workout{
-		ID:         w.ID,
-		StartedAt:  w.StartedAt,
-		EndedAt:    w.EndedAt,
-		Notes:      w.Notes,
-		Status:     toWorkoutStatus(w.Status),
-		Sets:       toWorkoutSetModels(sets),
-		TemplateID: w.TemplateID,
-		ShareCode:  w.ShareCode,
 	}, nil
 }
 
 // streamWorkoutEvents subscribes to one workout's Redis pub/sub channel and
-// re-shapes each event into the GraphQL model, shared by both the
-// owner-only and share-code subscription resolvers.
+// re-shapes each event into the GraphQL model.
 func (r *Resolver) streamWorkoutEvents(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
 	events, cleanup, err := r.Events.Subscribe(ctx, workoutID)
 	if err != nil {
@@ -425,6 +487,40 @@ func (r *mutationResolver) LogBodyMetric(ctx context.Context, metricType string,
 		return nil, err
 	}
 	return toBodyMetricModel(m), nil
+}
+
+// SaveFitnessProfile is the resolver for the saveFitnessProfile field.
+func (r *mutationResolver) SaveFitnessProfile(ctx context.Context, input FitnessProfileInput) (*UserFitnessProfile, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	goal := graphqlToDomainGoal[input.Goal]
+	experience := graphqlToDomainExperience[input.ExperienceLevel]
+	profile, err := r.Program.SaveFitnessProfile(ctx, userID, domain.UserFitnessProfile{
+		Goal:              goal,
+		ExperienceLevel:   experience,
+		DaysPerWeek:       input.DaysPerWeek,
+		EquipmentAccess:   input.EquipmentAccess,
+		AvoidMuscleGroups: input.AvoidMuscleGroups,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toFitnessProfileModel(profile), nil
+}
+
+// GenerateProgram is the resolver for the generateProgram field.
+func (r *mutationResolver) GenerateProgram(ctx context.Context) (*Program, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	program, err := r.Program.GenerateProgram(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return toProgramModel(program), nil
 }
 
 // Me is the resolver for the me field.
@@ -632,16 +728,34 @@ func (r *queryResolver) PlateauStatus(ctx context.Context, exerciseID uuid.UUID)
 	return toPlateauStatusModel(status), nil
 }
 
-// SharedWorkout is the resolver for the sharedWorkout field.
-func (r *queryResolver) SharedWorkout(ctx context.Context, code string) (*Workout, error) {
-	if _, ok := appmiddleware.FromContext(ctx); !ok {
+// MyFitnessProfile is the resolver for the myFitnessProfile field.
+func (r *queryResolver) MyFitnessProfile(ctx context.Context) (*UserFitnessProfile, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
 		return nil, domain.ErrInvalidCredentials
 	}
-	w, err := r.Workout.GetSharedWorkout(ctx, code)
+	profile, err := r.Program.MyFitnessProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return r.toSharedWorkoutModel(ctx, w)
+	return toFitnessProfileModel(profile), nil
+}
+
+// MyPrograms is the resolver for the myPrograms field.
+func (r *queryResolver) MyPrograms(ctx context.Context) ([]*Program, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	programs, err := r.Program.MyPrograms(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*Program, len(programs))
+	for i, p := range programs {
+		out[i] = toProgramModel(p)
+	}
+	return out, nil
 }
 
 // WorkoutProgressUpdated is the resolver for the workoutProgressUpdated field.
@@ -656,18 +770,6 @@ func (r *subscriptionResolver) WorkoutProgressUpdated(ctx context.Context, worko
 		return nil, err
 	}
 	return r.streamWorkoutEvents(ctx, workoutID)
-}
-
-// SharedWorkoutProgressUpdated is the resolver for the sharedWorkoutProgressUpdated field.
-func (r *subscriptionResolver) SharedWorkoutProgressUpdated(ctx context.Context, code string) (<-chan *LogSetResult, error) {
-	if _, ok := appmiddleware.FromContext(ctx); !ok {
-		return nil, domain.ErrInvalidCredentials
-	}
-	w, err := r.Workout.GetSharedWorkout(ctx, code)
-	if err != nil {
-		return nil, err
-	}
-	return r.streamWorkoutEvents(ctx, w.ID)
 }
 
 // Mutation returns MutationResolver implementation.

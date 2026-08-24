@@ -34,6 +34,14 @@ type Exercise struct {
 	IsCustom     bool      `json:"isCustom"`
 }
 
+type FitnessProfileInput struct {
+	Goal              FitnessGoal     `json:"goal"`
+	ExperienceLevel   ExperienceLevel `json:"experienceLevel"`
+	DaysPerWeek       int             `json:"daysPerWeek"`
+	EquipmentAccess   []string        `json:"equipmentAccess"`
+	AvoidMuscleGroups []string        `json:"avoidMuscleGroups"`
+}
+
 type LogSetResult struct {
 	Set        *WorkoutSet       `json:"set"`
 	NewRecords []*PersonalRecord `json:"newRecords"`
@@ -60,6 +68,23 @@ type PlateauStatus struct {
 	IsPlateaued   bool    `json:"isPlateaued"`
 	CurrentBestKg float64 `json:"currentBestKg"`
 	Message       string  `json:"message"`
+}
+
+type Program struct {
+	ID          uuid.UUID     `json:"id"`
+	Name        string        `json:"name"`
+	Goal        FitnessGoal   `json:"goal"`
+	DaysPerWeek int           `json:"daysPerWeek"`
+	Notes       string        `json:"notes"`
+	CreatedAt   time.Time     `json:"createdAt"`
+	Days        []*ProgramDay `json:"days"`
+}
+
+type ProgramDay struct {
+	ID       uuid.UUID        `json:"id"`
+	DayLabel string           `json:"dayLabel"`
+	Position int              `json:"position"`
+	Template *WorkoutTemplate `json:"template"`
 }
 
 type ProgressPoint struct {
@@ -106,6 +131,15 @@ type User struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
+type UserFitnessProfile struct {
+	Goal              FitnessGoal     `json:"goal"`
+	ExperienceLevel   ExperienceLevel `json:"experienceLevel"`
+	DaysPerWeek       int             `json:"daysPerWeek"`
+	EquipmentAccess   []string        `json:"equipmentAccess"`
+	AvoidMuscleGroups []string        `json:"avoidMuscleGroups"`
+	UpdatedAt         time.Time       `json:"updatedAt"`
+}
+
 type Workout struct {
 	ID         uuid.UUID     `json:"id"`
 	StartedAt  time.Time     `json:"startedAt"`
@@ -114,7 +148,6 @@ type Workout struct {
 	Status     WorkoutStatus `json:"status"`
 	Sets       []*WorkoutSet `json:"sets"`
 	TemplateID *uuid.UUID    `json:"templateId,omitempty"`
-	ShareCode  *string       `json:"shareCode,omitempty"`
 }
 
 type WorkoutConnection struct {
@@ -144,6 +177,122 @@ type WorkoutTemplate struct {
 	Name      string              `json:"name"`
 	CreatedAt time.Time           `json:"createdAt"`
 	Exercises []*TemplateExercise `json:"exercises"`
+}
+
+type ExperienceLevel string
+
+const (
+	ExperienceLevelBeginner     ExperienceLevel = "BEGINNER"
+	ExperienceLevelIntermediate ExperienceLevel = "INTERMEDIATE"
+	ExperienceLevelAdvanced     ExperienceLevel = "ADVANCED"
+)
+
+var AllExperienceLevel = []ExperienceLevel{
+	ExperienceLevelBeginner,
+	ExperienceLevelIntermediate,
+	ExperienceLevelAdvanced,
+}
+
+func (e ExperienceLevel) IsValid() bool {
+	switch e {
+	case ExperienceLevelBeginner, ExperienceLevelIntermediate, ExperienceLevelAdvanced:
+		return true
+	}
+	return false
+}
+
+func (e ExperienceLevel) String() string {
+	return string(e)
+}
+
+func (e *ExperienceLevel) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ExperienceLevel(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ExperienceLevel", str)
+	}
+	return nil
+}
+
+func (e ExperienceLevel) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ExperienceLevel) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ExperienceLevel) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type FitnessGoal string
+
+const (
+	FitnessGoalStrength       FitnessGoal = "STRENGTH"
+	FitnessGoalHypertrophy    FitnessGoal = "HYPERTROPHY"
+	FitnessGoalFatLoss        FitnessGoal = "FAT_LOSS"
+	FitnessGoalGeneralFitness FitnessGoal = "GENERAL_FITNESS"
+)
+
+var AllFitnessGoal = []FitnessGoal{
+	FitnessGoalStrength,
+	FitnessGoalHypertrophy,
+	FitnessGoalFatLoss,
+	FitnessGoalGeneralFitness,
+}
+
+func (e FitnessGoal) IsValid() bool {
+	switch e {
+	case FitnessGoalStrength, FitnessGoalHypertrophy, FitnessGoalFatLoss, FitnessGoalGeneralFitness:
+		return true
+	}
+	return false
+}
+
+func (e FitnessGoal) String() string {
+	return string(e)
+}
+
+func (e *FitnessGoal) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FitnessGoal(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FitnessGoal", str)
+	}
+	return nil
+}
+
+func (e FitnessGoal) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FitnessGoal) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FitnessGoal) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type SetType string

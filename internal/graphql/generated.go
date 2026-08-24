@@ -72,11 +72,13 @@ type ComplexityRoot struct {
 		DeleteWorkout         func(childComplexity int, workoutID uuid.UUID) int
 		DeleteWorkoutTemplate func(childComplexity int, templateID uuid.UUID) int
 		FinishWorkout         func(childComplexity int, workoutID uuid.UUID, notes *string) int
+		GenerateProgram       func(childComplexity int) int
 		LogBodyMetric         func(childComplexity int, metricType string, value float64) int
 		LogSet                func(childComplexity int, workoutID uuid.UUID, exerciseID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType, supersetID *uuid.UUID) int
 		Login                 func(childComplexity int, email string, password string) int
 		Logout                func(childComplexity int, refreshToken string) int
 		RefreshToken          func(childComplexity int, refreshToken string) int
+		SaveFitnessProfile    func(childComplexity int, input FitnessProfileInput) int
 		Signup                func(childComplexity int, email string, password string, displayName string) int
 		StartWorkout          func(childComplexity int, templateID *uuid.UUID) int
 		UpdateSet             func(childComplexity int, setID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType) int
@@ -102,6 +104,23 @@ type ComplexityRoot struct {
 		Message       func(childComplexity int) int
 	}
 
+	Program struct {
+		CreatedAt   func(childComplexity int) int
+		Days        func(childComplexity int) int
+		DaysPerWeek func(childComplexity int) int
+		Goal        func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Name        func(childComplexity int) int
+		Notes       func(childComplexity int) int
+	}
+
+	ProgramDay struct {
+		DayLabel func(childComplexity int) int
+		ID       func(childComplexity int) int
+		Position func(childComplexity int) int
+		Template func(childComplexity int) int
+	}
+
 	ProgressPoint struct {
 		Day         func(childComplexity int) int
 		MaxWeight   func(childComplexity int) int
@@ -122,19 +141,19 @@ type ComplexityRoot struct {
 		Exercises             func(childComplexity int, search *string) int
 		LastSetForExercise    func(childComplexity int, exerciseID uuid.UUID) int
 		Me                    func(childComplexity int) int
+		MyFitnessProfile      func(childComplexity int) int
+		MyPrograms            func(childComplexity int) int
 		PersonalRecords       func(childComplexity int) int
 		PlateauStatus         func(childComplexity int, exerciseID uuid.UUID) int
 		ProgressOverTime      func(childComplexity int, exerciseID uuid.UUID, days int) int
 		ProgressionSuggestion func(childComplexity int, exerciseID uuid.UUID) int
-		SharedWorkout         func(childComplexity int, code string) int
 		VolumeTrend           func(childComplexity int, days int) int
 		WorkoutHistory        func(childComplexity int, first int, after *string) int
 		WorkoutTemplates      func(childComplexity int) int
 	}
 
 	Subscription struct {
-		SharedWorkoutProgressUpdated func(childComplexity int, code string) int
-		WorkoutProgressUpdated       func(childComplexity int, workoutID uuid.UUID) int
+		WorkoutProgressUpdated func(childComplexity int, workoutID uuid.UUID) int
 	}
 
 	TemplateExercise struct {
@@ -154,12 +173,20 @@ type ComplexityRoot struct {
 		Timezone    func(childComplexity int) int
 	}
 
+	UserFitnessProfile struct {
+		AvoidMuscleGroups func(childComplexity int) int
+		DaysPerWeek       func(childComplexity int) int
+		EquipmentAccess   func(childComplexity int) int
+		ExperienceLevel   func(childComplexity int) int
+		Goal              func(childComplexity int) int
+		UpdatedAt         func(childComplexity int) int
+	}
+
 	Workout struct {
 		EndedAt    func(childComplexity int) int
 		ID         func(childComplexity int) int
 		Notes      func(childComplexity int) int
 		Sets       func(childComplexity int) int
-		ShareCode  func(childComplexity int) int
 		StartedAt  func(childComplexity int) int
 		Status     func(childComplexity int) int
 		TemplateID func(childComplexity int) int
@@ -213,6 +240,8 @@ type MutationResolver interface {
 	CreateWorkoutTemplate(ctx context.Context, name string, exercises []*TemplateExerciseInput) (*WorkoutTemplate, error)
 	DeleteWorkoutTemplate(ctx context.Context, templateID uuid.UUID) (bool, error)
 	LogBodyMetric(ctx context.Context, metricType string, value float64) (*BodyMetric, error)
+	SaveFitnessProfile(ctx context.Context, input FitnessProfileInput) (*UserFitnessProfile, error)
+	GenerateProgram(ctx context.Context) (*Program, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*User, error)
@@ -227,11 +256,11 @@ type QueryResolver interface {
 	BodyMetrics(ctx context.Context, metricType string, days int) ([]*BodyMetric, error)
 	ProgressionSuggestion(ctx context.Context, exerciseID uuid.UUID) (*ProgressionSuggestion, error)
 	PlateauStatus(ctx context.Context, exerciseID uuid.UUID) (*PlateauStatus, error)
-	SharedWorkout(ctx context.Context, code string) (*Workout, error)
+	MyFitnessProfile(ctx context.Context) (*UserFitnessProfile, error)
+	MyPrograms(ctx context.Context) ([]*Program, error)
 }
 type SubscriptionResolver interface {
 	WorkoutProgressUpdated(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error)
-	SharedWorkoutProgressUpdated(ctx context.Context, code string) (<-chan *LogSetResult, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -401,6 +430,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.FinishWorkout(childComplexity, args["workoutId"].(uuid.UUID), args["notes"].(*string)), true
+	case "Mutation.generateProgram":
+		if e.ComplexityRoot.Mutation.GenerateProgram == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.GenerateProgram(childComplexity), true
 	case "Mutation.logBodyMetric":
 		if e.ComplexityRoot.Mutation.LogBodyMetric == nil {
 			break
@@ -456,6 +491,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.RefreshToken(childComplexity, args["refreshToken"].(string)), true
+	case "Mutation.saveFitnessProfile":
+		if e.ComplexityRoot.Mutation.SaveFitnessProfile == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_saveFitnessProfile_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SaveFitnessProfile(childComplexity, args["input"].(FitnessProfileInput)), true
 	case "Mutation.signup":
 		if e.ComplexityRoot.Mutation.Signup == nil {
 			break
@@ -559,6 +605,74 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PlateauStatus.Message(childComplexity), true
 
+	case "Program.createdAt":
+		if e.ComplexityRoot.Program.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.CreatedAt(childComplexity), true
+	case "Program.days":
+		if e.ComplexityRoot.Program.Days == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.Days(childComplexity), true
+	case "Program.daysPerWeek":
+		if e.ComplexityRoot.Program.DaysPerWeek == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.DaysPerWeek(childComplexity), true
+	case "Program.goal":
+		if e.ComplexityRoot.Program.Goal == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.Goal(childComplexity), true
+	case "Program.id":
+		if e.ComplexityRoot.Program.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.ID(childComplexity), true
+	case "Program.name":
+		if e.ComplexityRoot.Program.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.Name(childComplexity), true
+	case "Program.notes":
+		if e.ComplexityRoot.Program.Notes == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.Notes(childComplexity), true
+
+	case "ProgramDay.dayLabel":
+		if e.ComplexityRoot.ProgramDay.DayLabel == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgramDay.DayLabel(childComplexity), true
+	case "ProgramDay.id":
+		if e.ComplexityRoot.ProgramDay.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgramDay.ID(childComplexity), true
+	case "ProgramDay.position":
+		if e.ComplexityRoot.ProgramDay.Position == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgramDay.Position(childComplexity), true
+	case "ProgramDay.template":
+		if e.ComplexityRoot.ProgramDay.Template == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgramDay.Template(childComplexity), true
+
 	case "ProgressPoint.day":
 		if e.ComplexityRoot.ProgressPoint.Day == nil {
 			break
@@ -655,6 +769,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Me(childComplexity), true
+	case "Query.myFitnessProfile":
+		if e.ComplexityRoot.Query.MyFitnessProfile == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.MyFitnessProfile(childComplexity), true
+	case "Query.myPrograms":
+		if e.ComplexityRoot.Query.MyPrograms == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.MyPrograms(childComplexity), true
 	case "Query.personalRecords":
 		if e.ComplexityRoot.Query.PersonalRecords == nil {
 			break
@@ -694,17 +820,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ProgressionSuggestion(childComplexity, args["exerciseId"].(uuid.UUID)), true
-	case "Query.sharedWorkout":
-		if e.ComplexityRoot.Query.SharedWorkout == nil {
-			break
-		}
-
-		args, err := ec.field_Query_sharedWorkout_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Query.SharedWorkout(childComplexity, args["code"].(string)), true
 	case "Query.volumeTrend":
 		if e.ComplexityRoot.Query.VolumeTrend == nil {
 			break
@@ -734,17 +849,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Query.WorkoutTemplates(childComplexity), true
 
-	case "Subscription.sharedWorkoutProgressUpdated":
-		if e.ComplexityRoot.Subscription.SharedWorkoutProgressUpdated == nil {
-			break
-		}
-
-		args, err := ec.field_Subscription_sharedWorkoutProgressUpdated_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Subscription.SharedWorkoutProgressUpdated(childComplexity, args["code"].(string)), true
 	case "Subscription.workoutProgressUpdated":
 		if e.ComplexityRoot.Subscription.WorkoutProgressUpdated == nil {
 			break
@@ -825,6 +929,43 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.User.Timezone(childComplexity), true
 
+	case "UserFitnessProfile.avoidMuscleGroups":
+		if e.ComplexityRoot.UserFitnessProfile.AvoidMuscleGroups == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserFitnessProfile.AvoidMuscleGroups(childComplexity), true
+	case "UserFitnessProfile.daysPerWeek":
+		if e.ComplexityRoot.UserFitnessProfile.DaysPerWeek == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserFitnessProfile.DaysPerWeek(childComplexity), true
+	case "UserFitnessProfile.equipmentAccess":
+		if e.ComplexityRoot.UserFitnessProfile.EquipmentAccess == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserFitnessProfile.EquipmentAccess(childComplexity), true
+	case "UserFitnessProfile.experienceLevel":
+		if e.ComplexityRoot.UserFitnessProfile.ExperienceLevel == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserFitnessProfile.ExperienceLevel(childComplexity), true
+	case "UserFitnessProfile.goal":
+		if e.ComplexityRoot.UserFitnessProfile.Goal == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserFitnessProfile.Goal(childComplexity), true
+	case "UserFitnessProfile.updatedAt":
+		if e.ComplexityRoot.UserFitnessProfile.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserFitnessProfile.UpdatedAt(childComplexity), true
+
 	case "Workout.endedAt":
 		if e.ComplexityRoot.Workout.EndedAt == nil {
 			break
@@ -849,12 +990,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Workout.Sets(childComplexity), true
-	case "Workout.shareCode":
-		if e.ComplexityRoot.Workout.ShareCode == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Workout.ShareCode(childComplexity), true
 	case "Workout.startedAt":
 		if e.ComplexityRoot.Workout.StartedAt == nil {
 			break
@@ -988,6 +1123,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputFitnessProfileInput,
 		ec.unmarshalInputTemplateExerciseInput,
 	)
 	first := true
@@ -1194,6 +1330,40 @@ func (ec *executionContext) childFields_PlateauStatus(ctx context.Context, field
 	return nil, fmt.Errorf("no field named %q was found under type PlateauStatus", field.Name)
 }
 
+func (ec *executionContext) childFields_Program(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_Program_id(ctx, field)
+	case "name":
+		return ec.fieldContext_Program_name(ctx, field)
+	case "goal":
+		return ec.fieldContext_Program_goal(ctx, field)
+	case "daysPerWeek":
+		return ec.fieldContext_Program_daysPerWeek(ctx, field)
+	case "notes":
+		return ec.fieldContext_Program_notes(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_Program_createdAt(ctx, field)
+	case "days":
+		return ec.fieldContext_Program_days(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type Program", field.Name)
+}
+
+func (ec *executionContext) childFields_ProgramDay(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_ProgramDay_id(ctx, field)
+	case "dayLabel":
+		return ec.fieldContext_ProgramDay_dayLabel(ctx, field)
+	case "position":
+		return ec.fieldContext_ProgramDay_position(ctx, field)
+	case "template":
+		return ec.fieldContext_ProgramDay_template(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProgramDay", field.Name)
+}
+
 func (ec *executionContext) childFields_ProgressPoint(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "day":
@@ -1256,6 +1426,24 @@ func (ec *executionContext) childFields_User(ctx context.Context, field graphql.
 	return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 }
 
+func (ec *executionContext) childFields_UserFitnessProfile(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "goal":
+		return ec.fieldContext_UserFitnessProfile_goal(ctx, field)
+	case "experienceLevel":
+		return ec.fieldContext_UserFitnessProfile_experienceLevel(ctx, field)
+	case "daysPerWeek":
+		return ec.fieldContext_UserFitnessProfile_daysPerWeek(ctx, field)
+	case "equipmentAccess":
+		return ec.fieldContext_UserFitnessProfile_equipmentAccess(ctx, field)
+	case "avoidMuscleGroups":
+		return ec.fieldContext_UserFitnessProfile_avoidMuscleGroups(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_UserFitnessProfile_updatedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type UserFitnessProfile", field.Name)
+}
+
 func (ec *executionContext) childFields_Workout(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -1272,8 +1460,6 @@ func (ec *executionContext) childFields_Workout(ctx context.Context, field graph
 		return ec.fieldContext_Workout_sets(ctx, field)
 	case "templateId":
 		return ec.fieldContext_Workout_templateId(ctx, field)
-	case "shareCode":
-		return ec.fieldContext_Workout_shareCode(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Workout", field.Name)
 }
@@ -1672,6 +1858,20 @@ func (ec *executionContext) field_Mutation_refreshToken_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_saveFitnessProfile_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (FitnessProfileInput, error) {
+			return ec.unmarshalNFitnessProfileInput2workouttrackerᚋinternalᚋgraphqlᚐFitnessProfileInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_signup_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1876,20 +2076,6 @@ func (ec *executionContext) field_Query_progressionSuggestion_args(ctx context.C
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_sharedWorkout_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "code",
-		func(ctx context.Context, v any) (string, error) {
-			return ec.unmarshalNString2string(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["code"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Query_volumeTrend_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1923,20 +2109,6 @@ func (ec *executionContext) field_Query_workoutHistory_args(ctx context.Context,
 		return nil, err
 	}
 	args["after"] = arg1
-	return args, nil
-}
-
-func (ec *executionContext) field_Subscription_sharedWorkoutProgressUpdated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "code",
-		func(ctx context.Context, v any) (string, error) {
-			return ec.unmarshalNString2string(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["code"] = arg0
 	return args, nil
 }
 
@@ -2958,6 +3130,82 @@ func (ec *executionContext) fieldContext_Mutation_logBodyMetric(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_saveFitnessProfile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_saveFitnessProfile(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SaveFitnessProfile(ctx, fc.Args["input"].(FitnessProfileInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *UserFitnessProfile) graphql.Marshaler {
+			return ec.marshalNUserFitnessProfile2ᚖworkouttrackerᚋinternalᚋgraphqlᚐUserFitnessProfile(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_saveFitnessProfile(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_UserFitnessProfile(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_saveFitnessProfile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_generateProgram(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_generateProgram(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Mutation().GenerateProgram(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *Program) graphql.Marshaler {
+			return ec.marshalNProgram2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgram(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_generateProgram(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Program(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3209,6 +3457,277 @@ func (ec *executionContext) _PlateauStatus_message(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_PlateauStatus_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("PlateauStatus", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Program_id(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v uuid.UUID) graphql.Marshaler {
+			return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type UUID does not have child fields"))
+}
+
+func (ec *executionContext) _Program_name(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Program_goal(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_goal(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Goal, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v FitnessGoal) graphql.Marshaler {
+			return ec.marshalNFitnessGoal2workouttrackerᚋinternalᚋgraphqlᚐFitnessGoal(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_goal(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type FitnessGoal does not have child fields"))
+}
+
+func (ec *executionContext) _Program_daysPerWeek(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_daysPerWeek(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DaysPerWeek, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_daysPerWeek(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _Program_notes(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_notes(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Notes, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_notes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Program_createdAt(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _Program_days(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_days(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Days, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ProgramDay) graphql.Marshaler {
+			return ec.marshalNProgramDay2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgramDayᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_days(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Program",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProgramDay(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProgramDay_id(ctx context.Context, field graphql.CollectedField, obj *ProgramDay) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgramDay_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v uuid.UUID) graphql.Marshaler {
+			return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgramDay_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgramDay", field, false, false, errors.New("field of type UUID does not have child fields"))
+}
+
+func (ec *executionContext) _ProgramDay_dayLabel(ctx context.Context, field graphql.CollectedField, obj *ProgramDay) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgramDay_dayLabel(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DayLabel, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgramDay_dayLabel(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgramDay", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProgramDay_position(ctx context.Context, field graphql.CollectedField, obj *ProgramDay) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgramDay_position(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Position, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgramDay_position(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgramDay", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProgramDay_template(ctx context.Context, field graphql.CollectedField, obj *ProgramDay) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgramDay_template(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Template, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *WorkoutTemplate) graphql.Marshaler {
+			return ec.marshalNWorkoutTemplate2ᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkoutTemplate(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgramDay_template(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProgramDay",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WorkoutTemplate(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _ProgressPoint_day(ctx context.Context, field graphql.CollectedField, obj *ProgressPoint) (ret graphql.Marshaler) {
@@ -3875,46 +4394,66 @@ func (ec *executionContext) fieldContext_Query_plateauStatus(ctx context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_sharedWorkout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_myFitnessProfile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Query_sharedWorkout(ctx, field)
+			return ec.fieldContext_Query_myFitnessProfile(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().SharedWorkout(ctx, fc.Args["code"].(string))
+			return ec.Resolvers.Query().MyFitnessProfile(ctx)
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *Workout) graphql.Marshaler {
-			return ec.marshalOWorkout2ᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkout(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *UserFitnessProfile) graphql.Marshaler {
+			return ec.marshalOUserFitnessProfile2ᚖworkouttrackerᚋinternalᚋgraphqlᚐUserFitnessProfile(ctx, selections, v)
 		},
 		true,
 		false,
 	)
 }
-func (ec *executionContext) fieldContext_Query_sharedWorkout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_myFitnessProfile(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_Workout(ctx, field)
+			return ec.childFields_UserFitnessProfile(ctx, field)
 		},
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_sharedWorkout_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myPrograms(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_myPrograms(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Query().MyPrograms(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Program) graphql.Marshaler {
+			return ec.marshalNProgram2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgramᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_myPrograms(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Program(ctx, field)
+		},
 	}
 	return fc, nil
 }
@@ -4033,50 +4572,6 @@ func (ec *executionContext) fieldContext_Subscription_workoutProgressUpdated(ctx
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Subscription_workoutProgressUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Subscription_sharedWorkoutProgressUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
-	return graphql.ResolveFieldStream(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Subscription_sharedWorkoutProgressUpdated(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Subscription().SharedWorkoutProgressUpdated(ctx, fc.Args["code"].(string))
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *LogSetResult) graphql.Marshaler {
-			return ec.marshalNLogSetResult2ᚖworkouttrackerᚋinternalᚋgraphqlᚐLogSetResult(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Subscription_sharedWorkoutProgressUpdated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Subscription",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_LogSetResult(ctx, field)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Subscription_sharedWorkoutProgressUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4336,6 +4831,144 @@ func (ec *executionContext) fieldContext_User_createdAt(_ context.Context, field
 	return graphql.NewScalarFieldContext("User", field, false, false, errors.New("field of type Time does not have child fields"))
 }
 
+func (ec *executionContext) _UserFitnessProfile_goal(ctx context.Context, field graphql.CollectedField, obj *UserFitnessProfile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserFitnessProfile_goal(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Goal, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v FitnessGoal) graphql.Marshaler {
+			return ec.marshalNFitnessGoal2workouttrackerᚋinternalᚋgraphqlᚐFitnessGoal(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserFitnessProfile_goal(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserFitnessProfile", field, false, false, errors.New("field of type FitnessGoal does not have child fields"))
+}
+
+func (ec *executionContext) _UserFitnessProfile_experienceLevel(ctx context.Context, field graphql.CollectedField, obj *UserFitnessProfile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserFitnessProfile_experienceLevel(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExperienceLevel, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v ExperienceLevel) graphql.Marshaler {
+			return ec.marshalNExperienceLevel2workouttrackerᚋinternalᚋgraphqlᚐExperienceLevel(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserFitnessProfile_experienceLevel(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserFitnessProfile", field, false, false, errors.New("field of type ExperienceLevel does not have child fields"))
+}
+
+func (ec *executionContext) _UserFitnessProfile_daysPerWeek(ctx context.Context, field graphql.CollectedField, obj *UserFitnessProfile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserFitnessProfile_daysPerWeek(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DaysPerWeek, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserFitnessProfile_daysPerWeek(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserFitnessProfile", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _UserFitnessProfile_equipmentAccess(ctx context.Context, field graphql.CollectedField, obj *UserFitnessProfile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserFitnessProfile_equipmentAccess(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.EquipmentAccess, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserFitnessProfile_equipmentAccess(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserFitnessProfile", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _UserFitnessProfile_avoidMuscleGroups(ctx context.Context, field graphql.CollectedField, obj *UserFitnessProfile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserFitnessProfile_avoidMuscleGroups(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AvoidMuscleGroups, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserFitnessProfile_avoidMuscleGroups(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserFitnessProfile", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _UserFitnessProfile_updatedAt(ctx context.Context, field graphql.CollectedField, obj *UserFitnessProfile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserFitnessProfile_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserFitnessProfile_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserFitnessProfile", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
 func (ec *executionContext) _Workout_id(ctx context.Context, field graphql.CollectedField, obj *Workout) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4504,29 +5137,6 @@ func (ec *executionContext) _Workout_templateId(ctx context.Context, field graph
 }
 func (ec *executionContext) fieldContext_Workout_templateId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Workout", field, false, false, errors.New("field of type UUID does not have child fields"))
-}
-
-func (ec *executionContext) _Workout_shareCode(ctx context.Context, field graphql.CollectedField, obj *Workout) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Workout_shareCode(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ShareCode, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
-			return ec.marshalOString2ᚖstring(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_Workout_shareCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("Workout", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _WorkoutConnection_edges(ctx context.Context, field graphql.CollectedField, obj *WorkoutConnection) (ret graphql.Marshaler) {
@@ -6015,6 +6625,64 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputFitnessProfileInput(ctx context.Context, obj any) (FitnessProfileInput, error) {
+	var it FitnessProfileInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"goal", "experienceLevel", "daysPerWeek", "equipmentAccess", "avoidMuscleGroups"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "goal":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("goal"))
+			data, err := ec.unmarshalNFitnessGoal2workouttrackerᚋinternalᚋgraphqlᚐFitnessGoal(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Goal = data
+		case "experienceLevel":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("experienceLevel"))
+			data, err := ec.unmarshalNExperienceLevel2workouttrackerᚋinternalᚋgraphqlᚐExperienceLevel(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExperienceLevel = data
+		case "daysPerWeek":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("daysPerWeek"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DaysPerWeek = data
+		case "equipmentAccess":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("equipmentAccess"))
+			data, err := ec.unmarshalNString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EquipmentAccess = data
+		case "avoidMuscleGroups":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("avoidMuscleGroups"))
+			data, err := ec.unmarshalNString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AvoidMuscleGroups = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputTemplateExerciseInput(ctx context.Context, obj any) (TemplateExerciseInput, error) {
 	var it TemplateExerciseInput
 	if obj == nil {
@@ -6392,6 +7060,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "saveFitnessProfile":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_saveFitnessProfile(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "generateProgram":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_generateProgram(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -6543,6 +7225,127 @@ func (ec *executionContext) _PlateauStatus(ctx context.Context, sel ast.Selectio
 			}
 		case "message":
 			out.Values[i] = ec._PlateauStatus_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var programImplementors = []string{"Program"}
+
+func (ec *executionContext) _Program(ctx context.Context, sel ast.SelectionSet, obj *Program) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, programImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Program")
+		case "id":
+			out.Values[i] = ec._Program_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._Program_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "goal":
+			out.Values[i] = ec._Program_goal(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "daysPerWeek":
+			out.Values[i] = ec._Program_daysPerWeek(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "notes":
+			out.Values[i] = ec._Program_notes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._Program_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "days":
+			out.Values[i] = ec._Program_days(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var programDayImplementors = []string{"ProgramDay"}
+
+func (ec *executionContext) _ProgramDay(ctx context.Context, sel ast.SelectionSet, obj *ProgramDay) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, programDayImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProgramDay")
+		case "id":
+			out.Values[i] = ec._ProgramDay_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "dayLabel":
+			out.Values[i] = ec._ProgramDay_dayLabel(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "position":
+			out.Values[i] = ec._ProgramDay_position(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "template":
+			out.Values[i] = ec._ProgramDay_template(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -6957,7 +7760,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "sharedWorkout":
+		case "myFitnessProfile":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -6966,8 +7769,30 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_sharedWorkout(ctx, field)
+				res = ec._Query_myFitnessProfile(ctx, field)
 				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myPrograms":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myPrograms(ctx, field)
+				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
@@ -7029,8 +7854,6 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	switch fields[0].Name {
 	case "workoutProgressUpdated":
 		return ec._Subscription_workoutProgressUpdated(ctx, fields[0])
-	case "sharedWorkoutProgressUpdated":
-		return ec._Subscription_sharedWorkoutProgressUpdated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -7157,6 +7980,69 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 	return out
 }
 
+var userFitnessProfileImplementors = []string{"UserFitnessProfile"}
+
+func (ec *executionContext) _UserFitnessProfile(ctx context.Context, sel ast.SelectionSet, obj *UserFitnessProfile) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userFitnessProfileImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserFitnessProfile")
+		case "goal":
+			out.Values[i] = ec._UserFitnessProfile_goal(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "experienceLevel":
+			out.Values[i] = ec._UserFitnessProfile_experienceLevel(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "daysPerWeek":
+			out.Values[i] = ec._UserFitnessProfile_daysPerWeek(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "equipmentAccess":
+			out.Values[i] = ec._UserFitnessProfile_equipmentAccess(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "avoidMuscleGroups":
+			out.Values[i] = ec._UserFitnessProfile_avoidMuscleGroups(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._UserFitnessProfile_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var workoutImplementors = []string{"Workout"}
 
 func (ec *executionContext) _Workout(ctx context.Context, sel ast.SelectionSet, obj *Workout) graphql.Marshaler {
@@ -7201,11 +8087,6 @@ func (ec *executionContext) _Workout(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "templateId":
 			out.Values[i] = ec._Workout_templateId(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "shareCode":
-			out.Values[i] = ec._Workout_shareCode(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -7925,6 +8806,31 @@ func (ec *executionContext) marshalNExercise2ᚖworkouttrackerᚋinternalᚋgrap
 	return ec._Exercise(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNExperienceLevel2workouttrackerᚋinternalᚋgraphqlᚐExperienceLevel(ctx context.Context, v any) (ExperienceLevel, error) {
+	var res ExperienceLevel
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNExperienceLevel2workouttrackerᚋinternalᚋgraphqlᚐExperienceLevel(ctx context.Context, sel ast.SelectionSet, v ExperienceLevel) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNFitnessGoal2workouttrackerᚋinternalᚋgraphqlᚐFitnessGoal(ctx context.Context, v any) (FitnessGoal, error) {
+	var res FitnessGoal
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFitnessGoal2workouttrackerᚋinternalᚋgraphqlᚐFitnessGoal(ctx context.Context, sel ast.SelectionSet, v FitnessGoal) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNFitnessProfileInput2workouttrackerᚋinternalᚋgraphqlᚐFitnessProfileInput(ctx context.Context, v any) (FitnessProfileInput, error) {
+	res, err := ec.unmarshalInputFitnessProfileInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8019,6 +8925,62 @@ func (ec *executionContext) marshalNPlateauStatus2ᚖworkouttrackerᚋinternal�
 		return graphql.Null
 	}
 	return ec._PlateauStatus(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProgram2workouttrackerᚋinternalᚋgraphqlᚐProgram(ctx context.Context, sel ast.SelectionSet, v Program) graphql.Marshaler {
+	return ec._Program(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNProgram2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgramᚄ(ctx context.Context, sel ast.SelectionSet, v []*Program) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProgram2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgram(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNProgram2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgram(ctx context.Context, sel ast.SelectionSet, v *Program) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Program(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProgramDay2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgramDayᚄ(ctx context.Context, sel ast.SelectionSet, v []*ProgramDay) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProgramDay2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgramDay(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNProgramDay2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgramDay(ctx context.Context, sel ast.SelectionSet, v *ProgramDay) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProgramDay(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNProgressPoint2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐProgressPointᚄ(ctx context.Context, sel ast.SelectionSet, v []*ProgressPoint) graphql.Marshaler {
@@ -8187,6 +9149,20 @@ func (ec *executionContext) marshalNUser2ᚖworkouttrackerᚋinternalᚋgraphql�
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUserFitnessProfile2workouttrackerᚋinternalᚋgraphqlᚐUserFitnessProfile(ctx context.Context, sel ast.SelectionSet, v UserFitnessProfile) graphql.Marshaler {
+	return ec._UserFitnessProfile(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUserFitnessProfile2ᚖworkouttrackerᚋinternalᚋgraphqlᚐUserFitnessProfile(ctx context.Context, sel ast.SelectionSet, v *UserFitnessProfile) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserFitnessProfile(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNWorkout2workouttrackerᚋinternalᚋgraphqlᚐWorkout(ctx context.Context, sel ast.SelectionSet, v Workout) graphql.Marshaler {
@@ -8600,6 +9576,13 @@ func (ec *executionContext) marshalOUser2ᚖworkouttrackerᚋinternalᚋgraphql�
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOUserFitnessProfile2ᚖworkouttrackerᚋinternalᚋgraphqlᚐUserFitnessProfile(ctx context.Context, sel ast.SelectionSet, v *UserFitnessProfile) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._UserFitnessProfile(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOWorkout2ᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkout(ctx context.Context, sel ast.SelectionSet, v *Workout) graphql.Marshaler {
