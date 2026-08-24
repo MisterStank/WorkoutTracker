@@ -61,6 +61,8 @@ Every logged set beyond a warm-up is checked against your history for three kind
 
 **Repeat last set**: each exercise card in an active workout has a **Repeat last** button — logs another set identical to the one before it (same reps, weight, RPE, and set type) in a single tap, for straight sets across working sets.
 
+**Fixing a mistake**: tap the **⋮** on any logged set to **Edit** or **Delete** it. Editing or removing a set that was holding a personal record automatically updates your records to whatever the next-best set was — nothing is left pointing at a set that no longer exists.
+
 **Rest timer**: logging a set starts a rest timer automatically, shown as a countdown ring above your exercise list. Add fifteen seconds with the **+** button, or tap **Skip** to end the rest early.
 
 ## 4. Supersets
@@ -99,6 +101,8 @@ Open the **Progress** tab. It has three sub-tabs of its own:
 Personal records are tracked per exercise across three categories — heaviest weight, best volume, and estimated one-rep max — and surface automatically as the gold banner described in [Chapter 3](#3-logging-a-set), not as a separate screen you have to check.
 
 Each entry in the **History** tab also shows that session's total volume, so you don't need to open a workout to see roughly how much work it was.
+
+**Deleting a workout**: swipe a card left in the **History** tab and confirm to remove the entire session, including its sets. This can't be undone.
 
 ## 8. Coaching signals
 
