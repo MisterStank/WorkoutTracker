@@ -1,0 +1,19 @@
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Flutter web is a single-page app (IndexedStack-based navigation, no
+    # browser routing) — fall back to index.html for any unmatched path so a
+    # hard refresh or a direct link never 404s.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Flutter's build output is content-hashed; safe to cache aggressively.
+    location ~* \.(?:js|css|wasm|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+    }
+}

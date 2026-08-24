@@ -1,0 +1,10 @@
+.dart_tool
+.flutter-plugins
+.flutter-plugins-dependencies
+build
+android
+ios
+macos
+windows
+linux
+.git

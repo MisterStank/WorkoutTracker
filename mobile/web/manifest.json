@@ -1,11 +1,11 @@
 {
-    "name": "mobile",
-    "short_name": "mobile",
+    "name": "WorkoutTracker",
+    "short_name": "WorkoutTracker",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#17191A",
+    "theme_color": "#9B2C2C",
+    "description": "Log workouts, track personal records, and follow a personalized training program.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
