@@ -40,3 +40,6 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Local-only notes/scratch — never tracked or pushed
+tmp/
