@@ -71,7 +71,12 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
-	r.Use(chimiddleware.RealIP)
+	// Deliberately no RealIP middleware: it blindly trusts X-Forwarded-For/
+	// X-Real-IP, letting any client spoof the address that ends up in
+	// r.RemoteAddr and the access log (see the deprecation notice on
+	// chimiddleware.RealIP — GHSA-9g5q-2w5x-hmxf and related advisories).
+	// Nothing here makes a security decision based on client IP, so the
+	// access log just shows the real TCP peer (Render's proxy) instead.
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	// Origins are configurable via ALLOWED_ORIGINS (defaults to local-dev
@@ -87,7 +92,7 @@ func main() {
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 	r.Handle("/graphql", gqlHandler)
 	r.Handle("/playground", playground.Handler("GraphQL Playground", "/graphql"))

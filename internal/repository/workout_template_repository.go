@@ -24,7 +24,7 @@ func (r *WorkoutTemplateRepository) Create(ctx context.Context, t *domain.Workou
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO workout_templates (id, user_id, name, created_at) VALUES ($1, $2, $3, $4)`,

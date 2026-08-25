@@ -25,7 +25,7 @@ func (r *ProgramRepository) Create(ctx context.Context, p *domain.Program) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO programs (id, user_id, name, goal, days_per_week, notes, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,

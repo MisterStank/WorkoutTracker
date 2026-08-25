@@ -99,7 +99,7 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var setNumber int
 	if err := tx.QueryRow(ctx,
