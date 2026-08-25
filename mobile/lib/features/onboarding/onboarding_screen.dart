@@ -78,6 +78,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
               ),
             Expanded(
+              // Keyed so Flutter's unkeyed-list reconciliation can't confuse
+              // this for a different widget when the Skip button above (or
+              // the dots/button below) appear or disappear and shift this
+              // Expanded's position within Column.children — without a key,
+              // that shift was enough to make Flutter tear down and recreate
+              // the PageView (resetting it to page 0) the moment the intro
+              // chrome hid on reaching the last page.
+              key: const ValueKey('onboarding-pageview'),
               child: PageView(
                 controller: _controller,
                 onPageChanged: (i) => setState(() => _page = i),
