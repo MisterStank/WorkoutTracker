@@ -1,15 +1,12 @@
 name: api
 
 on:
+  # pull_request is deliberately NOT path-filtered: this workflow is a
+  # required status check (branch protection on main), and a required check
+  # that a path filter prevents from ever running on some PRs blocks merging
+  # that PR forever, waiting on a check that will never report. push stays
+  # path-filtered since nothing there gates a merge.
   pull_request:
-    paths:
-      - "cmd/**"
-      - "internal/**"
-      - "migrations/**"
-      - "go.mod"
-      - "go.sum"
-      - "Dockerfile"
-      - ".github/workflows/api.yml"
   push:
     branches: [main]
     paths:
@@ -25,7 +22,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -35,11 +32,17 @@ jobs:
         run: go vet ./...
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
+        with:
+          # v6's default bundled golangci-lint binary lagged go.mod's Go
+          # version (built with go1.24 targeting our go1.25), which fails
+          # outright at config-load time. "latest" always resolves a build
+          # new enough to support the Go version actually in use.
+          version: latest
 
   unit-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -62,13 +65,17 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - name: run migrations
         run: |
-          go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+          # The plain `go install .../cmd/migrate` build excludes every
+          # database driver by default (keeps the binary small) — without
+          # this build tag it compiles but errors at runtime with "unknown
+          # driver postgres" the moment it tries to connect.
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
           migrate -database "postgres://postgres:postgres@localhost:5432/workouttracker?sslmode=disable" -path migrations up
       - run: go test ./internal/repository/... ./internal/graphql/...
         env:
