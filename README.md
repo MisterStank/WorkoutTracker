@@ -2,7 +2,7 @@
 
 A workout tracker that adapts to user progress. Flutter mobile client, Go/GraphQL backend, Postgres, Redis.
 
-Architecture and phased roadmap: see `PLAN.md`. For what the app does and how to use it, see [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+For what the app does and how to use it, see [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## Stack
 
@@ -11,7 +11,7 @@ Architecture and phased roadmap: see `PLAN.md`. For what the app does and how to
 - **Database**: Postgres
 - **Cache / pub-sub**: Redis
 - **CI/CD**: GitHub Actions (lint/test) → Render (auto-deploy on push to `main`)
-- **Hosting**: Render (API + Postgres + Redis + web bundle) — see `DEPLOYMENT.md`
+- **Hosting**: Render (API + Postgres + Redis + web bundle)
 
 ## Backend — local development
 
