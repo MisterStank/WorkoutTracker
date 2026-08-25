@@ -106,6 +106,7 @@ class Program {
     required this.daysPerWeek,
     required this.notes,
     required this.days,
+    required this.createdAt,
   });
 
   final String id;
@@ -114,6 +115,7 @@ class Program {
   final int daysPerWeek;
   final String notes;
   final List<ProgramDay> days;
+  final DateTime createdAt;
 
   factory Program.fromJson(Map<String, dynamic> json) => Program(
         id: json['id'] as String,
@@ -122,5 +124,6 @@ class Program {
         daysPerWeek: json['daysPerWeek'] as int,
         notes: json['notes'] as String,
         days: (json['days'] as List<dynamic>).map((d) => ProgramDay.fromJson(d as Map<String, dynamic>)).toList(),
+        createdAt: DateTime.parse(json['createdAt'] as String),
       );
 }

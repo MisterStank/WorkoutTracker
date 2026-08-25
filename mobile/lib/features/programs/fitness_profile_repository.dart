@@ -8,7 +8,7 @@ class FitnessProfileRepository {
   final GraphQLClient _client;
 
   static const _programFields = '''
-    id name goal daysPerWeek notes
+    id name goal daysPerWeek notes createdAt
     days {
       id dayLabel position
       template {
