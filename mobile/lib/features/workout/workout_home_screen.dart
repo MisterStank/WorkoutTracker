@@ -10,6 +10,8 @@ import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import '../../core/widgets/semantic_banner.dart';
 import '../auth/auth_provider.dart';
+import '../programs/fitness_profile_models.dart';
+import '../programs/fitness_profile_provider.dart';
 import '../sharing/pr_share_card.dart';
 import '../sharing/share_preview_sheet.dart';
 import '../sharing/workout_summary_share_card.dart';
@@ -149,6 +151,11 @@ class WorkoutHomeScreen extends ConsumerWidget {
         await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen()));
       }
     }
+  }
+
+  static Future<void> _startFromTemplate(BuildContext context, WidgetRef ref, String templateId) async {
+    ref.read(activeSupersetsProvider.notifier).reset();
+    await ref.read(activeWorkoutProvider.notifier).start(templateId: templateId);
   }
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
@@ -303,15 +310,28 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-class _StartWorkoutView extends StatelessWidget {
+class _StartWorkoutView extends ConsumerStatefulWidget {
   const _StartWorkoutView({required this.onStart});
 
   final VoidCallback onStart;
 
   @override
+  ConsumerState<_StartWorkoutView> createState() => _StartWorkoutViewState();
+}
+
+class _StartWorkoutViewState extends ConsumerState<_StartWorkoutView> {
+  late Future<NextWorkout?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = ref.read(fitnessProfileRepositoryProvider).nextWorkout();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -325,13 +345,69 @@ class _StartWorkoutView extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
+            FutureBuilder<NextWorkout?>(
+              future: _future,
+              builder: (context, snapshot) {
+                final next = snapshot.data;
+                if (next == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _ContinueProgramCard(next: next),
+                );
+              },
+            ),
             FilledButton.icon(
-              onPressed: onStart,
+              onPressed: widget.onStart,
               icon: const Icon(Icons.play_arrow),
               label: const Text('Start workout'),
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContinueProgramCard extends ConsumerWidget {
+  const _ContinueProgramCard({required this.next});
+
+  final NextWorkout next;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(appCardRadius),
+        onTap: () => WorkoutHomeScreen._startFromTemplate(context, ref, next.day.template.id),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                next.program.name,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Icon(Icons.play_circle_fill, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Continue: ${next.day.dayLabel}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -184,6 +184,21 @@ type Program {
   days: [ProgramDay!]!
 }
 
+type NextWorkout {
+  program: Program!
+  day: ProgramDay!
+}
+
+input ProgramDayInput {
+  dayLabel: String!
+  templateId: UUID!
+}
+
+input CreateProgramInput {
+  name: String!
+  days: [ProgramDayInput!]!
+}
+
 type Query {
   me: User
   exercises(search: String): [Exercise!]!
@@ -202,6 +217,7 @@ type Query {
 
   myFitnessProfile: UserFitnessProfile
   myPrograms: [Program!]!
+  nextWorkout: NextWorkout
 }
 
 type Mutation {
@@ -224,6 +240,7 @@ type Mutation {
 
   saveFitnessProfile(input: FitnessProfileInput!): UserFitnessProfile!
   generateProgram: Program!
+  createProgramFromTemplates(input: CreateProgramInput!): Program!
 }
 
 type Subscription {

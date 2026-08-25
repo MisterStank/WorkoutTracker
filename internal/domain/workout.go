@@ -87,10 +87,12 @@ type ProgramDay struct {
 	Template   *WorkoutTemplate
 }
 
-// Program is a generated (or, in principle, hand-built) multi-day split.
-// Notes carries any skipped-muscle-group explanations from generation
-// (e.g. "no eligible chest exercises for your equipment") rather than
-// failing outright — see PersonalizationService.
+// Program is a generated or hand-built multi-day split. Notes carries any
+// skipped-muscle-group explanations from generation (e.g. "no eligible
+// chest exercises for your equipment") rather than failing outright — see
+// ProgramService. Hand-built programs (assembled from existing templates
+// rather than generated) default Goal to GoalGeneralFitness since there's
+// no questionnaire to derive one from.
 type Program struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
@@ -100,6 +102,17 @@ type Program struct {
 	Notes       string
 	CreatedAt   time.Time
 	Days        []*ProgramDay
+}
+
+// NextWorkout is "what should I train next" for a user's most recently
+// created program: Day is the ProgramDay after whichever one was most
+// recently finished (wrapping around), or the first day if none of this
+// program's days have been done yet. Derived fresh each time from workout
+// history rather than a stored counter, so it can't desync if a workout
+// gets edited or deleted.
+type NextWorkout struct {
+	Program *Program
+	Day     *ProgramDay
 }
 
 type WorkoutSet struct {
@@ -157,6 +170,11 @@ type WorkoutRepository interface {
 	// for recomputing rollups/records afterward — the cascade only cleans
 	// up rows, it doesn't know what should replace a lost personal best.
 	Delete(ctx context.Context, id uuid.UUID) error
+	// FindMostRecentFinishedByTemplateIDs powers NextWorkout: which of a
+	// program's day-templates did the user most recently complete? Returns
+	// nil (not an error) if none of the given templates has ever been
+	// finished by this user.
+	FindMostRecentFinishedByTemplateIDs(ctx context.Context, userID uuid.UUID, templateIDs []uuid.UUID) (*Workout, error)
 }
 
 type WorkoutTemplateRepository interface {

@@ -114,14 +114,33 @@ func (s *WorkoutService) ListTemplates(ctx context.Context, userID uuid.UUID) ([
 }
 
 func (s *WorkoutService) DeleteTemplate(ctx context.Context, userID, templateID uuid.UUID) error {
-	t, err := s.templates.FindByID(ctx, templateID)
+	t, err := s.GetTemplate(ctx, userID, templateID)
 	if err != nil {
 		return err
 	}
-	if t.UserID != userID {
-		return domain.ErrTemplateNotOwned
+	return s.templates.Delete(ctx, t.ID)
+}
+
+// GetTemplate returns domain.ErrTemplateNotOwned if templateID exists but
+// belongs to a different user, so callers (here and ProgramService's manual
+// program builder) can't be pointed at someone else's template.
+func (s *WorkoutService) GetTemplate(ctx context.Context, userID, templateID uuid.UUID) (*domain.WorkoutTemplate, error) {
+	t, err := s.templates.FindByID(ctx, templateID)
+	if err != nil {
+		return nil, err
 	}
-	return s.templates.Delete(ctx, templateID)
+	if t.UserID != userID {
+		return nil, domain.ErrTemplateNotOwned
+	}
+	return t, nil
+}
+
+// MostRecentFinishedByTemplateIDs is a thin passthrough to the repository,
+// exposed here (rather than adding a direct WorkoutRepository dependency to
+// ProgramService) so ProgramService keeps depending only on *WorkoutService
+// for anything workout-related, matching how it already reuses CreateTemplate.
+func (s *WorkoutService) MostRecentFinishedByTemplateIDs(ctx context.Context, userID uuid.UUID, templateIDs []uuid.UUID) (*domain.Workout, error) {
+	return s.workouts.FindMostRecentFinishedByTemplateIDs(ctx, userID, templateIDs)
 }
 
 func (s *WorkoutService) ActiveWorkout(ctx context.Context, userID uuid.UUID) (*domain.Workout, error) {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/analytics/analytics_screen.dart';
-import '../../features/templates/templates_screen.dart';
+import '../../features/programs/programs_screen.dart';
 import '../../features/workout/elapsed_time_text.dart';
 import '../../features/workout/workout_history_screen.dart';
 import '../../features/workout/workout_home_screen.dart';
@@ -30,7 +30,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   static const _tabs = [
     WorkoutHomeScreen(),
     WorkoutHistoryScreen(),
-    TemplatesScreen(),
+    ProgramsScreen(),
     AnalyticsScreen(),
   ];
 
@@ -52,7 +52,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             destinations: const [
               NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Home'),
               NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'History'),
-              NavigationDestination(icon: Icon(Icons.checklist_outlined), selectedIcon: Icon(Icons.checklist), label: 'Templates'),
+              NavigationDestination(icon: Icon(Icons.calendar_view_month_outlined), selectedIcon: Icon(Icons.calendar_view_month), label: 'Programs'),
               NavigationDestination(icon: Icon(Icons.show_chart), selectedIcon: Icon(Icons.show_chart), label: 'Progress'),
             ],
           ),

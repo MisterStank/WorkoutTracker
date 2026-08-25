@@ -20,301 +20,6 @@ type Resolver struct {
 	Events    *realtime.RedisEventBus
 }
 
-func toUserModel(u *domain.User) *User {
-	if u == nil {
-		return nil
-	}
-	return &User{
-		ID:          u.ID,
-		Email:       u.Email,
-		DisplayName: u.DisplayName,
-		Timezone:    u.Timezone,
-		CreatedAt:   u.CreatedAt,
-	}
-}
-
-func toAuthPayload(res *service.AuthResult) *AuthPayload {
-	return &AuthPayload{
-		User:         toUserModel(res.User),
-		AccessToken:  res.AccessToken,
-		RefreshToken: res.RefreshToken,
-	}
-}
-
-func toExerciseModel(e *domain.Exercise) *Exercise {
-	return &Exercise{
-		ID:           e.ID,
-		Name:         e.Name,
-		Category:     e.Category,
-		MuscleGroups: e.MuscleGroups,
-		Equipment:    e.Equipment,
-		IsCustom:     e.IsCustom,
-	}
-}
-
-// domainToGraphQLSetType/graphqlToDomainSetType map between domain.SetType's
-// lowercase DB values and the GraphQL enum's uppercase ones, rather than
-// relying on string-casing tricks that would break if either side's naming
-// changes.
-var domainToGraphQLSetType = map[domain.SetType]SetType{
-	domain.SetTypeNormal:  SetTypeNormal,
-	domain.SetTypeWarmup:  SetTypeWarmup,
-	domain.SetTypeDropset: SetTypeDropset,
-	domain.SetTypeFailure: SetTypeFailure,
-}
-
-var graphqlToDomainSetType = map[SetType]domain.SetType{
-	SetTypeNormal:  domain.SetTypeNormal,
-	SetTypeWarmup:  domain.SetTypeWarmup,
-	SetTypeDropset: domain.SetTypeDropset,
-	SetTypeFailure: domain.SetTypeFailure,
-}
-
-// domainToGraphQLGoal/graphqlToDomainGoal and their ExperienceLevel
-// counterparts mirror the SetType maps above — domain values are
-// lowercase/snake_case, GraphQL enum values are UPPER_SNAKE.
-var domainToGraphQLGoal = map[domain.Goal]FitnessGoal{
-	domain.GoalStrength:       FitnessGoalStrength,
-	domain.GoalHypertrophy:    FitnessGoalHypertrophy,
-	domain.GoalFatLoss:        FitnessGoalFatLoss,
-	domain.GoalGeneralFitness: FitnessGoalGeneralFitness,
-}
-
-var graphqlToDomainGoal = map[FitnessGoal]domain.Goal{
-	FitnessGoalStrength:       domain.GoalStrength,
-	FitnessGoalHypertrophy:    domain.GoalHypertrophy,
-	FitnessGoalFatLoss:        domain.GoalFatLoss,
-	FitnessGoalGeneralFitness: domain.GoalGeneralFitness,
-}
-
-var graphqlToDomainExperience = map[ExperienceLevel]domain.ExperienceLevel{
-	ExperienceLevelBeginner:     domain.ExperienceBeginner,
-	ExperienceLevelIntermediate: domain.ExperienceIntermediate,
-	ExperienceLevelAdvanced:     domain.ExperienceAdvanced,
-}
-
-var domainToGraphQLExperience = map[domain.ExperienceLevel]ExperienceLevel{
-	domain.ExperienceBeginner:     ExperienceLevelBeginner,
-	domain.ExperienceIntermediate: ExperienceLevelIntermediate,
-	domain.ExperienceAdvanced:     ExperienceLevelAdvanced,
-}
-
-func toWorkoutSetModel(s *domain.WorkoutSet) *WorkoutSet {
-	if s == nil {
-		return nil
-	}
-	setType, ok := domainToGraphQLSetType[s.SetType]
-	if !ok {
-		setType = SetTypeNormal
-	}
-	return &WorkoutSet{
-		ID:          s.ID,
-		ExerciseID:  s.ExerciseID,
-		SetNumber:   s.SetNumber,
-		Reps:        s.Reps,
-		WeightKg:    s.WeightKg,
-		Rpe:         s.RPE,
-		SetType:     setType,
-		SupersetID:  s.SupersetID,
-		PerformedAt: s.PerformedAt,
-	}
-}
-
-func toWorkoutSetModels(sets []*domain.WorkoutSet) []*WorkoutSet {
-	out := make([]*WorkoutSet, len(sets))
-	for i, s := range sets {
-		out[i] = toWorkoutSetModel(s)
-	}
-	return out
-}
-
-func toWorkoutStatus(s domain.WorkoutStatus) WorkoutStatus {
-	if s == domain.WorkoutCompleted {
-		return WorkoutStatusCompleted
-	}
-	return WorkoutStatusInProgress
-}
-
-func toPersonalRecordModel(pr *domain.PersonalRecord) *PersonalRecord {
-	return &PersonalRecord{
-		ID:           pr.ID,
-		ExerciseID:   pr.ExerciseID,
-		RecordType:   pr.RecordType,
-		Value:        pr.Value,
-		AchievedAt:   pr.AchievedAt,
-		WorkoutSetID: pr.WorkoutSetID,
-	}
-}
-
-func toLogSetResult(logged *domain.LoggedSet) *LogSetResult {
-	newRecords := make([]*PersonalRecord, len(logged.NewRecords))
-	for i, pr := range logged.NewRecords {
-		newRecords[i] = toPersonalRecordModel(pr)
-	}
-	return &LogSetResult{Set: toWorkoutSetModel(logged.Set), NewRecords: newRecords}
-}
-
-func toProgressPointModel(p *domain.ProgressPoint) *ProgressPoint {
-	return &ProgressPoint{
-		Day:         p.Day,
-		TotalVolume: p.TotalVolume,
-		MaxWeight:   p.MaxWeight,
-		SetCount:    p.SetCount,
-	}
-}
-
-func toBodyMetricModel(m *domain.BodyMetric) *BodyMetric {
-	return &BodyMetric{
-		ID:         m.ID,
-		MetricType: m.MetricType,
-		Value:      m.Value,
-		RecordedAt: m.RecordedAt,
-	}
-}
-
-func toTemplateExerciseModel(e *domain.TemplateExercise) *TemplateExercise {
-	return &TemplateExercise{
-		ID:            e.ID,
-		ExerciseID:    e.ExerciseID,
-		Position:      e.Position,
-		TargetSets:    e.TargetSets,
-		TargetReps:    e.TargetReps,
-		SupersetGroup: e.SupersetGroup,
-	}
-}
-
-func toWorkoutTemplateModel(t *domain.WorkoutTemplate) *WorkoutTemplate {
-	exercises := make([]*TemplateExercise, len(t.Exercises))
-	for i, e := range t.Exercises {
-		exercises[i] = toTemplateExerciseModel(e)
-	}
-	return &WorkoutTemplate{
-		ID:        t.ID,
-		Name:      t.Name,
-		CreatedAt: t.CreatedAt,
-		Exercises: exercises,
-	}
-}
-
-func toProgressionSuggestionModel(s *service.ProgressionSuggestion) *ProgressionSuggestion {
-	if s == nil {
-		return nil
-	}
-	return &ProgressionSuggestion{
-		SuggestedWeightKg: s.SuggestedWeightKg,
-		SuggestedReps:     s.SuggestedReps,
-		Reasoning:         s.Reasoning,
-		BasedOnRpe:        s.BasedOnRPE,
-	}
-}
-
-func toPlateauStatusModel(s *service.PlateauStatus) *PlateauStatus {
-	return &PlateauStatus{
-		IsPlateaued:   s.IsPlateaued,
-		CurrentBestKg: s.CurrentBestKg,
-		Message:       s.Message,
-	}
-}
-
-func toFitnessProfileModel(p *domain.UserFitnessProfile) *UserFitnessProfile {
-	if p == nil {
-		return nil
-	}
-	goal, ok := domainToGraphQLGoal[p.Goal]
-	if !ok {
-		goal = FitnessGoalGeneralFitness
-	}
-	experience, ok := domainToGraphQLExperience[p.ExperienceLevel]
-	if !ok {
-		experience = ExperienceLevelBeginner
-	}
-	return &UserFitnessProfile{
-		Goal:              goal,
-		ExperienceLevel:   experience,
-		DaysPerWeek:       p.DaysPerWeek,
-		EquipmentAccess:   p.EquipmentAccess,
-		AvoidMuscleGroups: p.AvoidMuscleGroups,
-		UpdatedAt:         p.UpdatedAt,
-	}
-}
-
-func toProgramDayModel(d *domain.ProgramDay) *ProgramDay {
-	return &ProgramDay{
-		ID:       d.ID,
-		DayLabel: d.DayLabel,
-		Position: d.Position,
-		Template: toWorkoutTemplateModel(d.Template),
-	}
-}
-
-func toProgramModel(p *domain.Program) *Program {
-	goal, ok := domainToGraphQLGoal[p.Goal]
-	if !ok {
-		goal = FitnessGoalGeneralFitness
-	}
-	days := make([]*ProgramDay, len(p.Days))
-	for i, d := range p.Days {
-		days[i] = toProgramDayModel(d)
-	}
-	return &Program{
-		ID:          p.ID,
-		Name:        p.Name,
-		Goal:        goal,
-		DaysPerWeek: p.DaysPerWeek,
-		Notes:       p.Notes,
-		CreatedAt:   p.CreatedAt,
-		Days:        days,
-	}
-}
-
-func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *domain.Workout) (*Workout, error) {
-	sets, err := r.Workout.SetsForWorkout(ctx, userID, w.ID)
-	if err != nil {
-		return nil, err
-	}
-	return &Workout{
-		ID:         w.ID,
-		StartedAt:  w.StartedAt,
-		EndedAt:    w.EndedAt,
-		Notes:      w.Notes,
-		Status:     toWorkoutStatus(w.Status),
-		Sets:       toWorkoutSetModels(sets),
-		TemplateID: w.TemplateID,
-	}, nil
-}
-
-// streamWorkoutEvents subscribes to one workout's Redis pub/sub channel and
-// re-shapes each event into the GraphQL model.
-func (r *Resolver) streamWorkoutEvents(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
-	events, cleanup, err := r.Events.Subscribe(ctx, workoutID)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make(chan *LogSetResult)
-	go func() {
-		defer close(out)
-		defer cleanup()
-		for {
-			select {
-			case logged, ok := <-events:
-				if !ok {
-					return
-				}
-				select {
-				case out <- toLogSetResult(logged):
-				case <-ctx.Done():
-					return
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return out, nil
-}
-
 // Signup is the resolver for the signup field.
 func (r *mutationResolver) Signup(ctx context.Context, email string, password string, displayName string) (*AuthPayload, error) {
 	res, err := r.Auth.SignUp(ctx, email, password, displayName)
@@ -517,6 +222,23 @@ func (r *mutationResolver) GenerateProgram(ctx context.Context) (*Program, error
 		return nil, domain.ErrInvalidCredentials
 	}
 	program, err := r.Program.GenerateProgram(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return toProgramModel(program), nil
+}
+
+// CreateProgramFromTemplates is the resolver for the createProgramFromTemplates field.
+func (r *mutationResolver) CreateProgramFromTemplates(ctx context.Context, input CreateProgramInput) (*Program, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	days := make([]service.DayInput, len(input.Days))
+	for i, d := range input.Days {
+		days[i] = service.DayInput{DayLabel: d.DayLabel, TemplateID: d.TemplateID}
+	}
+	program, err := r.Program.CreateFromTemplates(ctx, userID, input.Name, days)
 	if err != nil {
 		return nil, err
 	}
@@ -758,6 +480,25 @@ func (r *queryResolver) MyPrograms(ctx context.Context) ([]*Program, error) {
 	return out, nil
 }
 
+// NextWorkout is the resolver for the nextWorkout field.
+func (r *queryResolver) NextWorkout(ctx context.Context) (*NextWorkout, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	nw, err := r.Program.NextWorkout(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if nw == nil {
+		return nil, nil
+	}
+	return &NextWorkout{
+		Program: toProgramModel(nw.Program),
+		Day:     toProgramDayModel(nw.Day),
+	}, nil
+}
+
 // WorkoutProgressUpdated is the resolver for the workoutProgressUpdated field.
 func (r *subscriptionResolver) WorkoutProgressUpdated(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
@@ -786,3 +527,267 @@ type (
 	queryResolver        struct{ *Resolver }
 	subscriptionResolver struct{ *Resolver }
 )
+
+func toUserModel(u *domain.User) *User {
+	if u == nil {
+		return nil
+	}
+	return &User{
+		ID:          u.ID,
+		Email:       u.Email,
+		DisplayName: u.DisplayName,
+		Timezone:    u.Timezone,
+		CreatedAt:   u.CreatedAt,
+	}
+}
+func toAuthPayload(res *service.AuthResult) *AuthPayload {
+	return &AuthPayload{
+		User:         toUserModel(res.User),
+		AccessToken:  res.AccessToken,
+		RefreshToken: res.RefreshToken,
+	}
+}
+func toExerciseModel(e *domain.Exercise) *Exercise {
+	return &Exercise{
+		ID:           e.ID,
+		Name:         e.Name,
+		Category:     e.Category,
+		MuscleGroups: e.MuscleGroups,
+		Equipment:    e.Equipment,
+		IsCustom:     e.IsCustom,
+	}
+}
+
+var domainToGraphQLSetType = map[domain.SetType]SetType{
+	domain.SetTypeNormal:  SetTypeNormal,
+	domain.SetTypeWarmup:  SetTypeWarmup,
+	domain.SetTypeDropset: SetTypeDropset,
+	domain.SetTypeFailure: SetTypeFailure,
+}
+var graphqlToDomainSetType = map[SetType]domain.SetType{
+	SetTypeNormal:  domain.SetTypeNormal,
+	SetTypeWarmup:  domain.SetTypeWarmup,
+	SetTypeDropset: domain.SetTypeDropset,
+	SetTypeFailure: domain.SetTypeFailure,
+}
+var domainToGraphQLGoal = map[domain.Goal]FitnessGoal{
+	domain.GoalStrength:       FitnessGoalStrength,
+	domain.GoalHypertrophy:    FitnessGoalHypertrophy,
+	domain.GoalFatLoss:        FitnessGoalFatLoss,
+	domain.GoalGeneralFitness: FitnessGoalGeneralFitness,
+}
+var graphqlToDomainGoal = map[FitnessGoal]domain.Goal{
+	FitnessGoalStrength:       domain.GoalStrength,
+	FitnessGoalHypertrophy:    domain.GoalHypertrophy,
+	FitnessGoalFatLoss:        domain.GoalFatLoss,
+	FitnessGoalGeneralFitness: domain.GoalGeneralFitness,
+}
+var graphqlToDomainExperience = map[ExperienceLevel]domain.ExperienceLevel{
+	ExperienceLevelBeginner:     domain.ExperienceBeginner,
+	ExperienceLevelIntermediate: domain.ExperienceIntermediate,
+	ExperienceLevelAdvanced:     domain.ExperienceAdvanced,
+}
+var domainToGraphQLExperience = map[domain.ExperienceLevel]ExperienceLevel{
+	domain.ExperienceBeginner:     ExperienceLevelBeginner,
+	domain.ExperienceIntermediate: ExperienceLevelIntermediate,
+	domain.ExperienceAdvanced:     ExperienceLevelAdvanced,
+}
+
+func toWorkoutSetModel(s *domain.WorkoutSet) *WorkoutSet {
+	if s == nil {
+		return nil
+	}
+	setType, ok := domainToGraphQLSetType[s.SetType]
+	if !ok {
+		setType = SetTypeNormal
+	}
+	return &WorkoutSet{
+		ID:          s.ID,
+		ExerciseID:  s.ExerciseID,
+		SetNumber:   s.SetNumber,
+		Reps:        s.Reps,
+		WeightKg:    s.WeightKg,
+		Rpe:         s.RPE,
+		SetType:     setType,
+		SupersetID:  s.SupersetID,
+		PerformedAt: s.PerformedAt,
+	}
+}
+func toWorkoutSetModels(sets []*domain.WorkoutSet) []*WorkoutSet {
+	out := make([]*WorkoutSet, len(sets))
+	for i, s := range sets {
+		out[i] = toWorkoutSetModel(s)
+	}
+	return out
+}
+func toWorkoutStatus(s domain.WorkoutStatus) WorkoutStatus {
+	if s == domain.WorkoutCompleted {
+		return WorkoutStatusCompleted
+	}
+	return WorkoutStatusInProgress
+}
+func toPersonalRecordModel(pr *domain.PersonalRecord) *PersonalRecord {
+	return &PersonalRecord{
+		ID:           pr.ID,
+		ExerciseID:   pr.ExerciseID,
+		RecordType:   pr.RecordType,
+		Value:        pr.Value,
+		AchievedAt:   pr.AchievedAt,
+		WorkoutSetID: pr.WorkoutSetID,
+	}
+}
+func toLogSetResult(logged *domain.LoggedSet) *LogSetResult {
+	newRecords := make([]*PersonalRecord, len(logged.NewRecords))
+	for i, pr := range logged.NewRecords {
+		newRecords[i] = toPersonalRecordModel(pr)
+	}
+	return &LogSetResult{Set: toWorkoutSetModel(logged.Set), NewRecords: newRecords}
+}
+func toProgressPointModel(p *domain.ProgressPoint) *ProgressPoint {
+	return &ProgressPoint{
+		Day:         p.Day,
+		TotalVolume: p.TotalVolume,
+		MaxWeight:   p.MaxWeight,
+		SetCount:    p.SetCount,
+	}
+}
+func toBodyMetricModel(m *domain.BodyMetric) *BodyMetric {
+	return &BodyMetric{
+		ID:         m.ID,
+		MetricType: m.MetricType,
+		Value:      m.Value,
+		RecordedAt: m.RecordedAt,
+	}
+}
+func toTemplateExerciseModel(e *domain.TemplateExercise) *TemplateExercise {
+	return &TemplateExercise{
+		ID:            e.ID,
+		ExerciseID:    e.ExerciseID,
+		Position:      e.Position,
+		TargetSets:    e.TargetSets,
+		TargetReps:    e.TargetReps,
+		SupersetGroup: e.SupersetGroup,
+	}
+}
+func toWorkoutTemplateModel(t *domain.WorkoutTemplate) *WorkoutTemplate {
+	exercises := make([]*TemplateExercise, len(t.Exercises))
+	for i, e := range t.Exercises {
+		exercises[i] = toTemplateExerciseModel(e)
+	}
+	return &WorkoutTemplate{
+		ID:        t.ID,
+		Name:      t.Name,
+		CreatedAt: t.CreatedAt,
+		Exercises: exercises,
+	}
+}
+func toProgressionSuggestionModel(s *service.ProgressionSuggestion) *ProgressionSuggestion {
+	if s == nil {
+		return nil
+	}
+	return &ProgressionSuggestion{
+		SuggestedWeightKg: s.SuggestedWeightKg,
+		SuggestedReps:     s.SuggestedReps,
+		Reasoning:         s.Reasoning,
+		BasedOnRpe:        s.BasedOnRPE,
+	}
+}
+func toPlateauStatusModel(s *service.PlateauStatus) *PlateauStatus {
+	return &PlateauStatus{
+		IsPlateaued:   s.IsPlateaued,
+		CurrentBestKg: s.CurrentBestKg,
+		Message:       s.Message,
+	}
+}
+func toFitnessProfileModel(p *domain.UserFitnessProfile) *UserFitnessProfile {
+	if p == nil {
+		return nil
+	}
+	goal, ok := domainToGraphQLGoal[p.Goal]
+	if !ok {
+		goal = FitnessGoalGeneralFitness
+	}
+	experience, ok := domainToGraphQLExperience[p.ExperienceLevel]
+	if !ok {
+		experience = ExperienceLevelBeginner
+	}
+	return &UserFitnessProfile{
+		Goal:              goal,
+		ExperienceLevel:   experience,
+		DaysPerWeek:       p.DaysPerWeek,
+		EquipmentAccess:   p.EquipmentAccess,
+		AvoidMuscleGroups: p.AvoidMuscleGroups,
+		UpdatedAt:         p.UpdatedAt,
+	}
+}
+func toProgramDayModel(d *domain.ProgramDay) *ProgramDay {
+	return &ProgramDay{
+		ID:       d.ID,
+		DayLabel: d.DayLabel,
+		Position: d.Position,
+		Template: toWorkoutTemplateModel(d.Template),
+	}
+}
+func toProgramModel(p *domain.Program) *Program {
+	goal, ok := domainToGraphQLGoal[p.Goal]
+	if !ok {
+		goal = FitnessGoalGeneralFitness
+	}
+	days := make([]*ProgramDay, len(p.Days))
+	for i, d := range p.Days {
+		days[i] = toProgramDayModel(d)
+	}
+	return &Program{
+		ID:          p.ID,
+		Name:        p.Name,
+		Goal:        goal,
+		DaysPerWeek: p.DaysPerWeek,
+		Notes:       p.Notes,
+		CreatedAt:   p.CreatedAt,
+		Days:        days,
+	}
+}
+func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *domain.Workout) (*Workout, error) {
+	sets, err := r.Workout.SetsForWorkout(ctx, userID, w.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &Workout{
+		ID:         w.ID,
+		StartedAt:  w.StartedAt,
+		EndedAt:    w.EndedAt,
+		Notes:      w.Notes,
+		Status:     toWorkoutStatus(w.Status),
+		Sets:       toWorkoutSetModels(sets),
+		TemplateID: w.TemplateID,
+	}, nil
+}
+func (r *Resolver) streamWorkoutEvents(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error) {
+	events, cleanup, err := r.Events.Subscribe(ctx, workoutID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(chan *LogSetResult)
+	go func() {
+		defer close(out)
+		defer cleanup()
+		for {
+			select {
+			case logged, ok := <-events:
+				if !ok {
+					return
+				}
+				select {
+				case out <- toLogSetResult(logged):
+				case <-ctx.Done():
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return out, nil
+}

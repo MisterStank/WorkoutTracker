@@ -1,35 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../templates/templates_screen.dart';
+import 'build_program_screen.dart';
 import 'fitness_profile_models.dart';
 import 'fitness_profile_provider.dart';
+import 'fitness_profile_screen.dart';
 import 'program_review_screen.dart';
 
-/// Every program the user has generated, newest first — the piece that was
-/// missing before: generateProgram() persists a Program (and its days as
-/// ordinary templates), but nothing showed it as one grouped thing again
-/// after the one-time review screen right after generating. This list is
-/// that missing "where did it go" answer.
-class ProgramsListScreen extends ConsumerStatefulWidget {
-  const ProgramsListScreen({super.key});
+/// The Programs tab: every program the user has (AI-generated or manually
+/// built from existing templates, mixed together — both are just Program
+/// rows, no schema distinction), newest first. Template management (create/
+/// list/delete standalone templates) has moved off the bottom nav and lives
+/// behind the library icon here instead.
+class ProgramsScreen extends ConsumerStatefulWidget {
+  const ProgramsScreen({super.key});
 
   @override
-  ConsumerState<ProgramsListScreen> createState() => _ProgramsListScreenState();
+  ConsumerState<ProgramsScreen> createState() => _ProgramsScreenState();
 }
 
-class _ProgramsListScreenState extends ConsumerState<ProgramsListScreen> {
+class _ProgramsScreenState extends ConsumerState<ProgramsScreen> {
   late Future<List<Program>> _future;
 
   @override
   void initState() {
     super.initState();
+    _reload();
+  }
+
+  void _reload() {
     _future = ref.read(fitnessProfileRepositoryProvider).myPrograms();
+  }
+
+  Future<void> _generate() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FitnessProfileScreen()));
+    if (mounted) setState(_reload);
+  }
+
+  Future<void> _build() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const BuildProgramScreen()),
+    );
+    if (created == true && mounted) setState(_reload);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Programs')),
+      appBar: AppBar(
+        title: const Text('Programs'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.checklist),
+            tooltip: 'Template library',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen())),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Build a program from templates',
+            onPressed: _build,
+          ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Generate a program',
+            onPressed: _generate,
+          ),
+        ],
+      ),
       body: FutureBuilder<List<Program>>(
         future: _future,
         builder: (context, snapshot) {
@@ -45,10 +83,10 @@ class _ProgramsListScreenState extends ConsumerState<ProgramsListScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_awesome, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    Icon(Icons.calendar_view_month, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(height: 12),
                     Text(
-                      "No programs generated yet. Tap the sparkle icon on\nTemplates to answer a few questions and get one.",
+                      "No programs yet. Tap the sparkle icon to answer a\nfew questions and generate one, or the + icon to\nbuild one from your own templates.",
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),

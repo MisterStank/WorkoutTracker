@@ -81,6 +81,25 @@ func (r *WorkoutRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+func (r *WorkoutRepository) FindMostRecentFinishedByTemplateIDs(ctx context.Context, userID uuid.UUID, templateIDs []uuid.UUID) (*domain.Workout, error) {
+	row := r.db.QueryRow(ctx,
+		`SELECT id, user_id, started_at, ended_at, notes, status, template_id
+		 FROM workouts
+		 WHERE user_id = $1 AND status = 'completed' AND template_id = ANY($2)
+		 ORDER BY ended_at DESC LIMIT 1`,
+		userID, templateIDs,
+	)
+	var w domain.Workout
+	err := row.Scan(&w.ID, &w.UserID, &w.StartedAt, &w.EndedAt, &w.Notes, &w.Status, &w.TemplateID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
 func (r *WorkoutRepository) scanWorkout(row pgx.Row) (*domain.Workout, error) {
 	var w domain.Workout
 	err := row.Scan(&w.ID, &w.UserID, &w.StartedAt, &w.EndedAt, &w.Notes, &w.Status, &w.TemplateID)

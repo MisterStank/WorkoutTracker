@@ -25,6 +25,11 @@ type BodyMetric struct {
 	RecordedAt time.Time `json:"recordedAt"`
 }
 
+type CreateProgramInput struct {
+	Name string             `json:"name"`
+	Days []*ProgramDayInput `json:"days"`
+}
+
 type Exercise struct {
 	ID           uuid.UUID `json:"id"`
 	Name         string    `json:"name"`
@@ -48,6 +53,11 @@ type LogSetResult struct {
 }
 
 type Mutation struct {
+}
+
+type NextWorkout struct {
+	Program *Program    `json:"program"`
+	Day     *ProgramDay `json:"day"`
 }
 
 type PageInfo struct {
@@ -85,6 +95,11 @@ type ProgramDay struct {
 	DayLabel string           `json:"dayLabel"`
 	Position int              `json:"position"`
 	Template *WorkoutTemplate `json:"template"`
+}
+
+type ProgramDayInput struct {
+	DayLabel   string    `json:"dayLabel"`
+	TemplateID uuid.UUID `json:"templateId"`
 }
 
 type ProgressPoint struct {

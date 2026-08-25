@@ -127,3 +127,17 @@ class Program {
         createdAt: DateTime.parse(json['createdAt'] as String),
       );
 }
+
+/// "What should I train next" for the user's most recent program — see
+/// NextWorkout in the backend domain package for the wraparound logic.
+class NextWorkout {
+  const NextWorkout({required this.program, required this.day});
+
+  final Program program;
+  final ProgramDay day;
+
+  factory NextWorkout.fromJson(Map<String, dynamic> json) => NextWorkout(
+        program: Program.fromJson(json['program'] as Map<String, dynamic>),
+        day: ProgramDay.fromJson(json['day'] as Map<String, dynamic>),
+      );
+}

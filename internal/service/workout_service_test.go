@@ -158,6 +158,31 @@ func (f *fakeWorkoutRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (f *fakeWorkoutRepo) FindMostRecentFinishedByTemplateIDs(ctx context.Context, userID uuid.UUID, templateIDs []uuid.UUID) (*domain.Workout, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	inSet := func(id uuid.UUID) bool {
+		for _, t := range templateIDs {
+			if t == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	var best *domain.Workout
+	for _, w := range f.byID {
+		if w.UserID != userID || w.Status != domain.WorkoutCompleted || w.TemplateID == nil || !inSet(*w.TemplateID) {
+			continue
+		}
+		if best == nil || (w.EndedAt != nil && best.EndedAt != nil && w.EndedAt.After(*best.EndedAt)) {
+			best = w
+		}
+	}
+	return best, nil
+}
+
 func (f *fakeWorkoutRepo) ListForUser(ctx context.Context, userID uuid.UUID, limit int, afterStartedAt *time.Time, afterID *uuid.UUID) ([]*domain.Workout, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -72,4 +72,34 @@ class FitnessProfileRepository {
     final list = result.data!['myPrograms'] as List<dynamic>;
     return list.map((p) => Program.fromJson(p as Map<String, dynamic>)).toList();
   }
+
+  Future<NextWorkout?> nextWorkout() async {
+    final result = await _client.query(QueryOptions(
+      document: gql('query NextWorkout { nextWorkout { program { $_programFields } day { id dayLabel position template { id name createdAt exercises { id exerciseId position targetSets targetReps supersetGroup } } } } }'),
+      fetchPolicy: FetchPolicy.networkOnly,
+    ));
+    if (result.hasException) throw Exception(result.exception.toString());
+    final data = result.data!['nextWorkout'] as Map<String, dynamic>?;
+    return data == null ? null : NextWorkout.fromJson(data);
+  }
+
+  Future<Program> createProgramFromTemplates(String name, List<(String dayLabel, String templateId)> days) async {
+    final result = await _client.mutate(MutationOptions(
+      document: gql('''
+        mutation CreateProgramFromTemplates(\$input: CreateProgramInput!) {
+          createProgramFromTemplates(input: \$input) { $_programFields }
+        }
+      '''),
+      variables: {
+        'input': {
+          'name': name,
+          'days': [
+            for (final (dayLabel, templateId) in days) {'dayLabel': dayLabel, 'templateId': templateId},
+          ],
+        },
+      },
+    ));
+    if (result.hasException) throw Exception(result.exception.toString());
+    return Program.fromJson(result.data!['createProgramFromTemplates'] as Map<String, dynamic>);
+  }
 }

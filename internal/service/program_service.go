@@ -59,6 +59,99 @@ func (s *ProgramService) MyPrograms(ctx context.Context, userID uuid.UUID) ([]*d
 	return s.programs.ListForUser(ctx, userID)
 }
 
+// DayInput is one day of a manually-built program: a caller-chosen label
+// plus the ID of an already-existing template to use for that day.
+type DayInput struct {
+	DayLabel   string
+	TemplateID uuid.UUID
+}
+
+// CreateFromTemplates builds a Program out of the caller's own existing
+// templates rather than generating new ones — the "manually assemble a
+// program" path alongside GenerateProgram's AI-questionnaire path. Goal
+// defaults to GoalGeneralFitness since there's no fitness-profile
+// questionnaire to derive a real one from.
+func (s *ProgramService) CreateFromTemplates(ctx context.Context, userID uuid.UUID, name string, days []DayInput) (*domain.Program, error) {
+	program := &domain.Program{
+		ID:          uuid.New(),
+		UserID:      userID,
+		Name:        name,
+		Goal:        domain.GoalGeneralFitness,
+		DaysPerWeek: len(days),
+		CreatedAt:   time.Now(),
+	}
+
+	for i, day := range days {
+		tmpl, err := s.workouts.GetTemplate(ctx, userID, day.TemplateID)
+		if err != nil {
+			return nil, err
+		}
+		program.Days = append(program.Days, &domain.ProgramDay{
+			ID:         uuid.New(),
+			DayLabel:   day.DayLabel,
+			Position:   i,
+			TemplateID: tmpl.ID,
+			Template:   tmpl,
+		})
+	}
+
+	if err := s.programs.Create(ctx, program); err != nil {
+		return nil, err
+	}
+	return program, nil
+}
+
+// NextWorkout derives "what should I train next" from the user's most
+// recently created program plus their finished-workout history — see
+// domain.NextWorkout's doc comment for the wraparound logic. Returns nil,
+// nil (not an error) if the user has no programs yet.
+func (s *ProgramService) NextWorkout(ctx context.Context, userID uuid.UUID) (*domain.NextWorkout, error) {
+	programs, err := s.programs.ListForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(programs) == 0 {
+		return nil, nil
+	}
+	program := programs[0]
+	if len(program.Days) == 0 {
+		return nil, nil
+	}
+
+	templateIDs := make([]uuid.UUID, len(program.Days))
+	for i, d := range program.Days {
+		templateIDs[i] = d.TemplateID
+	}
+
+	mostRecent, err := s.workouts.MostRecentFinishedByTemplateIDs(ctx, userID, templateIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	nextPosition := 0
+	if mostRecent != nil && mostRecent.TemplateID != nil {
+		for _, d := range program.Days {
+			if d.TemplateID == *mostRecent.TemplateID {
+				nextPosition = (d.Position + 1) % len(program.Days)
+				break
+			}
+		}
+	}
+
+	var nextDay *domain.ProgramDay
+	for _, d := range program.Days {
+		if d.Position == nextPosition {
+			nextDay = d
+			break
+		}
+	}
+	if nextDay == nil {
+		nextDay = program.Days[0]
+	}
+
+	return &domain.NextWorkout{Program: program, Day: nextDay}, nil
+}
+
 // dayPlan is one training day within a split: a label plus a sequence of
 // exercise categories to fill it with (the same "push"/"pull"/"legs"/
 // "arms"/"core" taxonomy exercises are already tagged with — a category
