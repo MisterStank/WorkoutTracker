@@ -162,7 +162,7 @@ func seedWorkout(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, exerci
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	workoutID := uuid.New()
 	endedAt := workoutDate.Add(50 * time.Minute)
