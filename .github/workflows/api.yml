@@ -33,11 +33,13 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          # v6's default bundled golangci-lint binary lagged go.mod's Go
-          # version (built with go1.24 targeting our go1.25), which fails
-          # outright at config-load time. "latest" always resolves a build
-          # new enough to support the Go version actually in use.
-          version: latest
+          # golangci-lint refuses to run if it was built with an older Go
+          # than go.mod targets — and upstream's latest published binary
+          # release (checked at the time this was written) still trails
+          # our go1.25 go.mod. Building from source with goinstall uses
+          # this job's own (current) Go toolchain instead of a prebuilt
+          # binary, sidestepping the mismatch entirely.
+          install-mode: goinstall
 
   unit-test:
     runs-on: ubuntu-latest
