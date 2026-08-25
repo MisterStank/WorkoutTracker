@@ -18,7 +18,7 @@ void main() {
     expect(find.widgetWithText(FilledButton, 'Log in'), findsOneWidget);
   });
 
-  testWidgets('LoginScreen links to SignupScreen', (WidgetTester tester) async {
+  testWidgets('LoginScreen links to SignupScreen and back', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(home: LoginScreen()),
@@ -30,6 +30,12 @@ void main() {
 
     expect(find.widgetWithText(TextField, 'Display name'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Sign up'), findsOneWidget);
+
+    await tester.tap(find.text('Already have an account? Log in'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, 'Log in'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Display name'), findsNothing);
   });
 
   testWidgets('SignupScreen shows display name, email, and password fields', (WidgetTester tester) async {

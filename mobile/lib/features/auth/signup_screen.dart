@@ -87,6 +87,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
             child: isLoading ? const AuthButtonSpinner() : const Text('Sign up'),
           ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Already have an account? Log in'),
+          ),
         ],
       ),
     );

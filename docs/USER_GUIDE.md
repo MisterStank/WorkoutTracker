@@ -159,6 +159,12 @@ Tap **Generate** and the app builds a named, multi-day program — for example a
 
 Your answers are remembered — reopening the generator next time pre-fills your last profile, so tweaking and regenerating is quick.
 
+**Finding a program again**: tap the calendar icon next to the sparkle icon on the **Templates** tab to open **My Programs** — every program you've generated, newest first, each showing its goal, days per week, and how many templates it created. Tap one to reopen the same review screen you saw right after generating it. Individual days always show up as ordinary templates too — My Programs is just the grouped view tying them back together.
+
+<p>
+  <img src="images/my-programs-list.png" width="220" alt="My Programs list, showing every generated program">
+</p>
+
 ## 7. Offline logging
 
 If a set fails to save because you've got no connection, it isn't lost — it's queued on your device and shown immediately with a small cloud-off icon so you know it hasn't synced yet. The app keeps checking for connectivity in the background and pushes every queued set the moment it's back, swapping the placeholder for the confirmed, PR-checked result automatically.
