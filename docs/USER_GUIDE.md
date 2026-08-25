@@ -24,9 +24,25 @@ Create an account with your email, a password, and a display name. Once you're i
 2. Enter your email, a password, and the name you want to appear in the app.
 3. You're dropped straight into the home screen — no separate verification step.
 
+<p>
+  <img src="images/login-light.png" width="200" alt="Login screen, light theme">
+  <img src="images/login-dark.png" width="200" alt="Login screen, dark theme">
+</p>
+
 Already have an account? Use **Log in** instead. To sign out at any time, open the **⋮** menu on the Home tab and tap **Log out**.
 
 **First-run tour**: the first time you log in on a device, a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Templates** tab.
+
+<p>
+  <img src="images/onboarding-slide-1.png" width="180" alt="Tour slide 1: Log workouts fast">
+  <img src="images/onboarding-slide-2.png" width="180" alt="Tour slide 2: Templates and personalized programs">
+  <img src="images/onboarding-slide-3.png" width="180" alt="Tour slide 3: Progress and personal records">
+  <img src="images/onboarding-slide-4.png" width="180" alt="Tour slide 4: Share your stats">
+</p>
+<p>
+  <img src="images/onboarding-personalize.png" width="200" alt="Tour personalize step, with Skip for now">
+  <img src="images/onboarding-skip.png" width="200" alt="Home screen right after skipping the tour">
+</p>
 
 The app has four main tabs at the bottom of the screen — **Home**, **History**, **Templates**, and **Progress** — everything below is organized around them.
 
@@ -37,19 +53,37 @@ From the **Home** tab, tap **Start workout**. You'll be asked to choose:
 - **Blank workout** — starts immediately with nothing planned. Add exercises as you go — the natural choice if you're training by feel today.
 - **From a template** — opens your saved templates. Pick one and the app pre-loads every planned exercise as its own card, ready to log against — no need to add anything before you start.
 
+<p>
+  <img src="images/start-workout-sheet.png" width="220" alt="Choosing how to start a workout">
+</p>
+
 Once a workout is running, the top bar shows a live elapsed-time clock and your set count for the session. Only one workout can be active at a time — finishing or starting a new one closes out the last.
 
 **Jumping back in**: if you switch to another tab mid-workout, a slim bar appears above the bottom navigation showing your elapsed time and set count. Tap it from anywhere in the app to return straight to your active workout.
+
+<p>
+  <img src="images/resume-bar.png" width="220" alt="Resume-workout bar visible on a non-Home tab">
+</p>
 
 **Finishing up**: tap **Finish workout** at the bottom of the screen. You can add optional notes about how the session went before confirming — these are saved with the workout and visible later in your history.
 
 ## 3. Logging a set
 
-Tap **Log set** (the floating button on an active workout) and search for an exercise, or tap one already on screen — either a planned exercise chip or an exercise card. For a template-based workout, every planned exercise already has a card waiting, even before you've logged anything against it — tap **Add set** on an empty card to get started. Tapping either opens the set sheet:
+Tap **Log set** (the floating button on an active workout) and search for an exercise, or tap one already on screen — either a planned exercise chip or an exercise card. For a template-based workout, every planned exercise already has a card waiting, even before you've logged anything against it — tap **Add set** on an empty card to get started.
+
+<p>
+  <img src="images/exercise-picker.png" width="220" alt="Picking an exercise to log">
+</p>
+
+Tapping either opens the set sheet:
 
 1. Enter **reps** and **weight**. If you've done this exercise before, both fields pre-fill with your last set — you'll usually just need to confirm or tweak them.
 2. Optionally log **RPE** (rate of perceived exertion, 1–10) — how hard that set felt. This is what powers the coaching suggestions in [Chapter 9](#9-coaching-signals).
 3. Choose a **set type**, then tap **Log set**.
+
+<p>
+  <img src="images/log-set-sheet.png" width="220" alt="The set-logging sheet">
+</p>
 
 ### Set types
 
@@ -66,7 +100,15 @@ Every logged set beyond a warm-up is checked against your history for three kind
 
 **Repeat last set**: each exercise card in an active workout has a **Repeat last** button — logs another set identical to the one before it (same reps, weight, RPE, and set type) in a single tap, for straight sets across working sets.
 
+<p>
+  <img src="images/set-logged-rest-timer.png" width="220" alt="A logged set with the rest timer running">
+</p>
+
 **Fixing a mistake**: tap the **⋮** on any logged set to **Edit** or **Delete** it. Editing or removing a set that was holding a personal record automatically updates your records to whatever the next-best set was — nothing is left pointing at a set that no longer exists.
+
+<p>
+  <img src="images/edit-delete-set.png" width="220" alt="Edit or delete a logged set">
+</p>
 
 **Rest timer**: logging a set starts a rest timer automatically, shown as a countdown ring above your exercise list. Add fifteen seconds with the **+** button, or tap **Skip** to end the rest early.
 
@@ -88,7 +130,16 @@ Open the **Templates** tab to see everything you've saved. From here:
 - **Start from one** — tap a template to launch a workout pre-loaded with its exercise list.
 - **Delete one** — swipe or use the delete action on a template you no longer use. This doesn't touch any workouts you've already logged from it.
 
+<p>
+  <img src="images/templates-saved.png" width="220" alt="Saved templates list">
+  <img src="images/templates-list.png" width="220" alt="Templates tab including a generated program">
+</p>
+
 Once a template-based workout is running, its planned exercises appear both as a row of progress chips up top and as a full card each further down — see [Chapter 2](#2-starting-a-workout).
+
+<p>
+  <img src="images/prepopulated-cards.png" width="220" alt="Pre-populated exercise cards when starting from a template">
+</p>
 
 ## 6. Personalized programs
 
@@ -99,6 +150,10 @@ Don't want to build templates by hand? Tap the sparkle icon on the **Templates**
 3. **Days per week** — how many days you can train, from 1 to 6. This decides the split itself: fewer days lean toward full-body sessions, more days split into upper/lower or push/pull/legs.
 4. **Equipment access** — barbell, dumbbell, bodyweight, cable, machine, or any combination. Only exercises you can actually perform are selected.
 5. **Areas to avoid** — any muscle groups to leave out entirely, for working around an injury or a personal preference.
+
+<p>
+  <img src="images/program-generator.png" width="220" alt="The program generator form">
+</p>
 
 Tap **Generate** and the app builds a named, multi-day program — for example a 4-day Upper/Lower split — with each day saved as its own template under **Templates**, ready to start a workout from exactly like any template you built by hand. If your equipment or avoid-list is restrictive enough that a day can't be filled for a particular muscle group, the program still generates with a note explaining what was skipped, rather than failing outright.
 
@@ -118,9 +173,18 @@ Open the **Progress** tab. It has three sub-tabs of its own:
 - **By exercise** — pick any exercise to chart your heaviest set over time. If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 9](#9-coaching-signals).
 - **Measurements** — track body weight and five circumference measurements — waist, chest, arms, thighs, hips — each on its own chart. Choose a measurement from the dropdown, tap **Log**, and enter today's reading.
 
+<p>
+  <img src="images/progress-volume-light.png" width="220" alt="Volume chart, light theme">
+  <img src="images/progress-volume-dark.png" width="220" alt="Volume chart, dark theme">
+</p>
+
 Personal records are tracked per exercise across three categories — heaviest weight, best volume, and estimated one-rep max — and surface automatically as the gold banner described in [Chapter 3](#3-logging-a-set), not as a separate screen you have to check.
 
 Each entry in the **History** tab also shows that session's total volume, so you don't need to open a workout to see roughly how much work it was.
+
+<p>
+  <img src="images/workout-history.png" width="220" alt="Workout history list">
+</p>
 
 **Deleting a workout**: swipe a card left in the **History** tab and confirm to remove the entire session, including its sets. This can't be undone.
 
@@ -148,6 +212,11 @@ WorkoutTracker doesn't do live workout sharing — instead, you get a shareable 
 
 - **A new personal record**: when the gold PR banner appears (see [Chapter 3](#3-logging-a-set)), tap its share icon to preview a card with the exercise, the record you hit, and the new value.
 - **A finished workout**: after tapping **Finish workout**, a **Share** action appears alongside the confirmation — it opens a card summarizing that session's total sets, volume, duration, and exercise list.
+
+<p>
+  <img src="images/share-pr-card.png" width="220" alt="PR share card preview">
+  <img src="images/share-workout-summary.png" width="220" alt="Workout summary share card preview">
+</p>
 
 Either way, you get a preview first — nothing goes out until you tap **Share** on the preview, which hands the image to your device's normal share sheet so you can post it wherever you like (Instagram, messages, etc.). Both cards render with the same fixed dark red-and-black look regardless of your app theme, so the image looks consistent no matter which theme you're using.
 
