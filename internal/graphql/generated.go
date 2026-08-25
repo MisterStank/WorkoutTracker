@@ -80,6 +80,7 @@ type ComplexityRoot struct {
 		Logout                     func(childComplexity int, refreshToken string) int
 		RefreshToken               func(childComplexity int, refreshToken string) int
 		SaveFitnessProfile         func(childComplexity int, input FitnessProfileInput) int
+		SetActiveProgram           func(childComplexity int, programID uuid.UUID) int
 		Signup                     func(childComplexity int, email string, password string, displayName string) int
 		StartWorkout               func(childComplexity int, templateID *uuid.UUID) int
 		UpdateSet                  func(childComplexity int, setID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType) int
@@ -116,6 +117,7 @@ type ComplexityRoot struct {
 		DaysPerWeek func(childComplexity int) int
 		Goal        func(childComplexity int) int
 		ID          func(childComplexity int) int
+		IsActive    func(childComplexity int) int
 		Name        func(childComplexity int) int
 		Notes       func(childComplexity int) int
 	}
@@ -250,6 +252,7 @@ type MutationResolver interface {
 	SaveFitnessProfile(ctx context.Context, input FitnessProfileInput) (*UserFitnessProfile, error)
 	GenerateProgram(ctx context.Context) (*Program, error)
 	CreateProgramFromTemplates(ctx context.Context, input CreateProgramInput) (*Program, error)
+	SetActiveProgram(ctx context.Context, programID uuid.UUID) (*Program, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*User, error)
@@ -522,6 +525,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SaveFitnessProfile(childComplexity, args["input"].(FitnessProfileInput)), true
+	case "Mutation.setActiveProgram":
+		if e.ComplexityRoot.Mutation.SetActiveProgram == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setActiveProgram_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SetActiveProgram(childComplexity, args["programId"].(uuid.UUID)), true
 	case "Mutation.signup":
 		if e.ComplexityRoot.Mutation.Signup == nil {
 			break
@@ -668,6 +682,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Program.ID(childComplexity), true
+	case "Program.isActive":
+		if e.ComplexityRoot.Program.IsActive == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.IsActive(childComplexity), true
 	case "Program.name":
 		if e.ComplexityRoot.Program.Name == nil {
 			break
@@ -1397,6 +1417,8 @@ func (ec *executionContext) childFields_Program(ctx context.Context, field graph
 		return ec.fieldContext_Program_createdAt(ctx, field)
 	case "days":
 		return ec.fieldContext_Program_days(ctx, field)
+	case "isActive":
+		return ec.fieldContext_Program_isActive(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Program", field.Name)
 }
@@ -1934,6 +1956,20 @@ func (ec *executionContext) field_Mutation_saveFitnessProfile_args(ctx context.C
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setActiveProgram_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "programId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["programId"] = arg0
 	return args, nil
 }
 
@@ -3315,6 +3351,50 @@ func (ec *executionContext) fieldContext_Mutation_createProgramFromTemplates(ctx
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_setActiveProgram(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_setActiveProgram(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SetActiveProgram(ctx, fc.Args["programId"].(uuid.UUID))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *Program) graphql.Marshaler {
+			return ec.marshalNProgram2ᚖworkouttrackerᚋinternalᚋgraphqlᚐProgram(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_setActiveProgram(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Program(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setActiveProgram_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _NextWorkout_program(ctx context.Context, field graphql.CollectedField, obj *NextWorkout) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3800,6 +3880,29 @@ func (ec *executionContext) fieldContext_Program_days(_ context.Context, field g
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _Program_isActive(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_isActive(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.IsActive, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_isActive(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
 func (ec *executionContext) _ProgramDay_id(ctx context.Context, field graphql.CollectedField, obj *ProgramDay) (ret graphql.Marshaler) {
@@ -7360,6 +7463,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "setActiveProgram":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setActiveProgram(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7622,6 +7732,11 @@ func (ec *executionContext) _Program(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "days":
 			out.Values[i] = ec._Program_days(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isActive":
+			out.Values[i] = ec._Program_isActive(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

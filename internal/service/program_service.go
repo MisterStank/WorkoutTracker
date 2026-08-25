@@ -98,23 +98,41 @@ func (s *ProgramService) CreateFromTemplates(ctx context.Context, userID uuid.UU
 	if err := s.programs.Create(ctx, program); err != nil {
 		return nil, err
 	}
+	if err := s.programs.SetActive(ctx, userID, program.ID); err != nil {
+		return nil, err
+	}
+	program.IsActive = true
 	return program, nil
 }
 
-// NextWorkout derives "what should I train next" from the user's most
-// recently created program plus their finished-workout history — see
-// domain.NextWorkout's doc comment for the wraparound logic. Returns nil,
-// nil (not an error) if the user has no programs yet.
-func (s *ProgramService) NextWorkout(ctx context.Context, userID uuid.UUID) (*domain.NextWorkout, error) {
-	programs, err := s.programs.ListForUser(ctx, userID)
+// SetActiveProgram marks program as the one the user is currently
+// following — the explicit "use this program" action on the Programs tab.
+// Returns domain.ErrProgramNotOwned if programID belongs to another user.
+func (s *ProgramService) SetActiveProgram(ctx context.Context, userID, programID uuid.UUID) (*domain.Program, error) {
+	program, err := s.programs.FindByID(ctx, programID)
 	if err != nil {
 		return nil, err
 	}
-	if len(programs) == 0 {
-		return nil, nil
+	if program.UserID != userID {
+		return nil, domain.ErrProgramNotOwned
 	}
-	program := programs[0]
-	if len(program.Days) == 0 {
+	if err := s.programs.SetActive(ctx, userID, programID); err != nil {
+		return nil, err
+	}
+	program.IsActive = true
+	return program, nil
+}
+
+// NextWorkout derives "what should I train next" from the user's active
+// program (see SetActiveProgram) plus their finished-workout history — see
+// domain.NextWorkout's doc comment for the wraparound logic. Returns nil,
+// nil (not an error) if the user has no active program.
+func (s *ProgramService) NextWorkout(ctx context.Context, userID uuid.UUID) (*domain.NextWorkout, error) {
+	program, err := s.programs.FindActiveForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if program == nil || len(program.Days) == 0 {
 		return nil, nil
 	}
 
@@ -302,6 +320,10 @@ func (s *ProgramService) GenerateProgram(ctx context.Context, userID uuid.UUID) 
 	if err := s.programs.Create(ctx, program); err != nil {
 		return nil, err
 	}
+	if err := s.programs.SetActive(ctx, userID, program.ID); err != nil {
+		return nil, err
+	}
+	program.IsActive = true
 	return program, nil
 }
 

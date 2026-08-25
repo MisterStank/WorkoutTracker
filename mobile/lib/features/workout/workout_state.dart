@@ -28,3 +28,15 @@ class ActiveWorkoutError extends ActiveWorkoutState {
 
   final String message;
 }
+
+/// The result of ActiveWorkoutNotifier.finish(): the authoritative finished
+/// Workout (real endedAt/COMPLETED status from the server, not a pre-finish
+/// local snapshot) plus every PR earned across the whole session — unlike
+/// ActiveWorkoutInProgress.lastNewRecords, which only ever holds the most
+/// recent logSet's PRs and auto-clears after a few seconds.
+class FinishedWorkout {
+  const FinishedWorkout({required this.workout, required this.newRecords});
+
+  final Workout workout;
+  final List<PersonalRecord> newRecords;
+}

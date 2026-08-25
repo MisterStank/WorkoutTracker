@@ -88,6 +88,7 @@ type Program struct {
 	Notes       string        `json:"notes"`
 	CreatedAt   time.Time     `json:"createdAt"`
 	Days        []*ProgramDay `json:"days"`
+	IsActive    bool          `json:"isActive"`
 }
 
 type ProgramDay struct {

@@ -8,7 +8,7 @@ class FitnessProfileRepository {
   final GraphQLClient _client;
 
   static const _programFields = '''
-    id name goal daysPerWeek notes createdAt
+    id name goal daysPerWeek notes createdAt isActive
     days {
       id dayLabel position
       template {
@@ -101,5 +101,18 @@ class FitnessProfileRepository {
     ));
     if (result.hasException) throw Exception(result.exception.toString());
     return Program.fromJson(result.data!['createProgramFromTemplates'] as Map<String, dynamic>);
+  }
+
+  Future<Program> setActiveProgram(String programId) async {
+    final result = await _client.mutate(MutationOptions(
+      document: gql('''
+        mutation SetActiveProgram(\$programId: UUID!) {
+          setActiveProgram(programId: \$programId) { $_programFields }
+        }
+      '''),
+      variables: {'programId': programId},
+    ));
+    if (result.hasException) throw Exception(result.exception.toString());
+    return Program.fromJson(result.data!['setActiveProgram'] as Map<String, dynamic>);
   }
 }

@@ -48,7 +48,7 @@ func (r *ProgramRepository) Create(ctx context.Context, p *domain.Program) error
 
 func (r *ProgramRepository) ListForUser(ctx context.Context, userID uuid.UUID) ([]*domain.Program, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, user_id, name, goal, days_per_week, notes, created_at FROM programs WHERE user_id = $1 ORDER BY created_at DESC`,
+		`SELECT id, user_id, name, goal, days_per_week, notes, created_at, is_active FROM programs WHERE user_id = $1 ORDER BY created_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -59,7 +59,7 @@ func (r *ProgramRepository) ListForUser(ctx context.Context, userID uuid.UUID) (
 	var programs []*domain.Program
 	for rows.Next() {
 		var p domain.Program
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Goal, &p.DaysPerWeek, &p.Notes, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Goal, &p.DaysPerWeek, &p.Notes, &p.CreatedAt, &p.IsActive); err != nil {
 			return nil, err
 		}
 		programs = append(programs, &p)
@@ -81,8 +81,8 @@ func (r *ProgramRepository) ListForUser(ctx context.Context, userID uuid.UUID) (
 func (r *ProgramRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Program, error) {
 	var p domain.Program
 	err := r.db.QueryRow(ctx,
-		`SELECT id, user_id, name, goal, days_per_week, notes, created_at FROM programs WHERE id = $1`, id,
-	).Scan(&p.ID, &p.UserID, &p.Name, &p.Goal, &p.DaysPerWeek, &p.Notes, &p.CreatedAt)
+		`SELECT id, user_id, name, goal, days_per_week, notes, created_at, is_active FROM programs WHERE id = $1`, id,
+	).Scan(&p.ID, &p.UserID, &p.Name, &p.Goal, &p.DaysPerWeek, &p.Notes, &p.CreatedAt, &p.IsActive)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProgramNotFound
 	}
@@ -101,6 +101,43 @@ func (r *ProgramRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain
 func (r *ProgramRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM programs WHERE id = $1`, id)
 	return err
+}
+
+func (r *ProgramRepository) SetActive(ctx context.Context, userID, programID uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `UPDATE programs SET is_active = false WHERE user_id = $1 AND is_active`, userID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE programs SET is_active = true WHERE id = $1 AND user_id = $2`, programID, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *ProgramRepository) FindActiveForUser(ctx context.Context, userID uuid.UUID) (*domain.Program, error) {
+	var p domain.Program
+	err := r.db.QueryRow(ctx,
+		`SELECT id, user_id, name, goal, days_per_week, notes, created_at, is_active FROM programs WHERE user_id = $1 AND is_active`, userID,
+	).Scan(&p.ID, &p.UserID, &p.Name, &p.Goal, &p.DaysPerWeek, &p.Notes, &p.CreatedAt, &p.IsActive)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	days, err := r.daysForProgram(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	p.Days = days
+	return &p, nil
 }
 
 // daysForProgram hydrates each day's full WorkoutTemplate via the existing

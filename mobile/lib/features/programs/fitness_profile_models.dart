@@ -107,6 +107,7 @@ class Program {
     required this.notes,
     required this.days,
     required this.createdAt,
+    required this.isActive,
   });
 
   final String id;
@@ -116,6 +117,9 @@ class Program {
   final String notes;
   final List<ProgramDay> days;
   final DateTime createdAt;
+  // The one program (at most) the user is currently following — drives
+  // Home's "Continue" card. Set via FitnessProfileRepository.setActiveProgram.
+  final bool isActive;
 
   factory Program.fromJson(Map<String, dynamic> json) => Program(
         id: json['id'] as String,
@@ -125,6 +129,7 @@ class Program {
         notes: json['notes'] as String,
         days: (json['days'] as List<dynamic>).map((d) => ProgramDay.fromJson(d as Map<String, dynamic>)).toList(),
         createdAt: DateTime.parse(json['createdAt'] as String),
+        isActive: json['isActive'] as bool,
       );
 }
 

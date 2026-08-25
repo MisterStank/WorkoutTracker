@@ -59,6 +59,10 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
   int _localIdCounter = 0;
   StreamSubscription<LogSetResult>? _liveSub;
   String? _liveSubWorkoutId;
+  // Every PR earned since the current workout started, for the post-finish
+  // completion screen — unlike lastNewRecords (most recent logSet only,
+  // auto-cleared after 4s), this survives for the whole session.
+  List<PersonalRecord> _sessionRecords = [];
 
   @override
   void dispose() {
@@ -69,6 +73,7 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
 
   Future<void> refresh() async {
     state = const ActiveWorkoutLoading();
+    _sessionRecords = [];
     try {
       final workout = await _repository.activeWorkout();
       if (workout == null) {
@@ -85,6 +90,7 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
 
   Future<void> start({String? templateId}) async {
     state = const ActiveWorkoutLoading();
+    _sessionRecords = [];
     try {
       final workout = await _repository.startWorkout(templateId: templateId);
       state = ActiveWorkoutInProgress(workout);
@@ -206,16 +212,20 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
 
   String _pendingSetId(String localId) => 'pending-$localId';
 
-  Future<void> finish({String? notes}) async {
+  Future<FinishedWorkout?> finish({String? notes}) async {
     final current = state;
-    if (current is! ActiveWorkoutInProgress) return;
+    if (current is! ActiveWorkoutInProgress) return null;
 
     try {
-      await _repository.finishWorkout(workoutId: current.workout.id, notes: notes);
+      final finished = await _repository.finishWorkout(workoutId: current.workout.id, notes: notes);
+      final records = _sessionRecords;
+      _sessionRecords = [];
       _stopWatching();
       state = const ActiveWorkoutNone();
+      return FinishedWorkout(workout: finished, newRecords: records);
     } catch (e) {
       state = ActiveWorkoutError(e.toString());
+      return null;
     }
   }
 
@@ -303,6 +313,8 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     state = ActiveWorkoutInProgress(updatedWorkout, lastNewRecords: result.newRecords);
 
     if (result.newRecords.isNotEmpty) {
+      _sessionRecords = [..._sessionRecords, ...result.newRecords];
+
       // Auto-dismiss the "new PR" banner rather than leaving it stuck until
       // the next set is logged.
       Future.delayed(const Duration(seconds: 4), () {

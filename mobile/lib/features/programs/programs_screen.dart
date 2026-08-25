@@ -102,11 +102,16 @@ class _ProgramsScreenState extends ConsumerState<ProgramsScreen> {
               final p = programs[index];
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
+                color: p.isActive ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35) : null,
                 child: ListTile(
+                  leading: p.isActive ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary) : const Icon(Icons.calendar_view_month, color: Colors.transparent),
                   title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text('${p.daysPerWeek} days a week · ${p.goal.label} · ${p.days.length} template${p.days.length == 1 ? '' : 's'}'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProgramReviewScreen(program: p))),
+                  onTap: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProgramReviewScreen(program: p)));
+                    if (mounted) setState(_reload);
+                  },
                 ),
               );
             },

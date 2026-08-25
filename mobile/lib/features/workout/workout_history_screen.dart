@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/units/units_provider.dart';
+import '../sharing/share_preview_sheet.dart';
+import '../sharing/workout_summary_share_card.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 
@@ -138,7 +140,13 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
                           ),
                           child: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.onErrorContainer),
                         ),
-                        child: _WorkoutHistoryCard(workout: workout, catalog: catalog),
+                        child: _WorkoutHistoryCard(
+                          workout: workout,
+                          catalog: catalog,
+                          onDelete: () async {
+                            if (await _confirmDelete(context)) await _deleteWorkout(workout);
+                          },
+                        ),
                       );
                     },
                   ),
@@ -148,10 +156,11 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
 }
 
 class _WorkoutHistoryCard extends ConsumerWidget {
-  const _WorkoutHistoryCard({required this.workout, required this.catalog});
+  const _WorkoutHistoryCard({required this.workout, required this.catalog, required this.onDelete});
 
   final Workout workout;
   final Map<String, Exercise> catalog;
+  final Future<void> Function() onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -173,22 +182,52 @@ class _WorkoutHistoryCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_formatDate(workout.startedAt), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${workout.sets.length} set${workout.sets.length == 1 ? '' : 's'}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _formatDate(workout.startedAt),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${workout.sets.length} set${workout.sets.length == 1 ? '' : 's'}',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.ios_share, size: 18),
+                  tooltip: 'Share',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: workout.sets.isEmpty
+                      ? null
+                      : () => showSharePreview(
+                            context,
+                            card: WorkoutSummaryShareCard(workout: workout, exerciseNames: exerciseNames, unit: unit),
+                            filename: 'workout_${workout.id}',
+                          ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, size: 18, color: Theme.of(context).colorScheme.error),
+                  tooltip: 'Delete',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onDelete,
                 ),
               ],
             ),

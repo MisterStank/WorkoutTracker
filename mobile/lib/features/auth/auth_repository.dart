@@ -73,7 +73,7 @@ class AuthRepository {
       variables: {'refreshToken': refreshToken},
     ));
     if (result.hasException) {
-      throw Exception(result.exception.toString());
+      throw Exception(_friendlyMessage(result.exception));
     }
   }
 
@@ -84,7 +84,7 @@ class AuthRepository {
   ) async {
     final result = await _client.mutate(MutationOptions(document: gql(document), variables: variables));
     if (result.hasException) {
-      throw Exception(result.exception.toString());
+      throw Exception(_friendlyMessage(result.exception));
     }
     final payload = result.data![operationField] as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>;
@@ -96,6 +96,19 @@ class AuthRepository {
       refreshToken: payload['refreshToken'] as String,
     );
   }
+}
+
+/// The server's own GraphQL error message (e.g. "invalid email or
+/// password") if present — that's what's actually useful to show the user.
+/// Falls back to a generic message rather than dumping OperationException's
+/// verbose toString() (link failures, stack-shaped exception lists) in the
+/// UI.
+String _friendlyMessage(OperationException? exception) {
+  final graphqlErrors = exception?.graphqlErrors ?? const [];
+  if (graphqlErrors.isNotEmpty && graphqlErrors.first.message.isNotEmpty) {
+    return graphqlErrors.first.message;
+  }
+  return 'Something went wrong. Check your connection and try again.';
 }
 
 class AuthPayloadResult {

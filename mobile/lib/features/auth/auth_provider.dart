@@ -77,7 +77,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _tokenStorage.save(accessToken: result.accessToken, refreshToken: result.refreshToken);
       state = AuthAuthenticated(userId: result.userId, email: result.email, displayName: result.displayName);
     } catch (e) {
-      state = AuthError(e.toString());
+      final message = e.toString();
+      state = AuthError(message.startsWith('Exception: ') ? message.substring('Exception: '.length) : message);
     }
   }
 

@@ -182,6 +182,7 @@ type Program {
   notes: String!
   createdAt: Time!
   days: [ProgramDay!]!
+  isActive: Boolean!
 }
 
 type NextWorkout {
@@ -241,6 +242,7 @@ type Mutation {
   saveFitnessProfile(input: FitnessProfileInput!): UserFitnessProfile!
   generateProgram: Program!
   createProgramFromTemplates(input: CreateProgramInput!): Program!
+  setActiveProgram(programId: UUID!): Program!
 }
 
 type Subscription {

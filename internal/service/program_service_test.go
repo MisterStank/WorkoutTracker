@@ -85,6 +85,28 @@ func (f *fakeProgramRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (f *fakeProgramRepo) SetActive(ctx context.Context, userID, programID uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, p := range f.byID {
+		if p.UserID == userID {
+			p.IsActive = p.ID == programID
+		}
+	}
+	return nil
+}
+
+func (f *fakeProgramRepo) FindActiveForUser(ctx context.Context, userID uuid.UUID) (*domain.Program, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, p := range f.byID {
+		if p.UserID == userID && p.IsActive {
+			return p, nil
+		}
+	}
+	return nil, nil
+}
+
 // fullCatalog is a small but complete-enough exercise set for the
 // generator's tests: at least one bodyweight and one non-bodyweight option
 // per category, and a distinct muscle group per exercise so

@@ -14,7 +14,6 @@ import '../programs/fitness_profile_models.dart';
 import '../programs/fitness_profile_provider.dart';
 import '../sharing/pr_share_card.dart';
 import '../sharing/share_preview_sheet.dart';
-import '../sharing/workout_summary_share_card.dart';
 import '../templates/template_models.dart';
 import '../templates/template_provider.dart';
 import '../templates/templates_screen.dart';
@@ -23,6 +22,7 @@ import 'exercise_picker_screen.dart';
 import 'log_set_sheet.dart';
 import 'rest_timer_provider.dart';
 import 'superset_provider.dart';
+import 'workout_completion_screen.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 import 'workout_state.dart';
@@ -182,33 +182,12 @@ class WorkoutHomeScreen extends ConsumerWidget {
     );
     if (notes == null) return;
 
-    // Snapshot the workout before finishing — state flips to
-    // ActiveWorkoutNone right after, so this is the last point it's
-    // available for the post-finish share prompt.
-    final preFinishState = ref.read(activeWorkoutProvider);
-    final finishedWorkout = preFinishState is ActiveWorkoutInProgress ? preFinishState.workout : null;
-
-    await ref.read(activeWorkoutProvider.notifier).finish(notes: notes.isEmpty ? null : notes);
+    final result = await ref.read(activeWorkoutProvider.notifier).finish(notes: notes.isEmpty ? null : notes);
     ref.read(activeSupersetsProvider.notifier).reset();
 
-    if (finishedWorkout == null || finishedWorkout.sets.isEmpty || !context.mounted) return;
-    final catalog = ref.read(exerciseCatalogProvider).asData?.value ?? const {};
-    final unit = ref.read(weightUnitProvider);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Workout saved'),
-        action: SnackBarAction(
-          label: 'Share',
-          onPressed: () {
-            final exerciseNames = {for (final s in finishedWorkout.sets) catalog[s.exerciseId]?.name ?? 'Exercise'}.toList();
-            showSharePreview(
-              context,
-              card: WorkoutSummaryShareCard(workout: finishedWorkout, exerciseNames: exerciseNames, unit: unit),
-              filename: 'workout_${finishedWorkout.id}',
-            );
-          },
-        ),
-      ),
+    if (result == null || result.workout.sets.isEmpty || !context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => WorkoutCompletionScreen(workout: result.workout, newRecords: result.newRecords)),
     );
   }
 

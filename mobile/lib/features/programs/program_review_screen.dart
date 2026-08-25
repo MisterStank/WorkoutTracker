@@ -1,34 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../workout/superset_provider.dart';
+import '../workout/workout_provider.dart';
 import 'fitness_profile_models.dart';
+import 'fitness_profile_provider.dart';
 
-/// Read-only view of a just-generated Program — generation already
-/// persisted every day as an ordinary WorkoutTemplate, so this screen is a
-/// confirmation/summary, not a second save step. Each day is a card the
-/// user can glance at; starting a workout from one happens the normal way,
-/// from the Templates tab, since a program day is just a template.
-class ProgramReviewScreen extends StatelessWidget {
+/// A program's detail/action screen — reached by tapping it on the Programs
+/// tab. Answers "now what": mark it as the one you're following (drives
+/// Home's "Continue" card) and start a workout from any of its days
+/// directly, rather than just listing its exercises with nowhere to go.
+class ProgramReviewScreen extends ConsumerStatefulWidget {
   const ProgramReviewScreen({super.key, required this.program});
 
   final Program program;
 
   @override
+  ConsumerState<ProgramReviewScreen> createState() => _ProgramReviewScreenState();
+}
+
+class _ProgramReviewScreenState extends ConsumerState<ProgramReviewScreen> {
+  late Program _program;
+  bool _activating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _program = widget.program;
+  }
+
+  Future<void> _useThisProgram() async {
+    setState(() => _activating = true);
+    try {
+      final updated = await ref.read(fitnessProfileRepositoryProvider).setActiveProgram(_program.id);
+      if (mounted) setState(() => _program = updated);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not activate program: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _activating = false);
+    }
+  }
+
+  Future<void> _startDay(ProgramDay day) async {
+    ref.read(activeSupersetsProvider.notifier).reset();
+    await ref.read(activeWorkoutProvider.notifier).start(templateId: day.template.id);
+    if (!mounted) return;
+    // Return to the app shell (Home tab shows the resume bar / active
+    // workout automatically) rather than leaving the user on this
+    // now-stale review screen mid-workout.
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(program.name)),
+      appBar: AppBar(title: Text(_program.name)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            '${program.daysPerWeek} days a week · ${program.goal.label}',
-            style: Theme.of(context).textTheme.titleMedium,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${_program.daysPerWeek} days a week · ${_program.goal.label}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              if (_program.isActive)
+                Chip(
+                  avatar: const Icon(Icons.check_circle, size: 16),
+                  label: const Text('Active'),
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
-            'Saved as ${program.days.length} template${program.days.length == 1 ? '' : 's'} — start any day from the Templates tab whenever you train it.',
+            'Tap a day below to start a workout from it.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
-          if (program.notes.isNotEmpty) ...[
+          if (_program.notes.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -36,16 +90,22 @@ class ProgramReviewScreen extends StatelessWidget {
                 color: Theme.of(context).colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text(program.notes, style: Theme.of(context).textTheme.bodySmall),
+              child: Text(_program.notes, style: Theme.of(context).textTheme.bodySmall),
             ),
           ],
           const SizedBox(height: 16),
-          ...program.days.map((day) => _ProgramDayCard(day: day)),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Done'),
-          ),
+          if (!_program.isActive)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: FilledButton.icon(
+                onPressed: _activating ? null : _useThisProgram,
+                icon: _activating
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.check_circle_outline),
+                label: const Text('Use this program'),
+              ),
+            ),
+          ...widget.program.days.map((day) => _ProgramDayCard(day: day, onStart: () => _startDay(day))),
         ],
       ),
     );
@@ -53,31 +113,43 @@ class ProgramReviewScreen extends StatelessWidget {
 }
 
 class _ProgramDayCard extends StatelessWidget {
-  const _ProgramDayCard({required this.day});
+  const _ProgramDayCard({required this.day, required this.onStart});
 
   final ProgramDay day;
+  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
+    final empty = day.template.exercises.isEmpty;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Row(
           children: [
-            Text(day.dayLabel, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            if (day.template.exercises.isEmpty)
-              Text(
-                'No matching exercises for this day — try widening your equipment or exclusions.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-              )
-            else
-              Text(
-                '${day.template.exercises.length} exercise${day.template.exercises.length == 1 ? '' : 's'}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(day.dayLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(
+                    empty
+                        ? 'No matching exercises for this day — try widening your equipment or exclusions.'
+                        : '${day.template.exercises.length} exercise${day.template.exercises.length == 1 ? '' : 's'}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ],
               ),
+            ),
+            if (!empty) ...[
+              const SizedBox(width: 12),
+              IconButton.filled(
+                onPressed: onStart,
+                icon: const Icon(Icons.play_arrow),
+                tooltip: 'Start ${day.dayLabel}',
+              ),
+            ],
           ],
         ),
       ),

@@ -245,6 +245,19 @@ func (r *mutationResolver) CreateProgramFromTemplates(ctx context.Context, input
 	return toProgramModel(program), nil
 }
 
+// SetActiveProgram is the resolver for the setActiveProgram field.
+func (r *mutationResolver) SetActiveProgram(ctx context.Context, programID uuid.UUID) (*Program, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	program, err := r.Program.SetActiveProgram(ctx, userID, programID)
+	if err != nil {
+		return nil, err
+	}
+	return toProgramModel(program), nil
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
@@ -745,6 +758,7 @@ func toProgramModel(p *domain.Program) *Program {
 		Notes:       p.Notes,
 		CreatedAt:   p.CreatedAt,
 		Days:        days,
+		IsActive:    p.IsActive,
 	}
 }
 func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *domain.Workout) (*Workout, error) {

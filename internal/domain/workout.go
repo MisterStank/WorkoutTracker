@@ -102,6 +102,10 @@ type Program struct {
 	Notes       string
 	CreatedAt   time.Time
 	Days        []*ProgramDay
+	// IsActive marks the one program (at most) the user is currently
+	// following — NextWorkout is derived from this program, not just
+	// whichever was created most recently. See ProgramService.SetActiveProgram.
+	IsActive bool
 }
 
 // NextWorkout is "what should I train next" for a user's most recently
@@ -211,6 +215,14 @@ type ProgramRepository interface {
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]*Program, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Program, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	// SetActive marks programID as the sole active program for userID,
+	// deactivating any previously-active program for that same user in the
+	// same transaction.
+	SetActive(ctx context.Context, userID, programID uuid.UUID) error
+	// FindActiveForUser returns nil, nil (not an error) if the user has no
+	// active program — an expected state (never generated/built one yet, or
+	// explicitly has none selected), not a failure.
+	FindActiveForUser(ctx context.Context, userID uuid.UUID) (*Program, error)
 }
 
 type PersonalRecordRepository interface {
