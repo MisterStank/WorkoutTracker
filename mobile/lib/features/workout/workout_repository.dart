@@ -43,7 +43,7 @@ class WorkoutRepository {
     final result = await _client.query(QueryOptions(
       document: gql('''
         query Exercises(\$search: String) {
-          exercises(search: \$search) { id name category }
+          exercises(search: \$search) { id name category instructions }
         }
       '''),
       variables: {'search': search},

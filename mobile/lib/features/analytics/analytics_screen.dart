@@ -228,8 +228,14 @@ class _MeasurementsTabState extends ConsumerState<_MeasurementsTab> {
     );
     if (value == null) return;
     final stored = _selected.isWeight ? weightUnit.toKg(value) : value;
-    await ref.read(analyticsRepositoryProvider).logBodyMetric(metricType: _selected.metricType, value: stored);
-    setState(_reload);
+    try {
+      await ref.read(analyticsRepositoryProvider).logBodyMetric(metricType: _selected.metricType, value: stored);
+      setState(_reload);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not log ${_selected.label.toLowerCase()}: $e')));
+      }
+    }
   }
 
   @override

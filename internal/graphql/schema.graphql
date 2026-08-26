@@ -27,6 +27,7 @@ type Exercise {
   muscleGroups: [String!]!
   equipment: String!
   isCustom: Boolean!
+  instructions: String!
 }
 
 enum SetType {

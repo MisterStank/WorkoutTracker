@@ -95,7 +95,7 @@ class WorkoutCompletionScreen extends ConsumerWidget {
               FilledButton.icon(
                 onPressed: () => showSharePreview(
                   context,
-                  card: WorkoutSummaryShareCard(workout: workout, exerciseNames: exerciseNames, unit: unit),
+                  card: WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: unit),
                   filename: 'workout_${workout.id}',
                 ),
                 icon: const Icon(Icons.ios_share),

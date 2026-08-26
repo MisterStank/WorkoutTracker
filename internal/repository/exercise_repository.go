@@ -20,7 +20,7 @@ func NewExerciseRepository(db *pgxpool.Pool) *ExerciseRepository {
 }
 
 func (r *ExerciseRepository) List(ctx context.Context, search string) ([]*domain.Exercise, error) {
-	query := `SELECT id, name, category, muscle_groups, equipment, is_custom, created_at FROM exercises`
+	query := `SELECT id, name, category, muscle_groups, equipment, is_custom, created_at, instructions FROM exercises`
 	args := []any{}
 	if search != "" {
 		query += ` WHERE name ILIKE $1`
@@ -37,7 +37,7 @@ func (r *ExerciseRepository) List(ctx context.Context, search string) ([]*domain
 	var exercises []*domain.Exercise
 	for rows.Next() {
 		var e domain.Exercise
-		if err := rows.Scan(&e.ID, &e.Name, &e.Category, &e.MuscleGroups, &e.Equipment, &e.IsCustom, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.Category, &e.MuscleGroups, &e.Equipment, &e.IsCustom, &e.CreatedAt, &e.Instructions); err != nil {
 			return nil, err
 		}
 		exercises = append(exercises, &e)
@@ -52,7 +52,7 @@ func (r *ExerciseRepository) List(ctx context.Context, search string) ([]*domain
 // name for deterministic, testable selection.
 func (r *ExerciseRepository) ListFiltered(ctx context.Context, equipment []string, excludeMuscleGroups []string, category string) ([]*domain.Exercise, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, name, category, muscle_groups, equipment, is_custom, created_at
+		`SELECT id, name, category, muscle_groups, equipment, is_custom, created_at, instructions
 		 FROM exercises
 		 WHERE ($1::text[] = '{}' OR equipment = ANY($1))
 		   AND NOT (muscle_groups && $2::text[])
@@ -68,7 +68,7 @@ func (r *ExerciseRepository) ListFiltered(ctx context.Context, equipment []strin
 	var exercises []*domain.Exercise
 	for rows.Next() {
 		var e domain.Exercise
-		if err := rows.Scan(&e.ID, &e.Name, &e.Category, &e.MuscleGroups, &e.Equipment, &e.IsCustom, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.Category, &e.MuscleGroups, &e.Equipment, &e.IsCustom, &e.CreatedAt, &e.Instructions); err != nil {
 			return nil, err
 		}
 		exercises = append(exercises, &e)
@@ -79,9 +79,9 @@ func (r *ExerciseRepository) ListFiltered(ctx context.Context, equipment []strin
 func (r *ExerciseRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Exercise, error) {
 	var e domain.Exercise
 	err := r.db.QueryRow(ctx,
-		`SELECT id, name, category, muscle_groups, equipment, is_custom, created_at
+		`SELECT id, name, category, muscle_groups, equipment, is_custom, created_at, instructions
 		 FROM exercises WHERE id = $1`, id,
-	).Scan(&e.ID, &e.Name, &e.Category, &e.MuscleGroups, &e.Equipment, &e.IsCustom, &e.CreatedAt)
+	).Scan(&e.ID, &e.Name, &e.Category, &e.MuscleGroups, &e.Equipment, &e.IsCustom, &e.CreatedAt, &e.Instructions)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrExerciseNotFound
 	}

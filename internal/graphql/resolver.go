@@ -568,6 +568,7 @@ func toExerciseModel(e *domain.Exercise) *Exercise {
 		MuscleGroups: e.MuscleGroups,
 		Equipment:    e.Equipment,
 		IsCustom:     e.IsCustom,
+		Instructions: e.Instructions,
 	}
 }
 

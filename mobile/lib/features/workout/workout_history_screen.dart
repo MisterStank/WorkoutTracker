@@ -219,7 +219,7 @@ class _WorkoutHistoryCard extends ConsumerWidget {
                       ? null
                       : () => showSharePreview(
                             context,
-                            card: WorkoutSummaryShareCard(workout: workout, exerciseNames: exerciseNames, unit: unit),
+                            card: WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: unit),
                             filename: 'workout_${workout.id}',
                           ),
                 ),

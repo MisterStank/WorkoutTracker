@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/notifications/retention_nudge_service.dart';
 import '../../core/offline/app_database.dart';
 import '../../core/offline/offline_provider.dart';
 import '../../core/storage/recent_exercises_storage.dart';
@@ -14,6 +15,25 @@ import 'workout_state.dart';
 
 final workoutRepositoryProvider = Provider<WorkoutRepository>((ref) {
   return WorkoutRepository(ref.watch(graphQLClientProvider));
+});
+
+/// Runs once per app session (Riverpod caches FutureProviders): initializes
+/// the retention-nudge notification plugin and schedules the reminder from
+/// whatever the user's most recent finished workout already was — so the
+/// nudge is still correct after an app restart, not just after the next
+/// workout finishes (see ActiveWorkoutNotifier.finish for that half).
+final retentionNudgeInitProvider = FutureProvider<void>((ref) async {
+  final service = ref.watch(retentionNudgeServiceProvider);
+  await service.initialize();
+  try {
+    final page = await ref.watch(workoutRepositoryProvider).workoutHistory(first: 1);
+    final mostRecent = page.workouts.isEmpty ? null : page.workouts.first;
+    await service.rescheduleFrom(mostRecent?.endedAt);
+  } catch (_) {
+    // Best-effort — a failed fetch just means the reminder doesn't get
+    // (re)scheduled this launch; nothing in the active-workout flow depends
+    // on it.
+  }
 });
 
 final recentExercisesStorageProvider = Provider<RecentExercisesStorage>((ref) {
@@ -222,6 +242,7 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
       _sessionRecords = [];
       _stopWatching();
       state = const ActiveWorkoutNone();
+      unawaited(_ref.read(retentionNudgeServiceProvider).rescheduleFrom(finished.endedAt ?? DateTime.now()));
       return FinishedWorkout(workout: finished, newRecords: records);
     } catch (e) {
       state = ActiveWorkoutError(e.toString());
@@ -285,7 +306,10 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     if (_liveSubWorkoutId == workoutId) return;
     _stopWatching();
     _liveSubWorkoutId = workoutId;
-    _liveSub = _repository.watchWorkoutProgress(workoutId).listen(_applyLoggedSet);
+    // Best-effort real-time sync, same philosophy as logout()'s server-side
+    // revoke below: a dropped subscription shouldn't surface an error or
+    // crash — the workout stays fully usable via the normal mutations.
+    _liveSub = _repository.watchWorkoutProgress(workoutId).listen(_applyLoggedSet, onError: (_) {});
   }
 
   void _stopWatching() {

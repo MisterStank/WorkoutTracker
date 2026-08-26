@@ -37,8 +37,14 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   }
 
   Future<void> _delete(String templateId) async {
-    await ref.read(templateRepositoryProvider).delete(templateId);
-    setState(_reload);
+    try {
+      await ref.read(templateRepositoryProvider).delete(templateId);
+      setState(_reload);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not delete: $e')));
+      }
+    }
   }
 
   Future<void> _start(WorkoutTemplate template) async {

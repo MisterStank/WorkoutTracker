@@ -212,6 +212,9 @@ class WorkoutHomeScreen extends ConsumerWidget {
     // queued offline sets get pushed as soon as connectivity returns even
     // if the user never re-opens the active-workout screen themselves.
     if (offlineQueueSupported) ref.watch(syncServiceProvider);
+    // Fire-and-forget: (re)schedules the retention nudge from the user's
+    // actual most recent workout on every app launch.
+    ref.watch(retentionNudgeInitProvider);
 
     return Scaffold(
       appBar: AppBar(

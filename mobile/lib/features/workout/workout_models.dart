@@ -1,14 +1,17 @@
 class Exercise {
-  const Exercise({required this.id, required this.name, required this.category});
+  const Exercise({required this.id, required this.name, required this.category, this.instructions = ''});
 
   final String id;
   final String name;
   final String category;
+  // Short hand-written form cue; empty for user-created custom exercises.
+  final String instructions;
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
         id: json['id'] as String,
         name: json['name'] as String,
         category: json['category'] as String,
+        instructions: json['instructions'] as String? ?? '',
       );
 }
 

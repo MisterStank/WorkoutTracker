@@ -56,6 +56,7 @@ type ComplexityRoot struct {
 		Category     func(childComplexity int) int
 		Equipment    func(childComplexity int) int
 		ID           func(childComplexity int) int
+		Instructions func(childComplexity int) int
 		IsCustom     func(childComplexity int) int
 		MuscleGroups func(childComplexity int) int
 		Name         func(childComplexity int) int
@@ -355,6 +356,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Exercise.ID(childComplexity), true
+	case "Exercise.instructions":
+		if e.ComplexityRoot.Exercise.Instructions == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Exercise.Instructions(childComplexity), true
 	case "Exercise.isCustom":
 		if e.ComplexityRoot.Exercise.IsCustom == nil {
 			break
@@ -1337,6 +1344,8 @@ func (ec *executionContext) childFields_Exercise(ctx context.Context, field grap
 		return ec.fieldContext_Exercise_equipment(ctx, field)
 	case "isCustom":
 		return ec.fieldContext_Exercise_isCustom(ctx, field)
+	case "instructions":
+		return ec.fieldContext_Exercise_instructions(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Exercise", field.Name)
 }
@@ -2593,6 +2602,29 @@ func (ec *executionContext) _Exercise_isCustom(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_Exercise_isCustom(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Exercise", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _Exercise_instructions(ctx context.Context, field graphql.CollectedField, obj *Exercise) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Exercise_instructions(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Instructions, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Exercise_instructions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Exercise", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _LogSetResult_set(ctx context.Context, field graphql.CollectedField, obj *LogSetResult) (ret graphql.Marshaler) {
@@ -7264,6 +7296,11 @@ func (ec *executionContext) _Exercise(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "isCustom":
 			out.Values[i] = ec._Exercise_isCustom(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "instructions":
+			out.Values[i] = ec._Exercise_instructions(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

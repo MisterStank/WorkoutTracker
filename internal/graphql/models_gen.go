@@ -37,6 +37,7 @@ type Exercise struct {
 	MuscleGroups []string  `json:"muscleGroups"`
 	Equipment    string    `json:"equipment"`
 	IsCustom     bool      `json:"isCustom"`
+	Instructions string    `json:"instructions"`
 }
 
 type FitnessProfileInput struct {

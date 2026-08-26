@@ -59,6 +59,16 @@ dependencies:
   # Native OS share sheet, for sharing a PR/workout-summary image
   share_plus: ^10.1.4
 
+  # Real UUIDs for client-generated IDs (e.g. ad-hoc superset grouping) that
+  # get sent to the backend's UUID! GraphQL fields
+  uuid: ^4.6.0
+
+  # Local "haven't trained in a while?" retention reminder (mobile only —
+  # no-ops on web, which flutter_local_notifications doesn't support for
+  # scheduled notifications)
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

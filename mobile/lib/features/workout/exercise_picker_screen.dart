@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'exercise_category_icon.dart';
+import 'exercise_detail_sheet.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 
@@ -175,9 +177,9 @@ class _ExerciseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        child: Icon(Icons.fitness_center, color: Theme.of(context).colorScheme.onPrimaryContainer, size: 20),
+      leading: GestureDetector(
+        onTap: () => showExerciseDetailSheet(context, exercise),
+        child: ExerciseCategoryIcon(category: exercise.category),
       ),
       title: Text(exercise.name),
       subtitle: Text(exercise.category),

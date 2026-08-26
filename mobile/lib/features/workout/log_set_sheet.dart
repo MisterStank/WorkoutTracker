@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/units/weight_unit.dart';
 import '../../core/widgets/semantic_banner.dart';
+import 'exercise_category_icon.dart';
+import 'exercise_detail_sheet.dart';
 import 'plate_calculator.dart';
 import 'workout_models.dart';
 
@@ -81,9 +83,9 @@ Future<LoggedSetInput?> showLogSetSheet(
                 ),
                 Row(
                   children: [
-                    CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                      child: Icon(Icons.fitness_center, color: Theme.of(context).colorScheme.onPrimaryContainer, size: 20),
+                    GestureDetector(
+                      onTap: () => showExerciseDetailSheet(context, exercise),
+                      child: ExerciseCategoryIcon(category: exercise.category),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

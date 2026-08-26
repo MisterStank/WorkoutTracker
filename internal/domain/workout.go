@@ -42,6 +42,9 @@ type Exercise struct {
 	Equipment    string
 	IsCustom     bool
 	CreatedAt    time.Time
+	// Instructions is a short, hand-written form cue — empty for
+	// user-created custom exercises, which have no cue to draw from.
+	Instructions string
 }
 
 type Workout struct {
