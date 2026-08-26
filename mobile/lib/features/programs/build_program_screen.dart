@@ -144,9 +144,8 @@ class _BuildProgramScreenState extends ConsumerState<BuildProgramScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _days.length,
-              onReorder: (oldIndex, newIndex) {
+              onReorderItem: (oldIndex, newIndex) {
                 setState(() {
-                  if (newIndex > oldIndex) newIndex -= 1;
                   final d = _days.removeAt(oldIndex);
                   _days.insert(newIndex, d);
                 });
