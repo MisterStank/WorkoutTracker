@@ -10,13 +10,15 @@ WorkoutSet _set(String id, {required String exerciseId, required int setNumber, 
   return WorkoutSet(id: id, exerciseId: exerciseId, setNumber: setNumber, reps: reps, weightKg: weightKg, setType: setType);
 }
 
+PersonalRecord _record(String exerciseId) => PersonalRecord(exerciseId: exerciseId, recordType: 'max_weight', value: 80);
+
 Future<void> _pump(WidgetTester tester, Widget card) async {
-  await tester.pumpWidget(MaterialApp(home: Scaffold(body: card)));
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: card))));
 }
 
 void main() {
   group('WorkoutSummaryShareCard', () {
-    testWidgets('shows per-exercise set count and best set, not just names', (tester) async {
+    testWidgets('lists every working set per exercise, not just the best one', (tester) async {
       final workout = Workout(
         id: 'w1',
         startedAt: DateTime(2026, 1, 1, 10),
@@ -25,7 +27,7 @@ void main() {
         notes: '',
         sets: [
           _set('s1', exerciseId: 'bench', setNumber: 1, reps: 8, weightKg: 60),
-          _set('s2', exerciseId: 'bench', setNumber: 2, reps: 5, weightKg: 80), // heavier -> should be "best"
+          _set('s2', exerciseId: 'bench', setNumber: 2, reps: 5, weightKg: 80),
           _set('s3', exerciseId: 'row', setNumber: 1, reps: 10, weightKg: 40),
         ],
       );
@@ -35,12 +37,87 @@ void main() {
 
       expect(find.text('Bench Press'), findsOneWidget);
       expect(find.text('Barbell Row'), findsOneWidget);
-      expect(find.text('2 sets'), findsOneWidget, reason: 'Bench Press has 2 working sets');
-      expect(find.text('1 set'), findsOneWidget, reason: 'Barbell Row has 1 working set, singular label');
-      expect(find.text('5 × 80 kg'), findsOneWidget, reason: 'heaviest set (80kg) should win over the lighter 60kg set, not the first-logged one');
+      expect(find.text('8 × 60 kg'), findsOneWidget, reason: 'both bench sets should be listed, not just the heavier one');
+      expect(find.text('5 × 80 kg'), findsOneWidget);
+      expect(find.text('10 × 40 kg'), findsOneWidget);
     });
 
-    testWidgets('excludes warm-up sets from set counts and best-set selection', (tester) async {
+    testWidgets('shows who did it and when', (tester) async {
+      final workout = Workout(
+        id: 'w1',
+        startedAt: DateTime(2026, 1, 6, 10), // a Tuesday
+        endedAt: DateTime(2026, 1, 6, 10, 30),
+        status: 'COMPLETED',
+        notes: '',
+        sets: [_set('s1', exerciseId: 'bench', setNumber: 1, reps: 8, weightKg: 60)],
+      );
+      final catalog = {'bench': _exercise('bench', 'Bench Press')};
+
+      await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg, displayName: 'Jamie Lee'));
+
+      expect(find.textContaining('Jamie Lee'), findsOneWidget);
+      expect(find.textContaining('Tue 1/6'), findsOneWidget);
+    });
+
+    testWidgets('omits the name line entirely when no display name is given', (tester) async {
+      final workout = Workout(id: 'w1', startedAt: DateTime(2026, 1, 6), endedAt: DateTime(2026, 1, 6, 0, 30), status: 'COMPLETED', notes: '', sets: [
+        _set('s1', exerciseId: 'bench', setNumber: 1, reps: 8, weightKg: 60),
+      ]);
+      final catalog = {'bench': _exercise('bench', 'Bench Press')};
+
+      await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg));
+
+      // The date-only line should just be the date, no leading " · " artifact.
+      expect(find.text('Tue 1/6'), findsOneWidget);
+    });
+
+    testWidgets('uses the given title as the headline instead of the weekday fallback', (tester) async {
+      final workout = Workout(id: 'w1', startedAt: DateTime(2026, 1, 6), endedAt: DateTime(2026, 1, 6, 0, 30), status: 'COMPLETED', notes: '', sets: [
+        _set('s1', exerciseId: 'bench', setNumber: 1, reps: 8, weightKg: 60),
+      ]);
+      final catalog = {'bench': _exercise('bench', 'Bench Press')};
+
+      await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg, title: 'Upper 1'));
+
+      expect(find.text('Upper 1'), findsOneWidget);
+      expect(find.text('Tuesday Workout'), findsNothing);
+    });
+
+    testWidgets('falls back to a weekday-based title when none is given', (tester) async {
+      final workout = Workout(id: 'w1', startedAt: DateTime(2026, 1, 6), endedAt: DateTime(2026, 1, 6, 0, 30), status: 'COMPLETED', notes: '', sets: [
+        _set('s1', exerciseId: 'bench', setNumber: 1, reps: 8, weightKg: 60),
+      ]);
+      final catalog = {'bench': _exercise('bench', 'Bench Press')};
+
+      await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg));
+
+      expect(find.text('Tuesday Workout'), findsOneWidget);
+    });
+
+    testWidgets('flags an exercise with a PR badge when it earned one this session', (tester) async {
+      final workout = Workout(id: 'w1', startedAt: DateTime(2026, 1, 1), endedAt: DateTime(2026, 1, 1, 0, 30), status: 'COMPLETED', notes: '', sets: [
+        _set('s1', exerciseId: 'bench', setNumber: 1, reps: 5, weightKg: 80),
+        _set('s2', exerciseId: 'row', setNumber: 1, reps: 10, weightKg: 40),
+      ]);
+      final catalog = {'bench': _exercise('bench', 'Bench Press'), 'row': _exercise('row', 'Barbell Row')};
+
+      await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg, newRecords: [_record('bench')]));
+
+      expect(find.text('PR'), findsOneWidget, reason: 'only the exercise that actually earned a PR should be flagged');
+    });
+
+    testWidgets('shows no PR badge when newRecords is empty (e.g. shared later from History)', (tester) async {
+      final workout = Workout(id: 'w1', startedAt: DateTime(2026, 1, 1), endedAt: DateTime(2026, 1, 1, 0, 30), status: 'COMPLETED', notes: '', sets: [
+        _set('s1', exerciseId: 'bench', setNumber: 1, reps: 5, weightKg: 80),
+      ]);
+      final catalog = {'bench': _exercise('bench', 'Bench Press')};
+
+      await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg));
+
+      expect(find.text('PR'), findsNothing);
+    });
+
+    testWidgets('excludes warm-up sets entirely', (tester) async {
       final workout = Workout(
         id: 'w1',
         startedAt: DateTime(2026, 1, 1),
@@ -56,8 +133,7 @@ void main() {
 
       await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg));
 
-      expect(find.text('1 set'), findsOneWidget, reason: 'the 200kg warm-up must not count as a working set');
-      expect(find.text('5 × 80 kg'), findsOneWidget, reason: 'the warm-up (heavier, but a warm-up) must not win best-set');
+      expect(find.text('5 × 80 kg'), findsOneWidget);
       expect(find.textContaining('200'), findsNothing);
     });
 
@@ -68,9 +144,7 @@ void main() {
         endedAt: DateTime(2026, 1, 1, 0, 10),
         status: 'COMPLETED',
         notes: '',
-        sets: [
-          _set('s1', exerciseId: 'bench', setNumber: 1, reps: 10, weightKg: 20, setType: SetType.warmup),
-        ],
+        sets: [_set('s1', exerciseId: 'bench', setNumber: 1, reps: 10, weightKg: 20, setType: SetType.warmup)],
       );
       final catalog = {'bench': _exercise('bench', 'Bench Press')};
 
@@ -79,10 +153,10 @@ void main() {
       expect(find.text('Bench Press'), findsNothing);
     });
 
-    testWidgets('shows an overflow count beyond the first five exercises', (tester) async {
+    testWidgets('shows an overflow count beyond the first ten exercises', (tester) async {
       final sets = <WorkoutSet>[];
       final catalog = <String, Exercise>{};
-      for (var i = 0; i < 7; i++) {
+      for (var i = 0; i < 12; i++) {
         final id = 'ex$i';
         sets.add(_set('s$i', exerciseId: id, setNumber: 1, reps: 8, weightKg: 40));
         catalog[id] = _exercise(id, 'Exercise $i');
@@ -91,7 +165,7 @@ void main() {
 
       await _pump(tester, WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: WeightUnit.kg));
 
-      expect(find.text('+2 more'), findsOneWidget);
+      expect(find.text('+2 more exercises'), findsOneWidget);
     });
 
     testWidgets('falls back to "Exercise" for a set whose exercise is missing from the catalog', (tester) async {

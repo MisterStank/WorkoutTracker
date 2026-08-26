@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/units/units_provider.dart';
+import '../auth/auth_provider.dart';
+import '../auth/auth_state.dart';
 import '../sharing/share_preview_sheet.dart';
 import '../sharing/workout_summary_share_card.dart';
+import '../templates/template_provider.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 
@@ -173,6 +176,10 @@ class _WorkoutHistoryCard extends ConsumerWidget {
         .fold<double>(0, (sum, s) => sum + s.weightKg * s.reps);
     final displayVolume = unit.fromKg(totalVolumeKg);
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final authState = ref.watch(authProvider);
+    final displayName = authState is AuthAuthenticated ? authState.displayName : null;
+    final templates = ref.watch(templateCatalogProvider).asData?.value ?? const {};
+    final workoutTitle = workout.templateId == null ? null : templates[workout.templateId]?.name;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -219,7 +226,13 @@ class _WorkoutHistoryCard extends ConsumerWidget {
                       ? null
                       : () => showSharePreview(
                             context,
-                            card: WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: unit),
+                            card: WorkoutSummaryShareCard(
+                              workout: workout,
+                              catalog: catalog,
+                              unit: unit,
+                              displayName: displayName,
+                              title: workoutTitle,
+                            ),
                             filename: 'workout_${workout.id}',
                           ),
                 ),

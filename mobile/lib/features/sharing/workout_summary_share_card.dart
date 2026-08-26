@@ -3,40 +3,59 @@ import 'package:flutter/material.dart';
 import '../../core/units/weight_unit.dart';
 import '../workout/workout_models.dart';
 
-/// One exercise's line on the summary card: name, working-set count, and
-/// the heaviest working set (by weight, ties broken by reps) — enough for
-/// someone glancing at the shared image to see what was actually trained,
-/// not just a list of names.
+/// One exercise's block on the summary card: every working set (not just
+/// the best one — matches how Hevy's share card reads, more complete than
+/// a single top-set summary), plus whether any of them was a PR this
+/// session.
 class _ExerciseSummary {
   _ExerciseSummary(this.name);
 
   final String name;
-  int setCount = 0;
-  WorkoutSet? best;
-
-  void addSet(WorkoutSet set) {
-    setCount++;
-    if (best == null || set.weightKg > best!.weightKg || (set.weightKg == best!.weightKg && set.reps > best!.reps)) {
-      best = set;
-    }
-  }
+  final List<WorkoutSet> sets = [];
+  bool isPr = false;
 }
 
-/// A shareable workout-summary card — date, duration, sets, volume, and a
-/// per-exercise breakdown (sets done + best set) rather than just a list of
-/// exercise names. Same fixed dark-on-brick-red palette as [PrShareCard],
-/// deliberately independent of the app's light/dark setting.
+/// A shareable workout-summary card — who did it, what it was called, when,
+/// duration/sets/volume, a full per-exercise set-by-set breakdown, and a PR
+/// callout inline on any exercise that earned one — closing the gap against
+/// Hevy/Strong-style workout cards, which always sign, title, and date the
+/// card and fold the PR story into the same image rather than a separate
+/// one. Same fixed dark-on-brick-red palette as [PrShareCard], deliberately
+/// independent of the app's light/dark setting. Sized to its content
+/// (no fixed height) since a full set-by-set breakdown varies a lot by
+/// workout length.
 class WorkoutSummaryShareCard extends StatelessWidget {
-  const WorkoutSummaryShareCard({super.key, required this.workout, required this.catalog, required this.unit});
+  const WorkoutSummaryShareCard({
+    super.key,
+    required this.workout,
+    required this.catalog,
+    required this.unit,
+    this.displayName,
+    this.title,
+    this.newRecords = const [],
+  });
 
   final Workout workout;
   final Map<String, Exercise> catalog;
   final WeightUnit unit;
+  // The user's name, shown as "Logged by <name>" — null (or empty) omits
+  // that line rather than showing a blank/anonymous credit.
+  final String? displayName;
+  // The workout/day name (e.g. a program day's label, or a template's
+  // name) to headline the card with, in place of a generic label. Null
+  // falls back to a weekday-based title ("Tuesday Workout").
+  final String? title;
+  // PRs earned during this workout, if known — flags a trophy badge on
+  // every exercise that hit one. History doesn't have this after the fact
+  // (only known at finish-time), so it's optional and defaults to none.
+  final List<PersonalRecord> newRecords;
 
   static const _background = Color(0xFF3D1410);
   static const _accent = Color(0xFFE8663F);
   static const _text = Color(0xFFFFF3ED);
-  static const _maxRows = 5;
+  static const _maxExercises = 10;
+
+  static const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   @override
   Widget build(BuildContext context) {
@@ -46,28 +65,42 @@ class WorkoutSummaryShareCard extends StatelessWidget {
     final duration = (workout.endedAt ?? DateTime.now()).difference(workout.startedAt);
     final durationLabel = duration.inHours > 0 ? '${duration.inHours}h ${duration.inMinutes % 60}m' : '${duration.inMinutes}m';
 
+    final prExerciseIds = newRecords.map((r) => r.exerciseId).toSet();
     final byExercise = <String, _ExerciseSummary>{};
     for (final set in workout.sets) {
+      if (set.setType == SetType.warmup) continue;
       final name = catalog[set.exerciseId]?.name ?? 'Exercise';
       final summary = byExercise.putIfAbsent(set.exerciseId, () => _ExerciseSummary(name));
-      if (set.setType != SetType.warmup) summary.addSet(set);
+      summary.sets.add(set);
+      if (prExerciseIds.contains(set.exerciseId)) summary.isPr = true;
     }
-    final exercises = byExercise.values.where((e) => e.setCount > 0).toList();
-    final shown = exercises.take(_maxRows).toList();
+    final exercises = byExercise.values.toList();
+    final shown = exercises.take(_maxExercises).toList();
     final overflow = exercises.length - shown.length;
+
+    final local = workout.startedAt.toLocal();
+    final dateLabel = '${_weekdays[local.weekday - 1].substring(0, 3)} ${local.month}/${local.day}';
+    final headline = title?.trim().isNotEmpty == true ? title!.trim() : '${_weekdays[local.weekday - 1]} Workout';
 
     return Container(
       width: 360,
-      height: 460,
       padding: const EdgeInsets.all(28),
       decoration: const BoxDecoration(
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_background, Color(0xFF17191A)]),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('WORKOUT COMPLETE', style: TextStyle(color: _accent, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
-          const SizedBox(height: 10),
+          const Text('WORKOUT COMPLETE', style: TextStyle(color: _accent, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
+          const SizedBox(height: 6),
+          Text(headline, style: const TextStyle(color: _text, fontSize: 24, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          Text(
+            [if (displayName != null && displayName!.trim().isNotEmpty) displayName!.trim(), dateLabel].join(' · '),
+            style: TextStyle(color: _text.withValues(alpha: 0.6), fontSize: 13),
+          ),
+          const SizedBox(height: 18),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -77,19 +110,13 @@ class WorkoutSummaryShareCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Expanded(
-            child: ListView(
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                for (final e in shown) _ExerciseRow(summary: e, unit: unit),
-                if (overflow > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text('+$overflow more', style: TextStyle(color: _text.withValues(alpha: 0.6), fontSize: 13)),
-                  ),
-              ],
+          for (final e in shown) _ExerciseBlock(summary: e, unit: unit),
+          if (overflow > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 4),
+              child: Text('+$overflow more exercise${overflow == 1 ? '' : 's'}', style: TextStyle(color: _text.withValues(alpha: 0.6), fontSize: 13)),
             ),
-          ),
+          const SizedBox(height: 6),
           Row(
             children: [
               const Icon(Icons.fitness_center, color: _accent, size: 16),
@@ -103,36 +130,53 @@ class WorkoutSummaryShareCard extends StatelessWidget {
   }
 }
 
-class _ExerciseRow extends StatelessWidget {
-  const _ExerciseRow({required this.summary, required this.unit});
+class _ExerciseBlock extends StatelessWidget {
+  const _ExerciseBlock({required this.summary, required this.unit});
 
   final _ExerciseSummary summary;
   final WeightUnit unit;
 
   @override
   Widget build(BuildContext context) {
-    final best = summary.best;
-    final bestLabel = best == null ? '' : '${best.reps} × ${unit.fromKg(best.weightKg).toStringAsFixed(0)} ${unit.label}';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              summary.name,
-              style: const TextStyle(color: WorkoutSummaryShareCard._text, fontSize: 15, fontWeight: FontWeight.w600),
-              overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  summary.name,
+                  style: const TextStyle(color: WorkoutSummaryShareCard._text, fontSize: 15, fontWeight: FontWeight.w700),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (summary.isPr) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.emoji_events, color: WorkoutSummaryShareCard._accent, size: 15),
+                const SizedBox(width: 2),
+                const Text('PR', style: TextStyle(color: WorkoutSummaryShareCard._accent, fontSize: 12, fontWeight: FontWeight.w700)),
+              ],
+            ],
+          ),
+          const SizedBox(height: 3),
+          for (var i = 0; i < summary.sets.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    child: Text('${i + 1}', style: TextStyle(color: WorkoutSummaryShareCard._text.withValues(alpha: 0.45), fontSize: 12)),
+                  ),
+                  Text(
+                    '${summary.sets[i].reps} × ${unit.fromKg(summary.sets[i].weightKg).toStringAsFixed(0)} ${unit.label}',
+                    style: TextStyle(color: WorkoutSummaryShareCard._text.withValues(alpha: 0.85), fontSize: 13),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${summary.setCount} set${summary.setCount == 1 ? '' : 's'}',
-            style: TextStyle(color: WorkoutSummaryShareCard._text.withValues(alpha: 0.6), fontSize: 13),
-          ),
-          if (bestLabel.isNotEmpty) ...[
-            const SizedBox(width: 10),
-            Text(bestLabel, style: const TextStyle(color: WorkoutSummaryShareCard._accent, fontSize: 13, fontWeight: FontWeight.w600)),
-          ],
         ],
       ),
     );

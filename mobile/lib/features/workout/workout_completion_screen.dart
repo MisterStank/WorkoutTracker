@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/units/units_provider.dart';
+import '../auth/auth_provider.dart';
+import '../auth/auth_state.dart';
 import '../sharing/pr_share_card.dart';
 import '../sharing/share_preview_sheet.dart';
 import '../sharing/workout_summary_share_card.dart';
+import '../templates/template_provider.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 
@@ -23,6 +26,10 @@ class WorkoutCompletionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(exerciseCatalogProvider).asData?.value ?? const {};
     final unit = ref.watch(weightUnitProvider);
+    final authState = ref.watch(authProvider);
+    final displayName = authState is AuthAuthenticated ? authState.displayName : null;
+    final templates = ref.watch(templateCatalogProvider).asData?.value ?? const {};
+    final workoutTitle = workout.templateId == null ? null : templates[workout.templateId]?.name;
 
     final exerciseNames = {
       for (final set in workout.sets) catalog[set.exerciseId]?.name ?? 'Exercise',
@@ -95,7 +102,14 @@ class WorkoutCompletionScreen extends ConsumerWidget {
               FilledButton.icon(
                 onPressed: () => showSharePreview(
                   context,
-                  card: WorkoutSummaryShareCard(workout: workout, catalog: catalog, unit: unit),
+                  card: WorkoutSummaryShareCard(
+                    workout: workout,
+                    catalog: catalog,
+                    unit: unit,
+                    displayName: displayName,
+                    title: workoutTitle,
+                    newRecords: newRecords,
+                  ),
                   filename: 'workout_${workout.id}',
                 ),
                 icon: const Icon(Icons.ios_share),
