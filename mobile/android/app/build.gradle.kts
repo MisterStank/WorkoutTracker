@@ -36,6 +36,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Enable core library desugaring for flutter_local_notifications
+        multiDexEnabled = true
     }
 
     signingConfigs {
@@ -58,6 +60,11 @@ android {
             }
         }
     }
+
+    compileOptions {
+        // Enable core library desugaring for Java 8+ APIs used by flutter_local_notifications
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 kotlin {
@@ -68,4 +75,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
