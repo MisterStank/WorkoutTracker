@@ -57,7 +57,7 @@ dependencies:
   fl_chart: ^0.69.0
 
   # Native OS share sheet, for sharing a PR/workout-summary image
-  share_plus: ^10.1.4
+  share_plus: ^7.2.1
 
   # Real UUIDs for client-generated IDs (e.g. ad-hoc superset grouping) that
   # get sent to the backend's UUID! GraphQL fields
