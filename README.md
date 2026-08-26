@@ -7,7 +7,7 @@ For what the app does and how to use it, see [docs/USER_GUIDE.md](docs/USER_GUID
 ## Stack
 
 - **Mobile**: Flutter, Riverpod, Drift (offline-first local storage)
-- **Backend**: Go, gqlgen (GraphQL), sqlc, pgx
+- **Backend**: Go, gqlgen (GraphQL), pgx
 - **Database**: Postgres
 - **Cache / pub-sub**: Redis
 - **CI/CD**: GitHub Actions (lint/test) → Render (auto-deploy on push to `main`)
@@ -30,9 +30,16 @@ Runs Postgres, Redis, and the API backend in containers. Mobile runs locally on 
 # 1. Clone and setup
 git clone <repo> && cd WorkoutTracker
 cp .env.example .env
+export $(grep -v '^#' .env | xargs)
 
 # 2. Start database + Redis + API backend (all containerized)
-docker compose up --build
+docker compose up --build -d --wait
+
+# 3. Run migrations
+migrate -database "$DATABASE_URL" -path migrations up
+
+# 4. Seed demo data
+go run ./cmd/seed
 
 # ✓ API is live at http://localhost:8080
 # ✓ GraphQL playground: http://localhost:8080/playground
@@ -65,6 +72,7 @@ For more control and faster iteration when modifying the backend.
 # 1. Clone and setup
 git clone <repo> && cd WorkoutTracker
 cp .env.example .env
+export $(grep -v '^#' .env | xargs)
 
 # 2. Start Postgres + Redis (Docker only, no API)
 docker compose up -d postgres redis
@@ -102,6 +110,7 @@ If you're only working on the API:
 
 ```bash
 cp .env.example .env
+export $(grep -v '^#' .env | xargs)
 docker compose up -d postgres redis
 migrate -database "$DATABASE_URL" -path migrations up
 
@@ -187,13 +196,7 @@ cd mobile && flutter build web
 
 ---
 
-## Build Order & Architecture
-
-The app is built in phases (see [PLAN.md](PLAN.md) for full architecture rationale):
-
-1. **Auth** — signup/login/refresh/logout with JWT + rotating refresh tokens
-2. **Workout tracking** — log workouts, sets, exercises, automatic PR detection
-3. **Analytics** — progress trends, real-time updates with Redis subscriptions
+## Architecture
 
 **Layering convention** (preserved to stay maintainable):
 - `domain/` — entities and repository interfaces (no framework deps)
