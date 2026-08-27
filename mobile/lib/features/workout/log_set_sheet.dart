@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_typography.dart';
 import '../../core/units/weight_unit.dart';
 import '../../core/widgets/semantic_banner.dart';
 import 'exercise_category_icon.dart';
@@ -106,7 +107,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                   const SizedBox(height: 6),
                   Text(
                     'Last time: ${lastSet.reps} × ${_formatWeight(unit.fromKg(lastSet.weightKg))} ${unit.label}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: AppTypography.mono, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
                 if (editing == null && suggestion != null) ...[
@@ -119,6 +120,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                     Expanded(
                       child: TextFormField(
                         controller: repsController,
+                        style: const TextStyle(fontFamily: AppTypography.mono),
                         autofocus: true,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(labelText: 'Reps', prefixIcon: Icon(Icons.repeat)),
@@ -129,6 +131,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                     Expanded(
                       child: TextFormField(
                         controller: weightController,
+                        style: const TextStyle(fontFamily: AppTypography.mono),
                         keyboardType: TextInputType.numberWithOptions(decimal: true, signed: exercise.isBodyweight),
                         decoration: InputDecoration(
                           labelText: exercise.isBodyweight ? 'Added wt (${unit.label})' : 'Weight (${unit.label})',
@@ -154,6 +157,7 @@ Future<LoggedSetInput?> showLogSetSheet(
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: rpeController,
+                  style: const TextStyle(fontFamily: AppTypography.mono),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'RPE (optional)', prefixIcon: Icon(Icons.speed)),
                   validator: validateRpe,

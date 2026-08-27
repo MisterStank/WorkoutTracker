@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_typography.dart';
 import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import '../../core/widgets/semantic_banner.dart';
@@ -463,12 +464,12 @@ class _RecordsTabState extends ConsumerState<_RecordsTab> {
                           child: Row(
                             children: [
                               Expanded(child: Text(recordTypeLabels[r.recordType] ?? r.recordType)),
-                              Text(_formatValue(r, unit), style: const TextStyle(fontWeight: FontWeight.w600)),
+                              Text(_formatValue(r, unit), style: const TextStyle(fontFamily: AppTypography.mono, fontWeight: FontWeight.w600)),
                               if (r.achievedAt != null) ...[
                                 const SizedBox(width: 10),
                                 Text(
                                   '${r.achievedAt!.year}-${r.achievedAt!.month.toString().padLeft(2, '0')}-${r.achievedAt!.day.toString().padLeft(2, '0')}',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: AppTypography.mono, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ],

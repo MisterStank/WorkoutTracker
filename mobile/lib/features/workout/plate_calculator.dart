@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_typography.dart';
 import '../../core/units/weight_unit.dart';
 
 /// Standard plate denominations available at most commercial gyms.
@@ -44,10 +45,11 @@ Future<void> showPlateCalculatorDialog(BuildContext context, {required double ta
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Target: ${targetWeight.toStringAsFixed(1)} ${unit.label}'),
+            Text('Target: ${targetWeight.toStringAsFixed(1)} ${unit.label}', style: const TextStyle(fontFamily: AppTypography.mono)),
             const SizedBox(height: 12),
             TextField(
               controller: barController,
+              style: const TextStyle(fontFamily: AppTypography.mono),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(labelText: 'Bar weight (${unit.label})'),
               onChanged: (_) => setState(() {}),
@@ -65,7 +67,7 @@ Future<void> showPlateCalculatorDialog(BuildContext context, {required double ta
                 spacing: 8,
                 runSpacing: 8,
                 children: plates
-                    .map((p) => Chip(label: Text(p == p.truncate() ? '${p.toInt()}' : '$p')))
+                    .map((p) => Chip(label: Text(p == p.truncate() ? '${p.toInt()}' : '$p', style: const TextStyle(fontFamily: AppTypography.mono))))
                     .toList(),
               ),
             ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_typography.dart';
 import '../../core/units/weight_unit.dart';
 import '../workout/workout_models.dart';
 
@@ -35,21 +36,24 @@ class PrShareCard extends StatelessWidget {
         children: [
           const Icon(Icons.emoji_events, color: _accent, size: 40),
           const SizedBox(height: 12),
-          const Text('NEW PERSONAL RECORD', style: TextStyle(color: _accent, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+          const Text('NEW PERSONAL RECORD',
+              style: TextStyle(fontFamily: AppTypography.display, color: _accent, fontWeight: FontWeight.w700, fontSize: 13, letterSpacing: 1.4)),
           const SizedBox(height: 8),
-          Text(exerciseName, style: const TextStyle(color: _text, fontSize: 24, fontWeight: FontWeight.w700)),
+          Text(exerciseName,
+              style: const TextStyle(fontFamily: AppTypography.display, color: _text, fontSize: 26, fontWeight: FontWeight.w700)),
           const Spacer(),
           Text(
             '${displayValue.toStringAsFixed(displayValue.truncateToDouble() == displayValue ? 0 : 1)} ${unit.label}',
-            style: const TextStyle(color: _text, fontSize: 48, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontFamily: AppTypography.mono, color: _text, fontSize: 46, fontWeight: FontWeight.w600, letterSpacing: -1),
           ),
-          Text(labels, style: TextStyle(color: _text.withValues(alpha: 0.8), fontSize: 14)),
+          Text(labels, style: TextStyle(fontFamily: AppTypography.body, color: _text.withValues(alpha: 0.8), fontSize: 14)),
           const Spacer(),
           Row(
             children: [
               const Icon(Icons.fitness_center, color: _accent, size: 16),
               const SizedBox(width: 6),
-              Text('WorkoutTracker', style: TextStyle(color: _text.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text('WORKOUTTRACKER',
+                  style: TextStyle(fontFamily: AppTypography.display, color: _text.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
             ],
           ),
         ],

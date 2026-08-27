@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_typography.dart';
+
 /// A ticking "N min" / "Just started" label for an in-progress workout —
 /// shared between the active-workout header and AppShell's persistent
 /// resume bar, so both read the same elapsed time.
@@ -35,6 +37,6 @@ class _ElapsedTimeTextState extends State<ElapsedTimeText> {
     final elapsed = DateTime.now().difference(widget.startedAt);
     final minutes = elapsed.inMinutes;
     final text = minutes < 1 ? 'Just started' : '$minutes min';
-    return Text(text, style: widget.style ?? Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600));
+    return Text(text, style: widget.style ?? Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: AppTypography.mono, fontWeight: FontWeight.w600));
   }
 }

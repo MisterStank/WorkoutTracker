@@ -7,6 +7,7 @@ import '../../core/offline/app_database.dart' show offlineQueueSupported;
 import '../../core/offline/sync_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart' show appCardRadius;
+import '../../core/theme/app_typography.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
@@ -300,7 +301,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WorkoutTracker'),
+        title: const Text('WORKOUTTRACKER'),
         actions: [
           TextButton(
             onPressed: () => ref.read(weightUnitProvider.notifier).toggle(),
@@ -530,7 +531,7 @@ class _ActiveWorkoutView extends ConsumerWidget {
                   ElapsedTimeText(startedAt: workout.startedAt),
                 ],
               ),
-              Text('${workout.sets.length} set${workout.sets.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall),
+              Text('${workout.sets.length} set${workout.sets.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: AppTypography.mono)),
             ],
           ),
         ),
@@ -765,7 +766,7 @@ class _RestTimerBanner extends ConsumerWidget {
           const SizedBox(width: 10),
           Text(
             'Rest: ${_format(timer.remaining)}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: semantic.onInfoContainer),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontFamily: AppTypography.mono, fontWeight: FontWeight.w600, color: semantic.onInfoContainer),
           ),
           const Spacer(),
           GestureDetector(
@@ -863,15 +864,15 @@ class _ExerciseGroupCard extends StatelessWidget {
                   children: [
                     SizedBox(
                       width: 28,
-                      child: Text('${set.setNumber}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      child: Text('${set.setNumber}', style: TextStyle(fontFamily: AppTypography.mono, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     ),
-                    Text('${set.reps} reps', style: Theme.of(context).textTheme.bodyMedium),
+                    Text('${set.reps} reps', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontFamily: AppTypography.mono)),
                     const SizedBox(width: 10),
                     Text('×', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 10),
                     Text(
                       '${displayWeight.toStringAsFixed(displayWeight.truncateToDouble() == displayWeight ? 0 : 1)} ${unit.label}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontFamily: AppTypography.mono, fontWeight: FontWeight.w500),
                     ),
                     if (set.setType != SetType.normal) ...[
                       const SizedBox(width: 8),
@@ -894,7 +895,7 @@ class _ExerciseGroupCard extends StatelessWidget {
                     if (set.rpe != null) ...[
                       const SizedBox(width: 10),
                       Chip(
-                        label: Text('RPE ${set.rpe}', style: const TextStyle(fontSize: 11)),
+                        label: Text('RPE ${set.rpe}', style: const TextStyle(fontFamily: AppTypography.mono, fontSize: 11)),
                         visualDensity: VisualDensity.compact,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),

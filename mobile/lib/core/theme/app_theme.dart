@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_typography.dart';
 
 /// A workout is logged one row at a time — buttons and tap targets stay at
 /// this height everywhere instead of each screen picking its own.
@@ -15,16 +16,16 @@ class AppTheme {
   static ThemeData get dark => _build(AppColors.darkScheme, AppSemanticColors.dark);
 
   static ThemeData _build(ColorScheme colorScheme, AppSemanticColors semantic) {
-    final base = ThemeData(colorScheme: colorScheme, useMaterial3: true);
+    final base = ThemeData(
+      colorScheme: colorScheme,
+      useMaterial3: true,
+      fontFamily: AppTypography.body,
+    );
+    final textTheme = AppTypography.textTheme(base.textTheme);
     return base.copyWith(
       scaffoldBackgroundColor: colorScheme.surface,
       extensions: [semantic],
-      textTheme: base.textTheme.copyWith(
-        headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-        titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-        titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-        labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-      ),
+      textTheme: textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
@@ -32,6 +33,8 @@ class AppTheme {
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 1,
+        // The AppBar carries the wordmark — track it slightly open.
+        titleTextStyle: textTheme.titleLarge?.copyWith(letterSpacing: 0.3),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -51,6 +54,7 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
+            fontFamily: AppTypography.body,
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? colorScheme.onSurface : colorScheme.onSurfaceVariant,

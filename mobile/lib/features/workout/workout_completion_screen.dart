@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_typography.dart';
 import '../../core/units/units_provider.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
@@ -140,7 +141,7 @@ class _StatColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+        Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontFamily: AppTypography.mono, fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
         Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ],

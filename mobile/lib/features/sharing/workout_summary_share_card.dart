@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_typography.dart';
 import '../../core/units/weight_unit.dart';
 import '../workout/workout_models.dart';
 
@@ -92,9 +93,12 @@ class WorkoutSummaryShareCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('WORKOUT COMPLETE', style: TextStyle(color: _accent, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
+          const Text('WORKOUT COMPLETE',
+              style: TextStyle(fontFamily: AppTypography.display, color: _accent, fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 1.4)),
           const SizedBox(height: 6),
-          Text(headline, style: const TextStyle(color: _text, fontSize: 24, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(headline,
+              style: const TextStyle(fontFamily: AppTypography.display, color: _text, fontSize: 26, fontWeight: FontWeight.w800),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
           Text(
             [if (displayName != null && displayName!.trim().isNotEmpty) displayName!.trim(), dateLabel].join(' · '),
@@ -121,7 +125,8 @@ class WorkoutSummaryShareCard extends StatelessWidget {
             children: [
               const Icon(Icons.fitness_center, color: _accent, size: 16),
               const SizedBox(width: 6),
-              Text('WorkoutTracker', style: TextStyle(color: _text.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text('WORKOUTTRACKER',
+                  style: TextStyle(fontFamily: AppTypography.display, color: _text.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
             ],
           ),
         ],
@@ -156,7 +161,8 @@ class _ExerciseBlock extends StatelessWidget {
                 const SizedBox(width: 6),
                 const Icon(Icons.emoji_events, color: WorkoutSummaryShareCard._accent, size: 15),
                 const SizedBox(width: 2),
-                const Text('PR', style: TextStyle(color: WorkoutSummaryShareCard._accent, fontSize: 12, fontWeight: FontWeight.w700)),
+                const Text('PR',
+                    style: TextStyle(fontFamily: AppTypography.display, color: WorkoutSummaryShareCard._accent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
               ],
             ],
           ),
@@ -168,11 +174,12 @@ class _ExerciseBlock extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 16,
-                    child: Text('${i + 1}', style: TextStyle(color: WorkoutSummaryShareCard._text.withValues(alpha: 0.45), fontSize: 12)),
+                    child: Text('${i + 1}',
+                        style: TextStyle(fontFamily: AppTypography.mono, color: WorkoutSummaryShareCard._text.withValues(alpha: 0.45), fontSize: 12)),
                   ),
                   Text(
                     '${summary.sets[i].reps} × ${unit.fromKg(summary.sets[i].weightKg).toStringAsFixed(0)} ${unit.label}',
-                    style: TextStyle(color: WorkoutSummaryShareCard._text.withValues(alpha: 0.85), fontSize: 13),
+                    style: TextStyle(fontFamily: AppTypography.mono, color: WorkoutSummaryShareCard._text.withValues(alpha: 0.85), fontSize: 13),
                   ),
                 ],
               ),
@@ -194,8 +201,8 @@ class _Stat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value, style: const TextStyle(color: WorkoutSummaryShareCard._text, fontSize: 22, fontWeight: FontWeight.w800)),
-        Text(label, style: TextStyle(color: WorkoutSummaryShareCard._text.withValues(alpha: 0.7), fontSize: 12)),
+        Text(value, style: const TextStyle(fontFamily: AppTypography.mono, color: WorkoutSummaryShareCard._text, fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
+        Text(label, style: TextStyle(fontFamily: AppTypography.body, color: WorkoutSummaryShareCard._text.withValues(alpha: 0.7), fontSize: 12)),
       ],
     );
   }

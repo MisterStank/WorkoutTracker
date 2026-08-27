@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_typography.dart';
 import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import 'log_set_sheet.dart';
@@ -159,15 +160,15 @@ class _SetRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          SizedBox(width: 24, child: Text('${set.setNumber}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
-          Text('${set.reps} × $weightStr ${unit.label}', style: Theme.of(context).textTheme.bodyMedium),
+          SizedBox(width: 24, child: Text('${set.setNumber}', style: TextStyle(fontFamily: AppTypography.mono, color: Theme.of(context).colorScheme.onSurfaceVariant))),
+          Text('${set.reps} × $weightStr ${unit.label}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontFamily: AppTypography.mono)),
           if (set.setType != SetType.normal) ...[
             const SizedBox(width: 8),
             Text(set.setType.badge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
           ],
           if (set.rpe != null) ...[
             const SizedBox(width: 8),
-            Text('RPE ${set.rpe}', style: Theme.of(context).textTheme.bodySmall),
+            Text('RPE ${set.rpe}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: AppTypography.mono)),
           ],
           const Spacer(),
           IconButton(

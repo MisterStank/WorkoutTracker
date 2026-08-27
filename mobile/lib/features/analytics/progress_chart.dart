@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_typography.dart';
 import 'analytics_models.dart';
 
 /// A line chart over a list of ProgressPoints, plotting whatever
@@ -47,7 +48,7 @@ class ProgressChart extends StatelessWidget {
                       final day = firstDay.add(Duration(days: value.round()));
                       return Padding(
                         padding: const EdgeInsets.only(top: 6),
-                        child: Text('${day.month}/${day.day}', style: const TextStyle(fontSize: 10)),
+                        child: Text('${day.month}/${day.day}', style: const TextStyle(fontFamily: AppTypography.mono, fontSize: 10)),
                       );
                     },
                   ),
@@ -60,7 +61,7 @@ class ProgressChart extends StatelessWidget {
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipColor: (_) => Theme.of(context).colorScheme.inverseSurface,
                   getTooltipItems: (touchedSpots) => touchedSpots
-                      .map((s) => LineTooltipItem(s.y.toStringAsFixed(1), TextStyle(color: Theme.of(context).colorScheme.onInverseSurface)))
+                      .map((s) => LineTooltipItem(s.y.toStringAsFixed(1), TextStyle(fontFamily: AppTypography.mono, color: Theme.of(context).colorScheme.onInverseSurface)))
                       .toList(),
                 ),
               ),
