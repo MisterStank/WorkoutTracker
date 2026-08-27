@@ -18,10 +18,10 @@ Everything the app does, and how to use it. Covers the mobile app end to end, in
 
 ## 1. Getting started
 
-Create an account with your email, a password, and a display name. Once you're in, you stay signed in — the app refreshes your session automatically, so you won't be asked to log in again until you explicitly sign out.
+Create an account with your email, a password (at least 8 characters), and a display name. Once you're in, you stay signed in — the app refreshes your session automatically, so you won't be asked to log in again until you explicitly sign out.
 
 1. Open the app and tap **Sign up** from the login screen.
-2. Enter your email, a password, and the name you want to appear in the app.
+2. Enter your email, a password (8+ characters), and the name you want to appear in the app. Bad values are flagged before the request is sent.
 3. You're dropped straight into the home screen — no separate verification step.
 
 <p>
@@ -31,7 +31,7 @@ Create an account with your email, a password, and a display name. Once you're i
 
 Already have an account? Use **Log in** instead. To sign out at any time, open the **⋮** menu on the Home tab and tap **Log out**.
 
-**First-run tour**: the first time you log in on a device, a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Templates** tab. If you're signing in on a new device and your account already has a fitness profile or a program, the app skips the tour and drops you straight into the home screen. You can replay the tour any time from **View app tour** in the Home tab's **⋮** menu.
+**First-run tour**: the first time you log in on a device, a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Programs** tab. If you're signing in on a new device and your account already has a fitness profile or a program, the app skips the tour entirely and drops you straight into the home screen. You can replay the tour any time from **View app tour** in the Home tab's **⋮** menu.
 
 <p>
   <img src="images/onboarding-slide-1.png" width="180" alt="Tour slide 1: Log workouts fast">
@@ -44,7 +44,7 @@ Already have an account? Use **Log in** instead. To sign out at any time, open t
   <img src="images/onboarding-skip.png" width="200" alt="Home screen right after skipping the tour">
 </p>
 
-The app has four main tabs at the bottom of the screen — **Home**, **History**, **Templates**, and **Progress** — everything below is organized around them.
+The app has four main tabs at the bottom of the screen — **Home**, **History**, **Programs**, and **Progress** — everything below is organized around them. Your saved single-day templates live one level in, behind the checklist icon on the **Programs** tab (see [Chapter 5](#5-templates)).
 
 ## 2. Starting a workout
 
@@ -77,9 +77,9 @@ Tap **Log set** (the floating button on an active workout) and search for an exe
 
 Tapping either opens the set sheet:
 
-1. Enter **reps** and **weight**. If you've done this exercise before, both fields pre-fill with your last set — you'll usually just need to confirm or tweak them.
-2. Optionally log **RPE** (rate of perceived exertion, 1–10) — how hard that set felt. This is what powers the coaching suggestions in [Chapter 9](#9-coaching-signals).
-3. Choose a **set type**, then tap **Log set**.
+1. Enter **reps** (1–100) and **weight** (0–1000 kg / equivalent in lb). If you've done this exercise before, both fields pre-fill with your last set — you'll usually just need to confirm or tweak them.
+2. Optionally log **RPE** (rate of perceived exertion, 1–10 in half-point steps) — how hard that set felt. This is what powers the coaching suggestions in [Chapter 9](#9-coaching-signals).
+3. Choose a **set type**, then tap **Log set**. Values outside the ranges above are rejected with an explanation.
 
 <p>
   <img src="images/log-set-sheet.png" width="220" alt="The set-logging sheet">
@@ -94,11 +94,11 @@ Tapping either opens the set sheet:
 | Drop set | Reduced weight, continued past failure. | Yes |
 | Failure | Taken to muscular failure. | Yes |
 
-Every logged set beyond a warm-up is checked against your history for three kinds of personal record: heaviest weight, best single-set volume (weight × reps), and estimated one-rep max. Beat one and a gold banner appears above your set list naming which record fell — tap the share icon on that banner to post it, see [Chapter 10](#10-sharing-your-stats).
+Every logged set beyond a warm-up is checked against your history for four kinds of personal record: heaviest weight, best single-set volume (weight × reps), estimated one-rep max, and most reps in a set. Beat one and a gold banner appears above your set list naming which record fell — tap the share icon on that banner to post it, see [Chapter 10](#10-sharing-your-stats).
 
 **Custom exercises**: not in the built-in list? Tap **+** in the exercise picker (or, when a search comes up empty, the **Create "…"** button) to add your own — a name, a category, its equipment, and optionally the muscle groups it trains. Custom exercises work everywhere a built-in does, including as candidates when a program is generated. Long-press a custom exercise in the picker to edit or delete it (deletion is blocked while it's used by a logged set or a template).
 
-**Bodyweight exercises**: for anything tagged *bodyweight* (pull-ups, dips, push-ups…), the weight field means *added* load — enter `0` for plain bodyweight, a positive number for weighted, or a negative number for assisted. These track a **most reps** personal record, and the "By exercise" chart defaults to reps for them since the weight stays at zero.
+**Bodyweight exercises**: for anything tagged *bodyweight* (pull-ups, dips, push-ups…), the weight field means *added* load — enter `0` for plain bodyweight, a positive number for weighted, or a negative number for assisted. Since the weight stays at zero, the **most reps** record is what tracks progress here, and the "By exercise" chart defaults to reps for them.
 
 **Plate calculator**: tap the calculator icon in the set sheet to see which plates to load per side of the bar for the weight you've entered — useful mid-set when doing the arithmetic in your head is the last thing you want to do.
 
@@ -120,20 +120,21 @@ Every logged set beyond a warm-up is checked against your history for three kind
 
 A superset links two or more exercises you alternate between with no rest in between. WorkoutTracker supports both ways people actually plan them:
 
-- **Planned, in a template** — when building a template, tap **Group with previous** on an exercise to link it to the one above. Linked exercises show a connecting icon between their chips whenever that template is in use.
+- **Planned, in a template** — when building or editing a template, tap **Group as superset** between an exercise and the one above it to link them. Linked exercises show a connecting icon between their chips whenever that template is in use.
 - **Ad hoc, mid-workout** — tap the link icon in the top bar during an active workout, select two or more exercises, and confirm. Every set you log for those exercises from then on is tagged as part of that group, for that session only.
 
 A linked-set icon appears next to any set that's part of a superset, so you can see the pairing directly in your set list, not just in the planning view.
 
 ## 5. Templates
 
-Open the **Templates** tab to see everything you've saved. From here:
+Templates aren't a bottom-nav tab of their own — open the **checklist icon** in the top bar of the **Programs** tab to reach the template library. From there:
 
 - **Create one** — tap **New template**, name it, and add exercises with a target set count each. Group any of them into supersets as you go.
-- **Generate a program** — tap the sparkle icon to build a whole set of templates automatically instead of one at a time — see [Chapter 6](#6-personalized-programs).
 - **Edit one** — tap a template to open it for editing (rename, add/remove exercises, change target sets, regroup supersets). This works on generated program days too.
-- **Start from one** — tap the **▶** button on a template to launch a workout pre-loaded with its exercise list. (When you reach the Templates list via **Start workout → From a template**, tapping the row starts it directly.)
+- **Start from one** — tap the **▶** button on a template to launch a workout pre-loaded with its exercise list. (When you reach the same list via **Start workout → From a template**, tapping the row starts it directly instead of opening the editor.)
 - **Delete one** — swipe, or use the delete action on a template you no longer use. This doesn't touch any workouts you've already logged from it.
+
+To build a whole program instead of one template at a time, use the sparkle or **+** icons on the **Programs** tab — see [Chapter 6](#6-personalized-programs).
 
 <p>
   <img src="images/templates-saved.png" width="220" alt="Saved templates list">
@@ -148,7 +149,7 @@ Once a template-based workout is running, its planned exercises appear both as a
 
 ## 6. Personalized programs
 
-Don't want to build templates by hand? Tap the sparkle icon on the **Templates** tab to generate a full multi-day training split from a short questionnaire:
+Don't want to build templates by hand? On the **Programs** tab, tap the sparkle icon to generate a full multi-day training split from a short questionnaire (or the **+** icon to assemble a program from templates you've already made):
 
 1. **Goal** — strength, hypertrophy, fat loss, or general fitness. This drives the sets, reps, and exercise selection for every day.
 2. **Experience level** — beginner, intermediate, or advanced.
@@ -160,13 +161,13 @@ Don't want to build templates by hand? Tap the sparkle icon on the **Templates**
   <img src="images/program-generator.png" width="220" alt="The program generator form">
 </p>
 
-Tap **Generate** and the app builds a named, multi-day program — for example a 4-day Upper/Lower split — with each day saved as its own template under **Templates**, ready to start a workout from exactly like any template you built by hand. If your equipment or avoid-list is restrictive enough that a day can't be filled for a particular muscle group, the program still generates with a note explaining what was skipped, rather than failing outright.
+Tap **Generate** and the app builds a named, multi-day program — for example a 4-day Upper/Lower split — with each day also saved as its own template in the library, ready to start a workout from exactly like any template you built by hand. If your equipment or avoid-list is restrictive enough that a movement pattern can't be filled on some day, the program still generates with a note explaining what was skipped, rather than failing outright.
 
 Your answers are remembered — reopening the generator next time pre-fills your last profile, so tweaking and regenerating is quick.
 
 **Week-to-week progression**: a generated program carries a progression rule based on your goal — *linear* (add a little weight each week) for strength, *double progression* (add reps to the top of the range, then weight) for hypertrophy, or *maintain* otherwise. The program review screen shows which one you're on, and Home's **Continue** card shows which week of the program you're in. When you start a workout from a program day, the set sheet pre-fills a suggested weight for each planned exercise from that rule and your training history — including a deload roughly every fourth week.
 
-**Finding a program again**: tap the calendar icon next to the sparkle icon on the **Templates** tab to open **My Programs** — every program you've generated, newest first, each showing its goal, days per week, and how many templates it created. Tap one to reopen the same review screen you saw right after generating it. Individual days always show up as ordinary templates too — My Programs is just the grouped view tying them back together.
+**Finding a program again**: the **Programs** tab itself is the list — every program you've generated or built, newest first, each showing its goal and days per week, with a check mark on the one you're currently following. Tap one to reopen the review screen you saw right after generating it (mark it active, start any day, see its progression rule). Individual days always show up as ordinary templates in the library too — the Programs list is just the grouped view tying them back together.
 
 <p>
   <img src="images/my-programs-list.png" width="220" alt="My Programs list, showing every generated program">
@@ -192,7 +193,7 @@ Open the **Progress** tab. It has four sub-tabs of its own:
   <img src="images/progress-volume-dark.png" width="220" alt="Volume chart, dark theme">
 </p>
 
-Personal records are tracked per exercise across three categories — heaviest weight, best volume, and estimated one-rep max — and surface automatically as the gold banner described in [Chapter 3](#3-logging-a-set), not as a separate screen you have to check.
+Personal records are tracked per exercise across four categories — heaviest weight, best volume, estimated one-rep max, and most reps — and surface automatically as the gold banner described in [Chapter 3](#3-logging-a-set) as you hit them. The **Records** sub-tab is the place to browse all of them after the fact.
 
 Each entry in the **History** tab also shows that session's total volume, so you don't need to open a workout to see roughly how much work it was.
 
@@ -217,6 +218,8 @@ Open the set sheet for an exercise you've logged before with an RPE, and a sugge
 | > 8.5 | Near failure — weight reduced about 5%. |
 
 No RPE logged yet for that exercise? The sheet just pre-fills your last set with no suggestion attached — log an RPE once and suggestions start from the next time.
+
+When the workout was started from a **program day**, the suggestion instead comes from that program's week-to-week progression rule (see [Chapter 6](#6-personalized-programs)) — labelled "Week N · …" — rather than this RPE table.
 
 ### Plateau notices
 
