@@ -5,6 +5,7 @@ import '../../core/widgets/semantic_banner.dart';
 import 'exercise_category_icon.dart';
 import 'exercise_detail_sheet.dart';
 import 'plate_calculator.dart';
+import 'set_input_validation.dart';
 import 'workout_models.dart';
 
 class LoggedSetInput {
@@ -121,25 +122,41 @@ Future<LoggedSetInput?> showLogSetSheet(
                         autofocus: true,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(labelText: 'Reps', prefixIcon: Icon(Icons.repeat)),
-                        validator: (v) => int.tryParse(v ?? '') == null ? 'Whole number' : null,
+                        validator: validateReps,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextFormField(
                         controller: weightController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(labelText: 'Weight (${unit.label})', prefixIcon: const Icon(Icons.scale)),
-                        validator: (v) => double.tryParse(v ?? '') == null ? 'Number' : null,
+                        keyboardType: TextInputType.numberWithOptions(decimal: true, signed: exercise.isBodyweight),
+                        decoration: InputDecoration(
+                          labelText: exercise.isBodyweight ? 'Added wt (${unit.label})' : 'Weight (${unit.label})',
+                          prefixIcon: const Icon(Icons.scale),
+                        ),
+                        validator: (v) => validateWeight(
+                          v,
+                          maxWeightInUnit: unit.fromKg(maxWeightKg),
+                          allowNonPositive: exercise.isBodyweight,
+                        ),
                       ),
                     ),
                   ],
                 ),
+                if (exercise.isBodyweight)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      '0 = bodyweight · negative = assisted',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: rpeController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'RPE (optional)', prefixIcon: Icon(Icons.speed)),
+                  validator: validateRpe,
                 ),
                 const SizedBox(height: 16),
                 Align(

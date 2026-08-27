@@ -1,15 +1,23 @@
 class ProgressPoint {
-  const ProgressPoint({required this.day, required this.totalVolume, required this.maxWeight, required this.setCount});
+  const ProgressPoint({
+    required this.day,
+    required this.totalVolume,
+    required this.maxWeight,
+    this.maxReps = 0,
+    required this.setCount,
+  });
 
   final DateTime day;
   final double totalVolume;
   final double maxWeight;
+  final int maxReps;
   final int setCount;
 
   factory ProgressPoint.fromJson(Map<String, dynamic> json) => ProgressPoint(
         day: DateTime.parse(json['day'] as String),
         totalVolume: (json['totalVolume'] as num).toDouble(),
         maxWeight: (json['maxWeight'] as num).toDouble(),
+        maxReps: json['maxReps'] as int? ?? 0,
         setCount: json['setCount'] as int,
       );
 }

@@ -10,6 +10,7 @@ import 'features/auth/auth_state.dart';
 import 'features/auth/login_screen.dart';
 import 'features/onboarding/onboarding_prefs.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/onboarding/onboarding_status.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,8 +54,24 @@ class AuthGate extends ConsumerWidget {
     }
 
     if (authState is AuthAuthenticated) {
-      final onboardingComplete = ref.watch(onboardingCompleteProvider);
-      return onboardingComplete ? const AppShell() : const OnboardingScreen();
+      if (ref.watch(onboardingCompleteProvider)) return const AppShell();
+
+      // Device hasn't seen onboarding — but the account might already be set
+      // up (returning user on a new device). Check server state before
+      // deciding whether to run the tour.
+      return ref.watch(onboardingDecisionProvider).when(
+            loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+            error: (_, _) => const OnboardingScreen(showPersonalization: true),
+            data: (decision) {
+              if (decision.isReturningUser) {
+                // Defer the state write so we don't mutate a provider while
+                // this widget is still building.
+                Future.microtask(() => markOnboardingComplete(ref));
+                return const AppShell();
+              }
+              return OnboardingScreen(showPersonalization: decision.showPersonalization);
+            },
+          );
     }
 
     return const LoginScreen();

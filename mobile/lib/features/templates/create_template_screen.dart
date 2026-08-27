@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../workout/exercise_picker_screen.dart';
 import '../workout/workout_models.dart';
+import '../workout/workout_provider.dart';
 import 'template_models.dart';
 import 'template_provider.dart';
 
 class CreateTemplateScreen extends ConsumerStatefulWidget {
-  const CreateTemplateScreen({super.key});
+  const CreateTemplateScreen({super.key, this.initial});
+
+  /// When set, the screen edits this template instead of creating one.
+  final WorkoutTemplate? initial;
 
   @override
   ConsumerState<CreateTemplateScreen> createState() => _CreateTemplateScreenState();
@@ -17,6 +21,27 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
   final _nameController = TextEditingController();
   final List<TemplateExerciseDraft> _exercises = [];
   bool _saving = false;
+
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _nameController.text = initial.name;
+      final catalog = ref.read(exerciseCatalogProvider).asData?.value ?? const {};
+      for (final te in initial.exercises) {
+        _exercises.add(TemplateExerciseDraft(
+          exerciseId: te.exerciseId,
+          exerciseName: catalog[te.exerciseId]?.name ?? 'Exercise',
+          targetSets: te.targetSets,
+          targetReps: te.targetReps,
+          supersetGroup: te.supersetGroup,
+        ));
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -91,7 +116,13 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
     if (name.isEmpty || _exercises.isEmpty) return;
     setState(() => _saving = true);
     try {
-      await ref.read(templateRepositoryProvider).create(name: name, exercises: _exercises);
+      final repo = ref.read(templateRepositoryProvider);
+      if (_isEditing) {
+        await repo.update(templateId: widget.initial!.id, name: name, exercises: _exercises);
+      } else {
+        await repo.create(name: name, exercises: _exercises);
+      }
+      ref.invalidate(templateCatalogProvider);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       setState(() => _saving = false);
@@ -106,7 +137,7 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
     final canSave = _nameController.text.trim().isNotEmpty && _exercises.isNotEmpty && !_saving;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New template')),
+      appBar: AppBar(title: Text(_isEditing ? 'Edit template' : 'New template')),
       body: Column(
         children: [
           Padding(
@@ -201,7 +232,7 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2.5, color: Theme.of(context).colorScheme.onPrimary),
                         )
-                      : const Text('Save template'),
+                      : Text(_isEditing ? 'Save changes' : 'Save template'),
                 ),
               ],
             ),

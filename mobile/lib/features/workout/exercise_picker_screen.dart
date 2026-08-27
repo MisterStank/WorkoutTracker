@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'create_exercise_screen.dart';
 import 'exercise_category_icon.dart';
 import 'exercise_detail_sheet.dart';
 import 'workout_models.dart';
@@ -70,6 +71,44 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
     Navigator.of(context).pop(exercise);
   }
 
+  Future<void> _openEditor({Exercise? initial, String? initialName}) async {
+    final saved = await Navigator.of(context).push<Exercise>(
+      MaterialPageRoute(builder: (_) => CreateExerciseScreen(initial: initial, initialName: initialName)),
+    );
+    if (saved != null && mounted) {
+      _searchController.text = saved.name;
+      await _search(saved.name);
+    }
+  }
+
+  Future<void> _manageCustom(Exercise exercise) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Edit exercise'), onTap: () => Navigator.pop(context, 'edit')),
+            ListTile(leading: const Icon(Icons.delete_outline), title: const Text('Delete exercise'), onTap: () => Navigator.pop(context, 'delete')),
+          ],
+        ),
+      ),
+    );
+    if (action == 'edit') {
+      await _openEditor(initial: exercise);
+    } else if (action == 'delete' && mounted) {
+      try {
+        await ref.read(workoutRepositoryProvider).deleteExercise(exercise.id);
+        ref.invalidate(exerciseCatalogProvider);
+        await _search(_searchController.text);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'.replaceFirst('Exception: ', ''))));
+        }
+      }
+    }
+  }
+
   void _confirmMultiSelect() {
     if (_selected.length < 2) return;
     for (final e in _selected.values) {
@@ -112,13 +151,35 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
                   child: Text('Done (${_selected.length})'),
                 ),
               ]
-            : null,
+            : [
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'New exercise',
+                  onPressed: () => _openEditor(),
+                ),
+              ],
       ),
       body: Builder(builder: (context) {
         if (_loading) return const Center(child: CircularProgressIndicator());
         if (_error != null) return Center(child: Text('Error: $_error'));
         if (_exercises.isEmpty) {
-          return const Center(child: Text('No exercises found'));
+          final query = _searchController.text.trim();
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('No exercises found'),
+                if (query.isNotEmpty && !widget.multiSelect) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () => _openEditor(initialName: query),
+                    icon: const Icon(Icons.add),
+                    label: Text('Create "$query"'),
+                  ),
+                ],
+              ],
+            ),
+          );
         }
 
         return ListView(
@@ -136,6 +197,7 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
             ..._exercises.map((e) => _ExerciseTile(
                   exercise: e,
                   onTap: () => _select(e),
+                  onLongPress: e.isCustom && !widget.multiSelect ? () => _manageCustom(e) : null,
                   selected: widget.multiSelect ? _selected.containsKey(e.id) : null,
                 )),
           ],
@@ -167,10 +229,11 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _ExerciseTile extends StatelessWidget {
-  const _ExerciseTile({required this.exercise, required this.onTap, this.selected});
+  const _ExerciseTile({required this.exercise, required this.onTap, this.onLongPress, this.selected});
 
   final Exercise exercise;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   // Null when not in multi-select mode (plain chevron row).
   final bool? selected;
 
@@ -182,7 +245,8 @@ class _ExerciseTile extends StatelessWidget {
         child: ExerciseCategoryIcon(category: exercise.category),
       ),
       title: Text(exercise.name),
-      subtitle: Text(exercise.category),
+      subtitle: Text(exercise.isCustom ? '${exercise.category} · custom (long-press to edit)' : exercise.category),
+      onLongPress: onLongPress,
       trailing: selected == null
           ? const Icon(Icons.chevron_right)
           : Icon(

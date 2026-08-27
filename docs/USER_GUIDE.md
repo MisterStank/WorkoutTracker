@@ -31,7 +31,7 @@ Create an account with your email, a password, and a display name. Once you're i
 
 Already have an account? Use **Log in** instead. To sign out at any time, open the **⋮** menu on the Home tab and tap **Log out**.
 
-**First-run tour**: the first time you log in on a device, a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Templates** tab.
+**First-run tour**: the first time you log in on a device, a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Templates** tab. If you're signing in on a new device and your account already has a fitness profile or a program, the app skips the tour and drops you straight into the home screen. You can replay the tour any time from **View app tour** in the Home tab's **⋮** menu.
 
 <p>
   <img src="images/onboarding-slide-1.png" width="180" alt="Tour slide 1: Log workouts fast">
@@ -57,7 +57,7 @@ From the **Home** tab, tap **Start workout**. You'll be asked to choose:
   <img src="images/start-workout-sheet.png" width="220" alt="Choosing how to start a workout">
 </p>
 
-Once a workout is running, the top bar shows a live elapsed-time clock and your set count for the session. Only one workout can be active at a time — finishing or starting a new one closes out the last.
+Once a workout is running, the top bar shows a live elapsed-time clock and your set count for the session. Only one workout can be active at a time — if you already have one running, tapping **Start workout** just takes you back to it rather than starting a fresh one.
 
 **Jumping back in**: if you switch to another tab mid-workout, a slim bar appears above the bottom navigation showing your elapsed time and set count. Tap it from anywhere in the app to return straight to your active workout.
 
@@ -65,7 +65,7 @@ Once a workout is running, the top bar shows a live elapsed-time clock and your 
   <img src="images/resume-bar.png" width="220" alt="Resume-workout bar visible on a non-Home tab">
 </p>
 
-**Finishing up**: tap **Finish workout** at the bottom of the screen. You can add optional notes about how the session went before confirming — these are saved with the workout and visible later in your history.
+**Finishing up**: tap **Finish workout** at the bottom of the screen. You can add optional notes about how the session went before confirming — these are saved with the workout and visible later in your history. The same dialog has a **Discard** action if you want to throw the session away instead; and if you tap Finish without having logged any sets, the app offers to discard the empty session rather than clutter your history with it.
 
 ## 3. Logging a set
 
@@ -96,6 +96,10 @@ Tapping either opens the set sheet:
 
 Every logged set beyond a warm-up is checked against your history for three kinds of personal record: heaviest weight, best single-set volume (weight × reps), and estimated one-rep max. Beat one and a gold banner appears above your set list naming which record fell — tap the share icon on that banner to post it, see [Chapter 10](#10-sharing-your-stats).
 
+**Custom exercises**: not in the built-in list? Tap **+** in the exercise picker (or, when a search comes up empty, the **Create "…"** button) to add your own — a name, a category, its equipment, and optionally the muscle groups it trains. Custom exercises work everywhere a built-in does, including as candidates when a program is generated. Long-press a custom exercise in the picker to edit or delete it (deletion is blocked while it's used by a logged set or a template).
+
+**Bodyweight exercises**: for anything tagged *bodyweight* (pull-ups, dips, push-ups…), the weight field means *added* load — enter `0` for plain bodyweight, a positive number for weighted, or a negative number for assisted. These track a **most reps** personal record, and the "By exercise" chart defaults to reps for them since the weight stays at zero.
+
 **Plate calculator**: tap the calculator icon in the set sheet to see which plates to load per side of the bar for the weight you've entered — useful mid-set when doing the arithmetic in your head is the last thing you want to do.
 
 **Repeat last set**: each exercise card in an active workout has a **Repeat last** button — logs another set identical to the one before it (same reps, weight, RPE, and set type) in a single tap, for straight sets across working sets.
@@ -110,7 +114,7 @@ Every logged set beyond a warm-up is checked against your history for three kind
   <img src="images/edit-delete-set.png" width="220" alt="Edit or delete a logged set">
 </p>
 
-**Rest timer**: logging a set starts a rest timer automatically, shown as a countdown ring above your exercise list. Add fifteen seconds with the **+** button, or tap **Skip** to end the rest early.
+**Rest timer**: logging a set starts a rest timer automatically, shown as a countdown ring above your exercise list. Add fifteen seconds with the **+** button, or tap **Skip** to end the rest early. When it reaches zero it fires a notification (with sound and vibration) so you don't have to keep the screen open. Long-press the **+** button to change the default rest length.
 
 ## 4. Supersets
 
@@ -127,8 +131,9 @@ Open the **Templates** tab to see everything you've saved. From here:
 
 - **Create one** — tap **New template**, name it, and add exercises with a target set count each. Group any of them into supersets as you go.
 - **Generate a program** — tap the sparkle icon to build a whole set of templates automatically instead of one at a time — see [Chapter 6](#6-personalized-programs).
-- **Start from one** — tap a template to launch a workout pre-loaded with its exercise list.
-- **Delete one** — swipe or use the delete action on a template you no longer use. This doesn't touch any workouts you've already logged from it.
+- **Edit one** — tap a template to open it for editing (rename, add/remove exercises, change target sets, regroup supersets). This works on generated program days too.
+- **Start from one** — tap the **▶** button on a template to launch a workout pre-loaded with its exercise list. (When you reach the Templates list via **Start workout → From a template**, tapping the row starts it directly.)
+- **Delete one** — swipe, or use the delete action on a template you no longer use. This doesn't touch any workouts you've already logged from it.
 
 <p>
   <img src="images/templates-saved.png" width="220" alt="Saved templates list">
@@ -147,7 +152,7 @@ Don't want to build templates by hand? Tap the sparkle icon on the **Templates**
 
 1. **Goal** — strength, hypertrophy, fat loss, or general fitness. This drives the sets, reps, and exercise selection for every day.
 2. **Experience level** — beginner, intermediate, or advanced.
-3. **Days per week** — how many days you can train, from 1 to 6. This decides the split itself: fewer days lean toward full-body sessions, more days split into upper/lower or push/pull/legs.
+3. **Days per week** — how many days you can train, from 1 to 7. This decides the split itself: 1–3 days is full-body, 4 is upper/lower, 5–7 is a push/pull/legs rotation. Every lower-body or full-body day is built around both a squat (knee-dominant) and a hinge (hip-dominant) movement so hamstrings and glutes aren't skipped; push days pair a horizontal and a vertical press, pull days a horizontal and a vertical pull.
 4. **Equipment access** — barbell, dumbbell, bodyweight, cable, machine, or any combination. Only exercises you can actually perform are selected.
 5. **Areas to avoid** — any muscle groups to leave out entirely, for working around an injury or a personal preference.
 
@@ -158,6 +163,8 @@ Don't want to build templates by hand? Tap the sparkle icon on the **Templates**
 Tap **Generate** and the app builds a named, multi-day program — for example a 4-day Upper/Lower split — with each day saved as its own template under **Templates**, ready to start a workout from exactly like any template you built by hand. If your equipment or avoid-list is restrictive enough that a day can't be filled for a particular muscle group, the program still generates with a note explaining what was skipped, rather than failing outright.
 
 Your answers are remembered — reopening the generator next time pre-fills your last profile, so tweaking and regenerating is quick.
+
+**Week-to-week progression**: a generated program carries a progression rule based on your goal — *linear* (add a little weight each week) for strength, *double progression* (add reps to the top of the range, then weight) for hypertrophy, or *maintain* otherwise. The program review screen shows which one you're on, and Home's **Continue** card shows which week of the program you're in. When you start a workout from a program day, the set sheet pre-fills a suggested weight for each planned exercise from that rule and your training history — including a deload roughly every fourth week.
 
 **Finding a program again**: tap the calendar icon next to the sparkle icon on the **Templates** tab to open **My Programs** — every program you've generated, newest first, each showing its goal, days per week, and how many templates it created. Tap one to reopen the same review screen you saw right after generating it. Individual days always show up as ordinary templates too — My Programs is just the grouped view tying them back together.
 
@@ -173,11 +180,12 @@ If a set fails to save because you've got no connection, it isn't lost — it's 
 
 ## 8. Progress & records
 
-Open the **Progress** tab. It has three sub-tabs of its own:
+Open the **Progress** tab. It has four sub-tabs of its own:
 
 - **Volume** — total weight moved per day across all exercises, over the last 90 days — the highest-level view of whether you're training more or less than you used to.
-- **By exercise** — pick any exercise to chart your heaviest set over time. If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 9](#9-coaching-signals).
-- **Measurements** — track body weight and five circumference measurements — waist, chest, arms, thighs, hips — each on its own chart. Choose a measurement from the dropdown, tap **Log**, and enter today's reading.
+- **By exercise** — pick any exercise and chart it by **Weight**, **Reps**, or **Volume** over time (bodyweight exercises default to Reps). If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 9](#9-coaching-signals).
+- **Records** — every all-time personal record you hold, grouped by exercise with the date it was set — so a PR that scrolled past the in-workout banner isn't lost.
+- **Measurements** — track body weight and five circumference measurements — waist, chest, arms, thighs, hips — each on its own chart. Choose a measurement from the dropdown, tap **Log**, and enter today's reading. Circumferences can be entered and shown in **cm** or **in** (toggle beside the Log button); body weight follows your app-wide KG/LB setting.
 
 <p>
   <img src="images/progress-volume-light.png" width="220" alt="Volume chart, light theme">
@@ -191,6 +199,8 @@ Each entry in the **History** tab also shows that session's total volume, so you
 <p>
   <img src="images/workout-history.png" width="220" alt="Workout history list">
 </p>
+
+**Fixing a past workout**: tap a card in the **History** tab to open the session and correct a mis-logged set — edit or delete any set the same way you would during the workout. You're warned once that this recalculates your personal records for that exercise.
 
 **Deleting a workout**: swipe a card left in the **History** tab and confirm to remove the entire session, including its sets. This can't be undone.
 

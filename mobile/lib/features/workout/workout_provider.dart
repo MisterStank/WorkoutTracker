@@ -250,6 +250,23 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
     }
   }
 
+  /// Abandons the active workout entirely — deletes it and its sets on the
+  /// server. Used when a session was started by mistake or has nothing worth
+  /// keeping.
+  Future<void> discard() async {
+    final current = state;
+    if (current is! ActiveWorkoutInProgress) return;
+    try {
+      await _repository.deleteWorkout(current.workout.id);
+    } catch (_) {
+      // Best effort — even if the delete fails, drop it from local state so
+      // the user isn't stuck; a stray empty workout is harmless.
+    }
+    _sessionRecords = [];
+    _stopWatching();
+    state = const ActiveWorkoutNone();
+  }
+
   /// Corrects a mis-logged set's reps/weight/RPE/type. Updates local state
   /// from the server's response rather than optimistically, since the
   /// server also recomputes personal records/rollups that the client has

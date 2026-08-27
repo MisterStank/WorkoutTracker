@@ -1,16 +1,34 @@
 class Exercise {
-  const Exercise({required this.id, required this.name, required this.category, this.instructions = ''});
+  const Exercise({
+    required this.id,
+    required this.name,
+    required this.category,
+    this.muscleGroups = const [],
+    this.equipment = '',
+    this.isCustom = false,
+    this.instructions = '',
+  });
 
   final String id;
   final String name;
   final String category;
+  final List<String> muscleGroups;
+  final String equipment;
+  final bool isCustom;
   // Short hand-written form cue; empty for user-created custom exercises.
   final String instructions;
+
+  /// Bodyweight exercises log *added* load — the weight field may be 0 or
+  /// negative (assisted).
+  bool get isBodyweight => equipment == 'bodyweight';
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
         id: json['id'] as String,
         name: json['name'] as String,
         category: json['category'] as String,
+        muscleGroups: (json['muscleGroups'] as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
+        equipment: json['equipment'] as String? ?? '',
+        isCustom: json['isCustom'] as bool? ?? false,
         instructions: json['instructions'] as String? ?? '',
       );
 }
@@ -155,19 +173,22 @@ const recordTypeLabels = {
   'max_weight': 'heaviest weight',
   'max_volume': 'best volume',
   'estimated_1rm': 'estimated 1RM',
+  'max_reps': 'most reps',
 };
 
 class PersonalRecord {
-  const PersonalRecord({required this.exerciseId, required this.recordType, required this.value});
+  const PersonalRecord({required this.exerciseId, required this.recordType, required this.value, this.achievedAt});
 
   final String exerciseId;
   final String recordType;
   final double value;
+  final DateTime? achievedAt;
 
   factory PersonalRecord.fromJson(Map<String, dynamic> json) => PersonalRecord(
         exerciseId: json['exerciseId'] as String,
         recordType: json['recordType'] as String,
         value: (json['value'] as num).toDouble(),
+        achievedAt: json['achievedAt'] == null ? null : DateTime.parse(json['achievedAt'] as String),
       );
 }
 

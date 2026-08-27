@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import 'auth_scaffold.dart';
 import 'auth_state.dart';
+import 'auth_validation.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -16,6 +17,22 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  String? _clientError;
+
+  void _submit() {
+    final error = validateSignup(
+      email: _emailController.text,
+      password: _passwordController.text,
+      displayName: _displayNameController.text,
+    );
+    setState(() => _clientError = error);
+    if (error != null) return;
+    ref.read(authProvider.notifier).signup(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          displayName: _displayNameController.text.trim(),
+        );
+  }
 
   @override
   void dispose() {
@@ -64,7 +81,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
           ),
           const SizedBox(height: 24),
-          if (authState is AuthError)
+          if (_clientError != null || authState is AuthError)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -72,19 +89,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   Icon(Icons.error_outline, size: 18, color: Theme.of(context).colorScheme.error),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(authState.message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    child: Text(
+                      _clientError ?? (authState as AuthError).message,
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
                   ),
                 ],
               ),
             ),
           FilledButton(
-            onPressed: isLoading
-                ? null
-                : () => ref.read(authProvider.notifier).signup(
-                      email: _emailController.text.trim(),
-                      password: _passwordController.text,
-                      displayName: _displayNameController.text.trim(),
-                    ),
+            onPressed: isLoading ? null : _submit,
             child: isLoading ? const AuthButtonSpinner() : const Text('Sign up'),
           ),
           const SizedBox(height: 8),

@@ -20,10 +20,16 @@ func NewProgressRollupRepository(db *pgxpool.Pool) *ProgressRollupRepository {
 
 func (r *ProgressRollupRepository) RangeForExercise(ctx context.Context, userID, exerciseID uuid.UUID, since time.Time) ([]*domain.ProgressPoint, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT day, total_volume, max_weight, set_count
-		 FROM progress_daily_rollup
-		 WHERE user_id = $1 AND exercise_id = $2 AND day >= $3
-		 ORDER BY day`,
+		`SELECT r.day, r.total_volume, r.max_weight,
+		        COALESCE((SELECT MAX(ws.reps) FROM workout_sets ws
+		                  JOIN workouts w ON w.id = ws.workout_id
+		                  WHERE w.user_id = r.user_id AND ws.exercise_id = r.exercise_id
+		                    AND ws.set_type != 'warmup'
+		                    AND date_trunc('day', ws.performed_at) = r.day), 0) AS max_reps,
+		        r.set_count
+		 FROM progress_daily_rollup r
+		 WHERE r.user_id = $1 AND r.exercise_id = $2 AND r.day >= $3
+		 ORDER BY r.day`,
 		userID, exerciseID, since,
 	)
 	if err != nil {
@@ -72,7 +78,7 @@ func (r *ProgressRollupRepository) RecomputeDay(ctx context.Context, userID, exe
 
 func (r *ProgressRollupRepository) RangeForUser(ctx context.Context, userID uuid.UUID, since time.Time) ([]*domain.ProgressPoint, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT day, SUM(total_volume), MAX(max_weight), SUM(set_count)
+		`SELECT day, SUM(total_volume), MAX(max_weight), 0, SUM(set_count)
 		 FROM progress_daily_rollup
 		 WHERE user_id = $1 AND day >= $2
 		 GROUP BY day
@@ -94,11 +100,9 @@ func scanProgressPoints(rows interface {
 	var points []*domain.ProgressPoint
 	for rows.Next() {
 		var p domain.ProgressPoint
-		var setCount int
-		if err := rows.Scan(&p.Day, &p.TotalVolume, &p.MaxWeight, &setCount); err != nil {
+		if err := rows.Scan(&p.Day, &p.TotalVolume, &p.MaxWeight, &p.MaxReps, &p.SetCount); err != nil {
 			return nil, err
 		}
-		p.SetCount = setCount
 		points = append(points, &p)
 	}
 	return points, rows.Err()

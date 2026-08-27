@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,8 +12,10 @@ import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import '../../core/widgets/semantic_banner.dart';
 import '../auth/auth_provider.dart';
+import '../onboarding/onboarding_screen.dart';
 import '../programs/fitness_profile_models.dart';
 import '../programs/fitness_profile_provider.dart';
+import '../programs/program_targets_provider.dart';
 import '../sharing/pr_share_card.dart';
 import '../sharing/share_preview_sheet.dart';
 import '../templates/template_models.dart';
@@ -27,7 +31,7 @@ import 'workout_models.dart';
 import 'workout_provider.dart';
 import 'workout_state.dart';
 
-enum _OverflowAction { themeSystem, themeLight, themeDark, logout }
+enum _OverflowAction { themeSystem, themeLight, themeDark, viewTour, logout }
 enum _SetAction { edit, delete }
 
 class WorkoutHomeScreen extends ConsumerWidget {
@@ -69,6 +73,17 @@ class WorkoutHomeScreen extends ConsumerWidget {
     } catch (_) {
       suggestion = null;
     }
+
+    // A workout started from a program day carries per-exercise weekly
+    // targets — prefer those over the generic RPE autoregulation.
+    final target = ref.read(activeProgramTargetsProvider)[exercise.id];
+    if (target != null && target.suggestedWeightKg > 0) {
+      suggestion = ProgressionSuggestion(
+        suggestedWeightKg: target.suggestedWeightKg,
+        suggestedReps: target.targetReps ?? lastSet?.reps ?? 8,
+        reasoning: 'Week ${target.weekNumber} · ${target.reasoning}',
+      );
+    }
     if (!context.mounted) return;
 
     final input = await showLogSetSheet(context, exercise, lastSet: lastSet, unit: unit, suggestion: suggestion);
@@ -100,11 +115,14 @@ class WorkoutHomeScreen extends ConsumerWidget {
   }
 
   static Future<void> _deleteSet(BuildContext context, WidgetRef ref, WorkoutSet set) async {
+    final unit = ref.read(weightUnitProvider);
+    final displayWeight = unit.fromKg(set.weightKg);
+    final weightStr = displayWeight.toStringAsFixed(displayWeight.truncateToDouble() == displayWeight ? 0 : 1);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete set?'),
-        content: Text('This removes set ${set.setNumber} — ${set.reps} reps × ${set.weightKg.toStringAsFixed(set.weightKg.truncateToDouble() == set.weightKg ? 0 : 1)} kg.'),
+        content: Text('This removes set ${set.setNumber} — ${set.reps} reps × $weightStr ${unit.label}.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
           FilledButton(
@@ -145,10 +163,11 @@ class WorkoutHomeScreen extends ConsumerWidget {
     );
     if (choice == 'blank') {
       ref.read(activeSupersetsProvider.notifier).reset();
+      ref.read(activeProgramTargetsProvider.notifier).clear();
       await ref.read(activeWorkoutProvider.notifier).start();
     } else if (choice == 'template') {
       if (context.mounted) {
-        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen()));
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen(startOnTap: true)));
       }
     }
   }
@@ -156,9 +175,56 @@ class WorkoutHomeScreen extends ConsumerWidget {
   static Future<void> _startFromTemplate(BuildContext context, WidgetRef ref, String templateId) async {
     ref.read(activeSupersetsProvider.notifier).reset();
     await ref.read(activeWorkoutProvider.notifier).start(templateId: templateId);
+    unawaited(ref.read(activeProgramTargetsProvider.notifier).loadForTemplate(templateId));
+  }
+
+  Future<void> _discard(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard workout?'),
+        content: const Text('This deletes the session and any sets logged in it. This can\'t be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(activeWorkoutProvider.notifier).discard();
+    ref.read(activeSupersetsProvider.notifier).reset();
+    ref.read(activeProgramTargetsProvider.notifier).clear();
   }
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
+    final state = ref.read(activeWorkoutProvider);
+    final isEmpty = state is ActiveWorkoutInProgress && state.workout.sets.isEmpty;
+    if (isEmpty) {
+      // Nothing to finish — offer to discard instead of saving a blank
+      // session that would only clutter History.
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Nothing logged yet'),
+          content: const Text('You haven\'t logged any sets. Discard this session?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Keep going')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Discard')),
+          ],
+        ),
+      );
+      if (discard == true) {
+        await ref.read(activeWorkoutProvider.notifier).discard();
+        ref.read(activeSupersetsProvider.notifier).reset();
+        ref.read(activeProgramTargetsProvider.notifier).clear();
+      }
+      return;
+    }
+
     final notes = await showDialog<String>(
       context: context,
       builder: (context) {
@@ -172,6 +238,14 @@ class WorkoutHomeScreen extends ConsumerWidget {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _discard(context, ref);
+              },
+              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+              child: const Text('Discard'),
+            ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(controller.text),
               child: const Text('Finish'),
@@ -184,6 +258,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
 
     final result = await ref.read(activeWorkoutProvider.notifier).finish(notes: notes.isEmpty ? null : notes);
     ref.read(activeSupersetsProvider.notifier).reset();
+    ref.read(activeProgramTargetsProvider.notifier).clear();
 
     if (result == null || result.workout.sets.isEmpty || !context.mounted) return;
     await Navigator.of(context).push(
@@ -199,6 +274,13 @@ class WorkoutHomeScreen extends ConsumerWidget {
         ref.read(themeModeProvider.notifier).setMode(ThemeMode.light);
       case _OverflowAction.themeDark:
         ref.read(themeModeProvider.notifier).setMode(ThemeMode.dark);
+      case _OverflowAction.viewTour:
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (ctx) => OnboardingScreen(
+            showPersonalization: false,
+            onDone: () => Navigator.of(ctx).pop(),
+          ),
+        ));
       case _OverflowAction.logout:
         ref.read(authProvider.notifier).logout();
     }
@@ -243,6 +325,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
               const PopupMenuItem(value: _OverflowAction.themeLight, child: Text('Light')),
               const PopupMenuItem(value: _OverflowAction.themeDark, child: Text('Dark')),
               const PopupMenuDivider(),
+              const PopupMenuItem(value: _OverflowAction.viewTour, child: Text('View app tour')),
               const PopupMenuItem(value: _OverflowAction.logout, child: Text('Log out')),
             ],
           ),
@@ -369,7 +452,7 @@ class _ContinueProgramCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                next.program.name,
+                '${next.program.name} · Week ${next.weekNumber}',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)),
               ),
               const SizedBox(height: 2),
@@ -622,6 +705,29 @@ class _NewRecordBanner extends StatelessWidget {
   }
 }
 
+Future<void> _editRestDefault(BuildContext context, WidgetRef ref) async {
+  final current = ref.read(restTimerProvider.notifier).defaultDuration.inSeconds;
+  final picked = await showDialog<int>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: const Text('Default rest time'),
+      children: [60, 90, 120, 180, 240, 300]
+          .map((s) => ListTile(
+                leading: Icon(s == current ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                title: Text(s < 60 ? '${s}s' : '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}'),
+                onTap: () => Navigator.of(context).pop(s),
+              ))
+          .toList(),
+    ),
+  );
+  if (picked != null) {
+    await ref.read(restTimerProvider.notifier).setDefault(Duration(seconds: picked));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Rest timer default set to ${picked}s')));
+    }
+  }
+}
+
 class _RestTimerBanner extends ConsumerWidget {
   const _RestTimerBanner();
 
@@ -662,11 +768,14 @@ class _RestTimerBanner extends ConsumerWidget {
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: semantic.onInfoContainer),
           ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.add, size: 18),
-            tooltip: '+15s',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => ref.read(restTimerProvider.notifier).addSeconds(15),
+          GestureDetector(
+            onLongPress: () => _editRestDefault(context, ref),
+            child: IconButton(
+              icon: const Icon(Icons.add, size: 18),
+              tooltip: '+15s (long-press to set default)',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => ref.read(restTimerProvider.notifier).addSeconds(15),
+            ),
           ),
           TextButton(
             onPressed: () => ref.read(restTimerProvider.notifier).skip(),

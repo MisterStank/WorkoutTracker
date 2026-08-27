@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +7,7 @@ import '../workout/superset_provider.dart';
 import '../workout/workout_provider.dart';
 import 'fitness_profile_models.dart';
 import 'fitness_profile_provider.dart';
+import 'program_targets_provider.dart';
 
 /// A program's detail/action screen — reached by tapping it on the Programs
 /// tab. Answers "now what": mark it as the one you're following (drives
@@ -46,6 +49,7 @@ class _ProgramReviewScreenState extends ConsumerState<ProgramReviewScreen> {
   Future<void> _startDay(ProgramDay day) async {
     ref.read(activeSupersetsProvider.notifier).reset();
     await ref.read(activeWorkoutProvider.notifier).start(templateId: day.template.id);
+    unawaited(ref.read(activeProgramTargetsProvider.notifier).loadForTemplate(day.template.id));
     if (!mounted) return;
     // Return to the app shell (Home tab shows the resume bar / active
     // workout automatically) rather than leaving the user on this
@@ -81,6 +85,25 @@ class _ProgramReviewScreenState extends ConsumerState<ProgramReviewScreen> {
           Text(
             'Tap a day below to start a workout from it.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.trending_up, size: 18, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(
+                    text: '${_program.progressionRule.label}. ',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  TextSpan(
+                    text: _program.progressionRule.blurb,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ])),
+              ),
+            ],
           ),
           if (_program.notes.isNotEmpty) ...[
             const SizedBox(height: 12),

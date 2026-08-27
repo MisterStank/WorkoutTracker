@@ -17,10 +17,37 @@ final retentionNudgeServiceProvider = Provider<RetentionNudgeService>((ref) {
 /// whether the user actually needs it.
 class RetentionNudgeService {
   static const _nudgeNotificationId = 7301;
+  static const _restNotificationId = 7302;
   static const _channelId = 'retention_nudge';
+  static const _restChannelId = 'rest_timer';
 
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  /// Fires an immediate notification (with sound + vibration) when a rest
+  /// timer finishes, so a phone in a pocket still tells the user to start
+  /// their next set. No-op on web.
+  Future<void> showRestComplete() async {
+    if (kIsWeb) return;
+    await initialize();
+    await _plugin.show(
+      _restNotificationId,
+      'Rest over',
+      'Time for your next set.',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _restChannelId,
+          'Rest timer',
+          channelDescription: 'Alerts you when a between-sets rest timer finishes',
+          importance: Importance.high,
+          priority: Priority.high,
+          enableVibration: true,
+          category: AndroidNotificationCategory.alarm,
+        ),
+        iOS: DarwinNotificationDetails(presentSound: true, presentAlert: true),
+      ),
+    );
+  }
 
   /// Sets up the plugin and requests notification permission. No-op on web
   /// (flutter_local_notifications doesn't support scheduled notifications

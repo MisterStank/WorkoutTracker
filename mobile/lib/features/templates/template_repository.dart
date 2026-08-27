@@ -1,4 +1,5 @@
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../core/graphql/graphql_errors.dart';
 
 import 'template_models.dart';
 
@@ -17,7 +18,7 @@ class TemplateRepository {
       document: gql('query WorkoutTemplates { workoutTemplates { $_templateFields } }'),
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final list = result.data!['workoutTemplates'] as List<dynamic>;
     return list.map((t) => WorkoutTemplate.fromJson(t as Map<String, dynamic>)).toList();
   }
@@ -41,8 +42,36 @@ class TemplateRepository {
             .toList(),
       },
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return WorkoutTemplate.fromJson(result.data!['createWorkoutTemplate'] as Map<String, dynamic>);
+  }
+
+  Future<WorkoutTemplate> update({
+    required String templateId,
+    required String name,
+    required List<TemplateExerciseDraft> exercises,
+  }) async {
+    final result = await _client.mutate(MutationOptions(
+      document: gql('''
+        mutation UpdateWorkoutTemplate(\$templateId: UUID!, \$name: String!, \$exercises: [TemplateExerciseInput!]!) {
+          updateWorkoutTemplate(templateId: \$templateId, name: \$name, exercises: \$exercises) { $_templateFields }
+        }
+      '''),
+      variables: {
+        'templateId': templateId,
+        'name': name,
+        'exercises': exercises
+            .map((e) => {
+                  'exerciseId': e.exerciseId,
+                  'targetSets': e.targetSets,
+                  'targetReps': e.targetReps,
+                  'supersetGroup': e.supersetGroup,
+                })
+            .toList(),
+      },
+    ));
+    if (result.hasException) throw graphQLException(result.exception);
+    return WorkoutTemplate.fromJson(result.data!['updateWorkoutTemplate'] as Map<String, dynamic>);
   }
 
   Future<void> delete(String templateId) async {
@@ -50,6 +79,6 @@ class TemplateRepository {
       document: gql('mutation DeleteWorkoutTemplate(\$templateId: UUID!) { deleteWorkoutTemplate(templateId: \$templateId) }'),
       variables: {'templateId': templateId},
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
   }
 }

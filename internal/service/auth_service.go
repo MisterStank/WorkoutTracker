@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"workouttracker/internal/domain"
@@ -28,6 +29,18 @@ type AuthResult struct {
 }
 
 func (s *AuthService) SignUp(ctx context.Context, email, password, displayName string) (*AuthResult, error) {
+	email, err := ValidateEmail(email)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidatePassword(password); err != nil {
+		return nil, err
+	}
+	displayName, err = ValidateDisplayName(displayName)
+	if err != nil {
+		return nil, err
+	}
+
 	if _, err := s.users.FindByEmail(ctx, email); err == nil {
 		return nil, domain.ErrEmailTaken
 	}
@@ -53,6 +66,7 @@ func (s *AuthService) SignUp(ctx context.Context, email, password, displayName s
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResult, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	user, err := s.users.FindByEmail(ctx, email)
 	if err != nil {
 		return nil, domain.ErrInvalidCredentials

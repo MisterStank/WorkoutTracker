@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/analytics/analytics_screen.dart';
 import '../../features/programs/programs_screen.dart';
 import '../../features/workout/elapsed_time_text.dart';
+import '../../features/workout/rest_timer_provider.dart';
 import '../../features/workout/workout_history_screen.dart';
 import '../../features/workout/workout_home_screen.dart';
 import '../../features/workout/workout_models.dart';
@@ -24,7 +25,7 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
   int _index = 0;
 
   static const _tabs = [
@@ -33,6 +34,27 @@ class _AppShellState extends ConsumerState<AppShell> {
     ProgramsScreen(),
     AnalyticsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The rest-timer ticker can be suspended while backgrounded — resync it
+    // from the wall clock when we come back.
+    if (state == AppLifecycleState.resumed) {
+      ref.read(restTimerProvider.notifier).resume();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

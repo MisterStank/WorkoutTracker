@@ -130,7 +130,7 @@ class _FitnessProfileFormState extends ConsumerState<FitnessProfileForm> {
             Text('$_daysPerWeek', style: Theme.of(context).textTheme.titleLarge),
             IconButton(
               icon: const Icon(Icons.add_circle_outline),
-              onPressed: _daysPerWeek < 6 ? () => setState(() => _daysPerWeek++) : null,
+              onPressed: _daysPerWeek < 7 ? () => setState(() => _daysPerWeek++) : null,
             ),
           ],
         ),

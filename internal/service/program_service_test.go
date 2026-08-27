@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -128,6 +129,69 @@ func fullCatalog() []*domain.Exercise {
 	}
 }
 
+// richCatalog covers every movement pattern the generator balances around,
+// with 2+ options each, so a generated split can be checked for balance.
+func richCatalog() []*domain.Exercise {
+	mk := func(name, category, equipment string, muscleGroups ...string) *domain.Exercise {
+		return &domain.Exercise{ID: uuid.New(), Name: name, Category: category, Equipment: equipment, MuscleGroups: muscleGroups}
+	}
+	return []*domain.Exercise{
+		// squat (knee-dominant)
+		mk("Back Squat", "legs", "barbell", "quads", "glutes"),
+		mk("Leg Press", "legs", "machine", "quads", "glutes"),
+		mk("Walking Lunge", "legs", "bodyweight", "quads", "glutes"),
+		// hinge (hip-dominant)
+		mk("Romanian Deadlift", "legs", "barbell", "hamstrings", "glutes"),
+		mk("Hip Thrust", "legs", "barbell", "glutes", "hamstrings"),
+		mk("Conventional Deadlift", "pull", "barbell", "hamstrings", "glutes", "back"),
+		// horizontal push
+		mk("Bench Press", "push", "barbell", "chest", "triceps", "shoulders"),
+		mk("Push-Up", "push", "bodyweight", "chest", "triceps"),
+		// vertical push
+		mk("Overhead Press", "push", "barbell", "shoulders", "triceps"),
+		mk("Pike Push-Up", "push", "bodyweight", "shoulders", "triceps"),
+		// horizontal pull
+		mk("Barbell Row", "pull", "barbell", "back", "biceps"),
+		mk("Seated Cable Row", "pull", "cable", "back", "biceps"),
+		// vertical pull
+		mk("Pull-Up", "pull", "bodyweight", "back", "biceps"),
+		mk("Lat Pulldown", "pull", "cable", "back", "biceps"),
+		// arms
+		mk("Barbell Curl", "arms", "barbell", "biceps"),
+		mk("Cable Curl", "arms", "cable", "biceps"),
+		mk("Triceps Pushdown", "arms", "cable", "triceps"),
+		mk("Overhead Triceps Extension", "arms", "dumbbell", "triceps"),
+		// core
+		mk("Plank", "core", "bodyweight", "abs"),
+		mk("Hanging Leg Raise", "core", "bodyweight", "abs"),
+	}
+}
+
+// dayExerciseNames resolves a generated day's template exercise IDs back to
+// names using the catalog that was fed to the service.
+func dayExerciseNames(day *domain.ProgramDay, catalog []*domain.Exercise) []string {
+	byID := map[uuid.UUID]string{}
+	for _, e := range catalog {
+		byID[e.ID] = e.Name
+	}
+	var names []string
+	for _, te := range day.Template.Exercises {
+		names = append(names, byID[te.ExerciseID])
+	}
+	return names
+}
+
+func containsAnyName(names []string, subs ...string) bool {
+	for _, n := range names {
+		for _, s := range subs {
+			if strings.Contains(strings.ToLower(n), s) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func newTestProgramService(exercises ...*domain.Exercise) (*service.ProgramService, *fakeFitnessProfileRepo, *fakeProgramRepo) {
 	workoutSvc, _ := newTestWorkoutServiceWithTemplates(exercises...)
 	profiles := newFakeFitnessProfileRepo()
@@ -135,6 +199,96 @@ func newTestProgramService(exercises ...*domain.Exercise) (*service.ProgramServi
 	exerciseRepo := newFakeExerciseRepo(exercises...)
 	svc := service.NewProgramService(profiles, programs, exerciseRepo, workoutSvc)
 	return svc, profiles, programs
+}
+
+func TestGenerateProgramBalancesMovementPatterns(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.New()
+	catalog := richCatalog()
+	svc, _, _ := newTestProgramService(catalog...)
+
+	_, err := svc.SaveFitnessProfile(ctx, userID, domain.UserFitnessProfile{
+		Goal: domain.GoalHypertrophy, ExperienceLevel: domain.ExperienceIntermediate, DaysPerWeek: 5,
+	})
+	require.NoError(t, err)
+
+	program, err := svc.GenerateProgram(ctx, userID)
+	require.NoError(t, err)
+	assert.Empty(t, program.Notes, "a full catalog should fill every pattern: %s", program.Notes)
+
+	for _, day := range program.Days {
+		names := dayExerciseNames(day, catalog)
+		switch {
+		case strings.HasPrefix(day.DayLabel, "Legs"), strings.HasPrefix(day.DayLabel, "Lower"):
+			assert.True(t, containsAnyName(names, "squat", "lunge", "leg press"), "%s needs a squat pattern: %v", day.DayLabel, names)
+			assert.True(t, containsAnyName(names, "deadlift", "romanian", "hip thrust"), "%s needs a hinge pattern: %v", day.DayLabel, names)
+		case strings.HasPrefix(day.DayLabel, "Push"):
+			assert.True(t, containsAnyName(names, "bench", "push-up"), "%s needs a horizontal press: %v", day.DayLabel, names)
+			assert.True(t, containsAnyName(names, "overhead", "pike"), "%s needs a vertical press: %v", day.DayLabel, names)
+		case strings.HasPrefix(day.DayLabel, "Pull"):
+			assert.True(t, containsAnyName(names, "pull-up", "pulldown"), "%s needs a vertical pull: %v", day.DayLabel, names)
+			assert.True(t, containsAnyName(names, "row"), "%s needs a horizontal pull: %v", day.DayLabel, names)
+		}
+		// No day should use the same exercise twice.
+		seen := map[string]bool{}
+		for _, n := range names {
+			assert.False(t, seen[n], "%s repeats exercise %q", day.DayLabel, n)
+			seen[n] = true
+		}
+	}
+}
+
+func TestProgramDayTargetsSuggestsLoadsFromHistory(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.New()
+	catalog := richCatalog()
+
+	workoutSvc, _ := newTestWorkoutServiceWithTemplates(catalog...)
+	profiles := newFakeFitnessProfileRepo()
+	programs := newFakeProgramRepo()
+	svc := service.NewProgramService(profiles, programs, newFakeExerciseRepo(catalog...), workoutSvc)
+
+	_, err := svc.SaveFitnessProfile(ctx, userID, domain.UserFitnessProfile{
+		Goal: domain.GoalStrength, ExperienceLevel: domain.ExperienceIntermediate, DaysPerWeek: 3,
+	})
+	require.NoError(t, err)
+	program, err := svc.GenerateProgram(ctx, userID)
+	require.NoError(t, err)
+
+	day := program.Days[0]
+	firstExerciseID := day.Template.Exercises[0].ExerciseID
+
+	// No history yet → 0 suggestion, first-time reasoning.
+	targets, err := svc.ProgramDayTargets(ctx, userID, day.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, targets)
+	assert.Equal(t, 0.0, targets[0].SuggestedWeightKg)
+	assert.Equal(t, 1, targets[0].WeekNumber)
+	assert.Contains(t, targets[0].Reasoning, "First time")
+
+	// Log a working set, then it should suggest at least that weight.
+	w, err := workoutSvc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+	_, err = workoutSvc.LogSet(ctx, userID, w.ID, firstExerciseID, 5, 100, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+
+	targets, err = svc.ProgramDayTargets(ctx, userID, day.ID)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, targets[0].SuggestedWeightKg, 100.0)
+}
+
+func TestGenerateProgramSupportsSevenDays(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.New()
+	svc, _, _ := newTestProgramService(richCatalog()...)
+	_, err := svc.SaveFitnessProfile(ctx, userID, domain.UserFitnessProfile{
+		Goal: domain.GoalGeneralFitness, ExperienceLevel: domain.ExperienceAdvanced, DaysPerWeek: 7,
+	})
+	require.NoError(t, err)
+	program, err := svc.GenerateProgram(ctx, userID)
+	require.NoError(t, err)
+	assert.Len(t, program.Days, 7)
+	assert.Equal(t, 7, program.DaysPerWeek)
 }
 
 func TestGenerateProgramRejectsWithoutSavedProfile(t *testing.T) {
@@ -266,7 +420,7 @@ func TestGenerateProgramNotesSkippedGroupsRatherThanFailing(t *testing.T) {
 	program, err := svc.GenerateProgram(ctx, userID)
 	require.NoError(t, err, "missing exercises for one category should degrade gracefully, not fail generation")
 	assert.NotEmpty(t, program.Notes, "should explain that no leg exercise was available")
-	assert.Contains(t, program.Notes, "legs")
+	assert.Contains(t, program.Notes, "squat", "the skip note should name the unfillable movement pattern")
 }
 
 func TestSaveFitnessProfileRoundTrips(t *testing.T) {

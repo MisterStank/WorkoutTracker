@@ -8,6 +8,7 @@ import '../auth/auth_state.dart';
 import '../sharing/share_preview_sheet.dart';
 import '../sharing/workout_summary_share_card.dart';
 import '../templates/template_provider.dart';
+import 'workout_detail_screen.dart';
 import 'workout_models.dart';
 import 'workout_provider.dart';
 
@@ -71,6 +72,22 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
         setState(() => _workouts.add(workout));
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not delete: $e')));
       }
+    }
+  }
+
+  Future<void> _openDetail(Workout workout) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => WorkoutDetailScreen(workout: workout)),
+    );
+    if (changed == true && mounted) {
+      // A set was edited/deleted — reload from the top so volume totals and
+      // exercise lists reflect the change.
+      setState(() {
+        _workouts.clear();
+        _cursor = null;
+        _hasNextPage = true;
+      });
+      await _loadMore();
     }
   }
 
@@ -149,6 +166,7 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
                           onDelete: () async {
                             if (await _confirmDelete(context)) await _deleteWorkout(workout);
                           },
+                          onOpen: () => _openDetail(workout),
                         ),
                       );
                     },
@@ -159,11 +177,12 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
 }
 
 class _WorkoutHistoryCard extends ConsumerWidget {
-  const _WorkoutHistoryCard({required this.workout, required this.catalog, required this.onDelete});
+  const _WorkoutHistoryCard({required this.workout, required this.catalog, required this.onDelete, required this.onOpen});
 
   final Workout workout;
   final Map<String, Exercise> catalog;
   final Future<void> Function() onDelete;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -183,7 +202,10 @@ class _WorkoutHistoryCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(appCardRadius),
+        child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,6 +287,7 @@ class _WorkoutHistoryCard extends ConsumerWidget {
               Text(workout.notes, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
             ],
           ],
+        ),
         ),
       ),
     );

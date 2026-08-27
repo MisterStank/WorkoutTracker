@@ -23,6 +23,10 @@ const (
 	RecordTypeMaxWeight    = "max_weight"
 	RecordTypeMaxVolume    = "max_volume"
 	RecordTypeEstimated1RM = "estimated_1rm"
+	// RecordTypeMaxReps is the most reps performed in a single working set.
+	// It's the only progress signal for pure-bodyweight exercises, where
+	// weight (added load) is 0 so the other three records stay flat.
+	RecordTypeMaxReps = "max_reps"
 )
 
 type SetType string
@@ -41,7 +45,10 @@ type Exercise struct {
 	MuscleGroups []string
 	Equipment    string
 	IsCustom     bool
-	CreatedAt    time.Time
+	// CreatedBy is the owner of a custom exercise; nil for built-in
+	// catalog entries. Only the owner may edit or delete it.
+	CreatedBy *uuid.UUID
+	CreatedAt time.Time
 	// Instructions is a short, hand-written form cue — empty for
 	// user-created custom exercises, which have no cue to draw from.
 	Instructions string
@@ -90,12 +97,43 @@ type ProgramDay struct {
 	Template   *WorkoutTemplate
 }
 
+// ProgressionRule drives how programDayTargets escalates loads week to
+// week. Derived from the program's goal at build time, not stored.
+type ProgressionRule string
+
+const (
+	ProgressionLinear ProgressionRule = "linear"             // add weight every week (strength)
+	ProgressionDouble ProgressionRule = "double_progression" // add reps first, then weight (hypertrophy)
+	ProgressionNone   ProgressionRule = "none"               // hold loads (fat loss / general fitness)
+)
+
+// ProgressionRuleForGoal picks the week-to-week model that fits a goal.
+func ProgressionRuleForGoal(goal Goal) ProgressionRule {
+	switch goal {
+	case GoalStrength:
+		return ProgressionLinear
+	case GoalHypertrophy:
+		return ProgressionDouble
+	default:
+		return ProgressionNone
+	}
+}
+
+// ExerciseTarget is one exercise's prescription for a specific week of a
+// program day — sets/reps from the template plus a suggested load computed
+// from training history and the program's progression rule.
+type ExerciseTarget struct {
+	ExerciseID        uuid.UUID
+	TargetSets        int
+	TargetReps        *int
+	SuggestedWeightKg float64
+	WeekNumber        int
+	Reasoning         string
+}
+
 // Program is a generated or hand-built multi-day split. Notes carries any
-// skipped-muscle-group explanations from generation (e.g. "no eligible
-// chest exercises for your equipment") rather than failing outright — see
-// ProgramService. Hand-built programs (assembled from existing templates
-// rather than generated) default Goal to GoalGeneralFitness since there's
-// no questionnaire to derive one from.
+// skipped-pattern explanations from generation rather than failing
+// outright — see ProgramService.
 type Program struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
@@ -154,13 +192,24 @@ type LoggedSet struct {
 }
 
 type ExerciseRepository interface {
-	List(ctx context.Context, search string) ([]*Exercise, error)
+	// List returns the built-in catalog plus any custom exercises owned by
+	// userID (uuid.Nil for an unauthenticated/no-user context = built-ins
+	// only), optionally name-filtered.
+	List(ctx context.Context, userID uuid.UUID, search string) ([]*Exercise, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Exercise, error)
 	// ListFiltered is the program generator's exercise picker: equipment
 	// (empty = any), excludeMuscleGroups (skips any exercise touching one
-	// of these), and category (empty = any). Ordered by name so the
-	// generator's "pick the first N" selection is deterministic.
-	ListFiltered(ctx context.Context, equipment []string, excludeMuscleGroups []string, category string) ([]*Exercise, error)
+	// of these), and category (empty = any). Built-ins plus userID's own
+	// custom exercises. Ordered by name so the generator's "pick the first
+	// N" selection is deterministic.
+	ListFiltered(ctx context.Context, userID uuid.UUID, equipment []string, excludeMuscleGroups []string, category string) ([]*Exercise, error)
+	Create(ctx context.Context, e *Exercise) error
+	Update(ctx context.Context, e *Exercise) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	// CountReferences reports how many logged sets or template entries point
+	// at this exercise, so a custom exercise that's in use can't be deleted
+	// out from under them.
+	CountReferences(ctx context.Context, exerciseID uuid.UUID) (int, error)
 }
 
 type WorkoutRepository interface {
@@ -186,6 +235,9 @@ type WorkoutRepository interface {
 
 type WorkoutTemplateRepository interface {
 	Create(ctx context.Context, t *WorkoutTemplate) error
+	// Update replaces a template's name and exercise list wholesale
+	// (delete-and-reinsert the template_exercises in one transaction).
+	Update(ctx context.Context, t *WorkoutTemplate) error
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]*WorkoutTemplate, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*WorkoutTemplate, error)
 	Delete(ctx context.Context, id uuid.UUID) error

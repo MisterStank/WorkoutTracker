@@ -40,6 +40,22 @@ type Exercise struct {
 	Instructions string    `json:"instructions"`
 }
 
+type ExerciseInput struct {
+	Name         string   `json:"name"`
+	Category     string   `json:"category"`
+	MuscleGroups []string `json:"muscleGroups"`
+	Equipment    string   `json:"equipment"`
+}
+
+type ExerciseTarget struct {
+	ExerciseID        uuid.UUID `json:"exerciseId"`
+	TargetSets        int       `json:"targetSets"`
+	TargetReps        *int      `json:"targetReps,omitempty"`
+	SuggestedWeightKg float64   `json:"suggestedWeightKg"`
+	WeekNumber        int       `json:"weekNumber"`
+	Reasoning         string    `json:"reasoning"`
+}
+
 type FitnessProfileInput struct {
 	Goal              FitnessGoal     `json:"goal"`
 	ExperienceLevel   ExperienceLevel `json:"experienceLevel"`
@@ -57,8 +73,9 @@ type Mutation struct {
 }
 
 type NextWorkout struct {
-	Program *Program    `json:"program"`
-	Day     *ProgramDay `json:"day"`
+	Program    *Program    `json:"program"`
+	Day        *ProgramDay `json:"day"`
+	WeekNumber int         `json:"weekNumber"`
 }
 
 type PageInfo struct {
@@ -82,14 +99,15 @@ type PlateauStatus struct {
 }
 
 type Program struct {
-	ID          uuid.UUID     `json:"id"`
-	Name        string        `json:"name"`
-	Goal        FitnessGoal   `json:"goal"`
-	DaysPerWeek int           `json:"daysPerWeek"`
-	Notes       string        `json:"notes"`
-	CreatedAt   time.Time     `json:"createdAt"`
-	Days        []*ProgramDay `json:"days"`
-	IsActive    bool          `json:"isActive"`
+	ID              uuid.UUID       `json:"id"`
+	Name            string          `json:"name"`
+	Goal            FitnessGoal     `json:"goal"`
+	DaysPerWeek     int             `json:"daysPerWeek"`
+	Notes           string          `json:"notes"`
+	CreatedAt       time.Time       `json:"createdAt"`
+	Days            []*ProgramDay   `json:"days"`
+	IsActive        bool            `json:"isActive"`
+	ProgressionRule ProgressionRule `json:"progressionRule"`
 }
 
 type ProgramDay struct {
@@ -108,6 +126,7 @@ type ProgressPoint struct {
 	Day         time.Time `json:"day"`
 	TotalVolume float64   `json:"totalVolume"`
 	MaxWeight   float64   `json:"maxWeight"`
+	MaxReps     int       `json:"maxReps"`
 	SetCount    int       `json:"setCount"`
 }
 
@@ -307,6 +326,63 @@ func (e *FitnessGoal) UnmarshalJSON(b []byte) error {
 }
 
 func (e FitnessGoal) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ProgressionRule string
+
+const (
+	ProgressionRuleLinear            ProgressionRule = "LINEAR"
+	ProgressionRuleDoubleProgression ProgressionRule = "DOUBLE_PROGRESSION"
+	ProgressionRuleNone              ProgressionRule = "NONE"
+)
+
+var AllProgressionRule = []ProgressionRule{
+	ProgressionRuleLinear,
+	ProgressionRuleDoubleProgression,
+	ProgressionRuleNone,
+}
+
+func (e ProgressionRule) IsValid() bool {
+	switch e {
+	case ProgressionRuleLinear, ProgressionRuleDoubleProgression, ProgressionRuleNone:
+		return true
+	}
+	return false
+}
+
+func (e ProgressionRule) String() string {
+	return string(e)
+}
+
+func (e *ProgressionRule) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ProgressionRule(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ProgressionRule", str)
+	}
+	return nil
+}
+
+func (e ProgressionRule) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ProgressionRule) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ProgressionRule) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

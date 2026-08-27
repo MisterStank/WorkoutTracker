@@ -135,6 +135,39 @@ func TestSignUpDuplicateEmailRejected(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrEmailTaken)
 }
 
+func TestSignUpValidatesInput(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name                     string
+		email, password, display string
+		wantErr                  error
+	}{
+		{"bad email", "notanemail", "password123", "Jo", domain.ErrInvalidEmail},
+		{"weak password", "jo@example.com", "short", "Jo", domain.ErrWeakPassword},
+		{"empty name", "jo@example.com", "password123", "   ", domain.ErrEmptyDisplayName},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := newTestAuthService().SignUp(ctx, tc.email, tc.password, tc.display)
+			assert.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+}
+
+func TestSignUpNormalizesEmail(t *testing.T) {
+	ctx := context.Background()
+	auth := newTestAuthService()
+
+	res, err := auth.SignUp(ctx, "  Jane@Example.COM ", "password123", "  Jane  ")
+	require.NoError(t, err)
+	assert.Equal(t, "jane@example.com", res.User.Email)
+	assert.Equal(t, "Jane", res.User.DisplayName)
+
+	_, err = auth.Login(ctx, "JANE@example.com", "password123")
+	require.NoError(t, err)
+}
+
 func TestLoginWrongPasswordRejected(t *testing.T) {
 	ctx := context.Background()
 	auth := newTestAuthService()

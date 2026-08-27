@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"workouttracker/internal/cache"
+	"workouttracker/internal/domain"
 	"workouttracker/internal/graphql"
 	appmiddleware "workouttracker/internal/middleware"
 	"workouttracker/internal/platform"
@@ -15,6 +16,7 @@ import (
 	"workouttracker/internal/repository"
 	"workouttracker/internal/service"
 
+	gqlgraphql "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
@@ -25,6 +27,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 func main() {
@@ -145,6 +148,31 @@ func newGraphQLServer(resolver *graphql.Resolver, tokens *service.TokenIssuer, a
 	srv.Use(extension.Introspection{})
 	srv.Use(extension.AutomaticPersistedQuery{
 		Cache: lru.New[string](100),
+	})
+
+	// Only known domain errors reach the client with their real message.
+	// Everything else (pgx/driver errors, bugs) is logged and replaced with
+	// a generic message so internals like "SQLSTATE 22003" don't leak.
+	srv.SetErrorPresenter(func(ctx context.Context, e error) *gqlerror.Error {
+		err := gqlgraphql.DefaultErrorPresenter(ctx, e)
+		if domain.IsUserFacing(e) {
+			return err
+		}
+		// gqlgen's own parse/validation errors (bad query text, unknown
+		// field, wrong argument type) are about the request, not our
+		// internals — safe and useful to pass through.
+		if err.Extensions != nil {
+			if code, _ := err.Extensions["code"].(string); strings.HasPrefix(code, "GRAPHQL_") {
+				return err
+			}
+		}
+		log.Printf("graphql: masking non-user-facing error: %v", e)
+		err.Message = "something went wrong, please try again"
+		return err
+	})
+	srv.SetRecoverFunc(func(ctx context.Context, err any) error {
+		log.Printf("graphql: panic recovered: %v", err)
+		return gqlerror.Errorf("something went wrong, please try again")
 	})
 
 	return srv

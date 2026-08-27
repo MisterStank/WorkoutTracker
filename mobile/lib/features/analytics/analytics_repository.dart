@@ -1,4 +1,5 @@
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../core/graphql/graphql_errors.dart';
 
 import 'analytics_models.dart';
 
@@ -13,13 +14,13 @@ class AnalyticsRepository {
     final result = await _client.query(QueryOptions(
       document: gql('''
         query ProgressOverTime(\$exerciseId: UUID!, \$days: Int!) {
-          progressOverTime(exerciseId: \$exerciseId, days: \$days) { day totalVolume maxWeight setCount }
+          progressOverTime(exerciseId: \$exerciseId, days: \$days) { day totalVolume maxWeight maxReps setCount }
         }
       '''),
       variables: {'exerciseId': exerciseId, 'days': days},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final list = result.data!['progressOverTime'] as List<dynamic>;
     return list.map((p) => ProgressPoint.fromJson(p as Map<String, dynamic>)).toList();
   }
@@ -34,7 +35,7 @@ class AnalyticsRepository {
       variables: {'days': days},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final list = result.data!['volumeTrend'] as List<dynamic>;
     return list.map((p) => ProgressPoint.fromJson(p as Map<String, dynamic>)).toList();
   }
@@ -49,7 +50,7 @@ class AnalyticsRepository {
       variables: {'metricType': metricType, 'days': days},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final list = result.data!['bodyMetrics'] as List<dynamic>;
     return list.map((m) => BodyMetric.fromJson(m as Map<String, dynamic>)).toList();
   }
@@ -63,7 +64,7 @@ class AnalyticsRepository {
       '''),
       variables: {'metricType': metricType, 'value': value},
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return BodyMetric.fromJson(result.data!['logBodyMetric'] as Map<String, dynamic>);
   }
 }

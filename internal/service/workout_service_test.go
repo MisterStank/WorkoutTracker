@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -24,23 +25,56 @@ import (
 // end-to-end.
 
 type fakeExerciseRepo struct {
-	byID map[uuid.UUID]*domain.Exercise
+	byID       map[uuid.UUID]*domain.Exercise
+	references map[uuid.UUID]int
 }
 
 func newFakeExerciseRepo(exercises ...*domain.Exercise) *fakeExerciseRepo {
-	f := &fakeExerciseRepo{byID: map[uuid.UUID]*domain.Exercise{}}
+	f := &fakeExerciseRepo{byID: map[uuid.UUID]*domain.Exercise{}, references: map[uuid.UUID]int{}}
 	for _, e := range exercises {
 		f.byID[e.ID] = e
 	}
 	return f
 }
 
-func (f *fakeExerciseRepo) List(ctx context.Context, search string) ([]*domain.Exercise, error) {
+func (f *fakeExerciseRepo) List(ctx context.Context, userID uuid.UUID, search string) ([]*domain.Exercise, error) {
 	var out []*domain.Exercise
 	for _, e := range f.byID {
+		if e.CreatedBy != nil && *e.CreatedBy != userID {
+			continue
+		}
 		out = append(out, e)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+func (f *fakeExerciseRepo) Create(ctx context.Context, e *domain.Exercise) error {
+	for _, existing := range f.byID {
+		if existing.CreatedBy != nil && e.CreatedBy != nil && *existing.CreatedBy == *e.CreatedBy &&
+			strings.EqualFold(existing.Name, e.Name) {
+			return domain.ErrExerciseNameTaken
+		}
+	}
+	f.byID[e.ID] = e
+	return nil
+}
+
+func (f *fakeExerciseRepo) Update(ctx context.Context, e *domain.Exercise) error {
+	if _, ok := f.byID[e.ID]; !ok {
+		return domain.ErrExerciseNotFound
+	}
+	f.byID[e.ID] = e
+	return nil
+}
+
+func (f *fakeExerciseRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	delete(f.byID, id)
+	return nil
+}
+
+func (f *fakeExerciseRepo) CountReferences(ctx context.Context, exerciseID uuid.UUID) (int, error) {
+	return f.references[exerciseID], nil
 }
 
 func (f *fakeExerciseRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.Exercise, error) {
@@ -56,9 +90,12 @@ func (f *fakeExerciseRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.
 // exercise touching one of them, category empty matches any. Sorted by
 // name so callers relying on deterministic "first match" selection (the
 // program generator) behave the same as against the real DB.
-func (f *fakeExerciseRepo) ListFiltered(ctx context.Context, equipment []string, excludeMuscleGroups []string, category string) ([]*domain.Exercise, error) {
+func (f *fakeExerciseRepo) ListFiltered(ctx context.Context, userID uuid.UUID, equipment []string, excludeMuscleGroups []string, category string) ([]*domain.Exercise, error) {
 	var out []*domain.Exercise
 	for _, e := range f.byID {
+		if e.CreatedBy != nil && *e.CreatedBy != userID {
+			continue
+		}
 		if category != "" && e.Category != category {
 			continue
 		}
@@ -325,10 +362,14 @@ func (f *fakeWorkoutSetRepo) LogSet(ctx context.Context, userID uuid.UUID, set *
 		domain.RecordTypeMaxWeight:    set.WeightKg,
 		domain.RecordTypeMaxVolume:    set.WeightKg * float64(set.Reps),
 		domain.RecordTypeEstimated1RM: set.WeightKg * (1 + float64(set.Reps)/30.0),
+		domain.RecordTypeMaxReps:      float64(set.Reps),
 	}
 
 	var newRecords []*domain.PersonalRecord
 	for recordType, value := range candidates {
+		if value <= 0 {
+			continue
+		}
 		key := userID.String() + "|" + set.ExerciseID.String() + "|" + recordType
 		if existing, ok := f.records[key]; !ok || value > existing.Value {
 			pr := &domain.PersonalRecord{
@@ -379,8 +420,12 @@ func (f *fakePersonalRecordRepo) Recompute(ctx context.Context, userID, exercise
 				domain.RecordTypeMaxWeight:    s.WeightKg,
 				domain.RecordTypeMaxVolume:    s.WeightKg * float64(s.Reps),
 				domain.RecordTypeEstimated1RM: s.WeightKg * (1 + float64(s.Reps)/30.0),
+				domain.RecordTypeMaxReps:      float64(s.Reps),
 			}
 			for recordType, value := range candidates {
+				if value <= 0 {
+					continue
+				}
 				if existing, ok := best[recordType]; !ok || value > existing.Value {
 					best[recordType] = &domain.PersonalRecord{
 						ID: uuid.New(), UserID: userID, ExerciseID: exerciseID,
@@ -391,7 +436,7 @@ func (f *fakePersonalRecordRepo) Recompute(ctx context.Context, userID, exercise
 		}
 	}
 
-	for _, recordType := range []string{domain.RecordTypeMaxWeight, domain.RecordTypeMaxVolume, domain.RecordTypeEstimated1RM} {
+	for _, recordType := range []string{domain.RecordTypeMaxWeight, domain.RecordTypeMaxVolume, domain.RecordTypeEstimated1RM, domain.RecordTypeMaxReps} {
 		key := userID.String() + "|" + exerciseID.String() + "|" + recordType
 		if pr, ok := best[recordType]; ok {
 			f.sets.records[key] = pr
@@ -428,6 +473,16 @@ func newFakeWorkoutTemplateRepo() *fakeWorkoutTemplateRepo {
 func (f *fakeWorkoutTemplateRepo) Create(ctx context.Context, t *domain.WorkoutTemplate) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.byID[t.ID] = t
+	return nil
+}
+
+func (f *fakeWorkoutTemplateRepo) Update(ctx context.Context, t *domain.WorkoutTemplate) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.byID[t.ID]; !ok {
+		return domain.ErrTemplateNotFound
+	}
 	f.byID[t.ID] = t
 	return nil
 }
@@ -520,6 +575,121 @@ func TestLogSetRejectsAfterFinish(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrWorkoutNotActive)
 }
 
+func TestCustomExerciseCRUD(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newTestWorkoutService()
+	userID := uuid.New()
+	other := uuid.New()
+
+	created, err := svc.CreateExercise(ctx, userID, "  Landmine Press ", "push", []string{"Shoulders", "shoulders"}, "barbell")
+	require.NoError(t, err)
+	assert.Equal(t, "Landmine Press", created.Name)
+	assert.True(t, created.IsCustom)
+	assert.Equal(t, []string{"shoulders"}, created.MuscleGroups) // trimmed, lowercased, de-duped
+	require.NotNil(t, created.CreatedBy)
+	assert.Equal(t, userID, *created.CreatedBy)
+
+	// Shows up in that user's list, not another user's.
+	mine, err := svc.ListExercises(ctx, userID, "")
+	require.NoError(t, err)
+	assert.Len(t, mine, 1)
+	theirs, err := svc.ListExercises(ctx, other, "")
+	require.NoError(t, err)
+	assert.Empty(t, theirs)
+
+	// Duplicate name for the same user is rejected.
+	_, err = svc.CreateExercise(ctx, userID, "landmine press", "push", nil, "barbell")
+	assert.ErrorIs(t, err, domain.ErrExerciseNameTaken)
+
+	// Invalid category/equipment rejected.
+	_, err = svc.CreateExercise(ctx, userID, "Bad", "banana", nil, "barbell")
+	assert.ErrorIs(t, err, domain.ErrInvalidExercise)
+
+	// Another user can't edit or delete it.
+	_, err = svc.UpdateExercise(ctx, other, created.ID, "Hijack", "push", nil, "barbell")
+	assert.ErrorIs(t, err, domain.ErrExerciseNotOwned)
+	assert.ErrorIs(t, svc.DeleteExercise(ctx, other, created.ID), domain.ErrExerciseNotOwned)
+
+	updated, err := svc.UpdateExercise(ctx, userID, created.ID, "Landmine Press", "push", []string{"chest"}, "dumbbell")
+	require.NoError(t, err)
+	assert.Equal(t, "dumbbell", updated.Equipment)
+
+	require.NoError(t, svc.DeleteExercise(ctx, userID, created.ID))
+	gone, _ := svc.ListExercises(ctx, userID, "")
+	assert.Empty(t, gone)
+}
+
+func TestDeleteExerciseRejectedWhenInUse(t *testing.T) {
+	ctx := context.Background()
+	exerciseRepo := newFakeExerciseRepo()
+	setRepo := newFakeWorkoutSetRepo()
+	svc := service.NewWorkoutService(exerciseRepo, newFakeWorkoutRepo(), setRepo,
+		&fakePersonalRecordRepo{sets: setRepo}, newFakeWorkoutTemplateRepo(), nil, nil)
+	userID := uuid.New()
+
+	created, err := svc.CreateExercise(ctx, userID, "Safety Bar Squat", "legs", nil, "barbell")
+	require.NoError(t, err)
+	exerciseRepo.references[created.ID] = 3
+
+	assert.ErrorIs(t, svc.DeleteExercise(ctx, userID, created.ID), domain.ErrExerciseInUse)
+}
+
+func TestBodyweightExerciseTracksRepPR(t *testing.T) {
+	ctx := context.Background()
+	pullUp := &domain.Exercise{ID: uuid.New(), Name: "Pull-Up", Equipment: "bodyweight"}
+	svc, _ := newTestWorkoutService(pullUp)
+	userID := uuid.New()
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+
+	// First bodyweight set (weight 0) — every record type is "new" the first time.
+	first, err := svc.LogSet(ctx, userID, w.ID, pullUp.ID, 6, 0, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	assert.Contains(t, recordTypes(first.NewRecords), domain.RecordTypeMaxReps)
+
+	// A heavier weight can't be a PR (still 0), but more reps is.
+	same, err := svc.LogSet(ctx, userID, w.ID, pullUp.ID, 6, 0, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, recordTypes(same.NewRecords), domain.RecordTypeMaxReps)
+
+	more, err := svc.LogSet(ctx, userID, w.ID, pullUp.ID, 9, 0, nil, domain.SetTypeNormal, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{domain.RecordTypeMaxReps}, recordTypes(more.NewRecords))
+}
+
+func recordTypes(records []*domain.PersonalRecord) []string {
+	out := make([]string, len(records))
+	for i, r := range records {
+		out[i] = r.RecordType
+	}
+	return out
+}
+
+func TestLogSetRejectsInvalidValues(t *testing.T) {
+	ctx := context.Background()
+	barbell := &domain.Exercise{ID: uuid.New(), Name: "Squat", Equipment: "barbell"}
+	bodyweight := &domain.Exercise{ID: uuid.New(), Name: "Pull-Up", Equipment: "bodyweight"}
+	svc, _ := newTestWorkoutService(barbell, bodyweight)
+	userID := uuid.New()
+	w, err := svc.StartWorkout(ctx, userID, nil)
+	require.NoError(t, err)
+
+	_, err = svc.LogSet(ctx, userID, w.ID, barbell.ID, -5, 100, nil, domain.SetTypeNormal, nil)
+	assert.ErrorIs(t, err, domain.ErrInvalidSetValues)
+
+	_, err = svc.LogSet(ctx, userID, w.ID, barbell.ID, 5, -100, nil, domain.SetTypeNormal, nil)
+	assert.ErrorIs(t, err, domain.ErrInvalidSetValues)
+
+	_, err = svc.LogSet(ctx, userID, w.ID, barbell.ID, 5, 100, rpePtr(99), domain.SetTypeNormal, nil)
+	assert.ErrorIs(t, err, domain.ErrInvalidRPE)
+
+	// Bodyweight exercises accept 0 and negative (assisted) added load.
+	_, err = svc.LogSet(ctx, userID, w.ID, bodyweight.ID, 8, 0, nil, domain.SetTypeNormal, nil)
+	assert.NoError(t, err)
+	_, err = svc.LogSet(ctx, userID, w.ID, bodyweight.ID, 8, -20, nil, domain.SetTypeNormal, nil)
+	assert.NoError(t, err)
+}
+
 func TestLogSetDetectsNewPersonalRecords(t *testing.T) {
 	ctx := context.Background()
 	exercise := &domain.Exercise{ID: uuid.New(), Name: "Deadlift"}
@@ -531,10 +701,11 @@ func TestLogSetDetectsNewPersonalRecords(t *testing.T) {
 
 	first, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
-	assert.Len(t, first.NewRecords, 3, "first set at any weight/volume/1RM is always a new PR across all three record types")
+	assert.Len(t, first.NewRecords, 4, "first set is a new PR across weight, volume, 1RM and reps")
 
 	// a heavier set at fewer reps: breaks max_weight and estimated 1RM
 	// (110*(1+2/30)=117.3 > 100*(1+5/30)=116.7), not max_volume (100*5=500 > 110*2=220)
+	// and not max_reps (2 < 5).
 	second, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 2, 110, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
 	require.Len(t, second.NewRecords, 2)
@@ -590,7 +761,7 @@ func TestWarmupSetsDoNotCountAsRecords(t *testing.T) {
 
 	working, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 60, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
-	assert.Len(t, working.NewRecords, 3, "the first working set should still register all PR types, unaffected by the earlier warm-up")
+	assert.Len(t, working.NewRecords, 4, "the first working set should still register all PR types, unaffected by the earlier warm-up")
 }
 
 func TestDropSetAndFailureSetCountTowardRecords(t *testing.T) {
@@ -682,7 +853,7 @@ func TestStartWorkoutRejectsUnownedTemplate(t *testing.T) {
 	owner := uuid.New()
 	attacker := uuid.New()
 
-	tmpl, err := svc.CreateTemplate(ctx, owner, "Leg Day", nil)
+	tmpl, err := svc.CreateTemplate(ctx, owner, "Leg Day", []*domain.TemplateExercise{{ExerciseID: uuid.New(), TargetSets: 3}})
 	require.NoError(t, err)
 
 	_, err = svc.StartWorkout(ctx, attacker, &tmpl.ID)
@@ -695,7 +866,7 @@ func TestDeleteTemplateRejectsUnowned(t *testing.T) {
 	owner := uuid.New()
 	attacker := uuid.New()
 
-	tmpl, err := svc.CreateTemplate(ctx, owner, "Pull Day", nil)
+	tmpl, err := svc.CreateTemplate(ctx, owner, "Pull Day", []*domain.TemplateExercise{{ExerciseID: uuid.New(), TargetSets: 3}})
 	require.NoError(t, err)
 
 	err = svc.DeleteTemplate(ctx, attacker, tmpl.ID)
@@ -705,6 +876,42 @@ func TestDeleteTemplateRejectsUnowned(t *testing.T) {
 	templates, err := svc.ListTemplates(ctx, owner)
 	require.NoError(t, err)
 	assert.Empty(t, templates)
+}
+
+func TestUpdateTemplateReplacesNameAndExercises(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newTestWorkoutServiceWithTemplates()
+	owner := uuid.New()
+	attacker := uuid.New()
+	exA, exB := uuid.New(), uuid.New()
+
+	tmpl, err := svc.CreateTemplate(ctx, owner, "Push Day", []*domain.TemplateExercise{{ExerciseID: exA, TargetSets: 3}})
+	require.NoError(t, err)
+
+	// Ownership enforced.
+	_, err = svc.UpdateTemplate(ctx, attacker, tmpl.ID, "Hijacked", []*domain.TemplateExercise{{ExerciseID: exA, TargetSets: 3}})
+	assert.ErrorIs(t, err, domain.ErrTemplateNotOwned)
+
+	// Empty exercise list rejected.
+	_, err = svc.UpdateTemplate(ctx, owner, tmpl.ID, "Push Day", nil)
+	assert.ErrorIs(t, err, domain.ErrTemplateNoExercises)
+
+	updated, err := svc.UpdateTemplate(ctx, owner, tmpl.ID, "  Chest Day ", []*domain.TemplateExercise{
+		{ExerciseID: exB, TargetSets: 4},
+		{ExerciseID: exA, TargetSets: 2},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Chest Day", updated.Name)
+	assert.Equal(t, tmpl.ID, updated.ID)
+	require.Len(t, updated.Exercises, 2)
+	assert.Equal(t, exB, updated.Exercises[0].ExerciseID)
+	assert.Equal(t, 0, updated.Exercises[0].Position)
+	assert.Equal(t, 1, updated.Exercises[1].Position)
+
+	fetched, err := svc.GetTemplate(ctx, owner, tmpl.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Chest Day", fetched.Name)
+	assert.Len(t, fetched.Exercises, 2)
 }
 
 func intPtr(v int) *int { return &v }
@@ -755,7 +962,7 @@ func TestUpdateSetChangesValuesAndRecomputesRecords(t *testing.T) {
 
 	logged, err := svc.LogSet(ctx, userID, w.ID, exercise.ID, 5, 100, nil, domain.SetTypeNormal, nil)
 	require.NoError(t, err)
-	require.Len(t, logged.NewRecords, 3, "a first-ever set sets all three record types")
+	require.Len(t, logged.NewRecords, 4, "a first-ever set sets all four record types")
 
 	updated, err := svc.UpdateSet(ctx, userID, logged.Set.ID, 8, 120, nil, domain.SetTypeNormal)
 	require.NoError(t, err)
@@ -764,7 +971,7 @@ func TestUpdateSetChangesValuesAndRecomputesRecords(t *testing.T) {
 
 	records, err := svc.PersonalRecords(ctx, userID)
 	require.NoError(t, err)
-	require.Len(t, records, 3)
+	require.Len(t, records, 4)
 	for _, r := range records {
 		if r.RecordType == domain.RecordTypeMaxWeight {
 			assert.Equal(t, 120.0, r.Value, "PR should reflect the edited weight, not the original")

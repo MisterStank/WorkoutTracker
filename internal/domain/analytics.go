@@ -13,7 +13,10 @@ type ProgressPoint struct {
 	Day         time.Time
 	TotalVolume float64
 	MaxWeight   float64
-	SetCount    int
+	// MaxReps is the most reps in a single working set that day — the
+	// progress signal for bodyweight exercises, where MaxWeight is 0.
+	MaxReps  int
+	SetCount int
 }
 
 type BodyMetric struct {

@@ -1,4 +1,5 @@
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../core/graphql/graphql_errors.dart';
 
 import 'workout_models.dart';
 
@@ -39,19 +40,58 @@ class WorkoutRepository {
     });
   }
 
+  static const _exerciseFields = 'id name category muscleGroups equipment isCustom instructions';
+
   Future<List<Exercise>> exercises({String? search}) async {
     final result = await _client.query(QueryOptions(
-      document: gql('''
-        query Exercises(\$search: String) {
-          exercises(search: \$search) { id name category instructions }
-        }
-      '''),
+      document: gql('query Exercises(\$search: String) { exercises(search: \$search) { $_exerciseFields } }'),
       variables: {'search': search},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final list = result.data!['exercises'] as List<dynamic>;
     return list.map((e) => Exercise.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<Exercise> _mutateExercise(String field, String doc, Map<String, dynamic> vars) async {
+    final result = await _client.mutate(MutationOptions(document: gql(doc), variables: vars));
+    if (result.hasException) throw graphQLException(result.exception);
+    return Exercise.fromJson(result.data![field] as Map<String, dynamic>);
+  }
+
+  Future<Exercise> createExercise({
+    required String name,
+    required String category,
+    required List<String> muscleGroups,
+    required String equipment,
+  }) {
+    return _mutateExercise(
+      'createExercise',
+      'mutation CreateExercise(\$input: ExerciseInput!) { createExercise(input: \$input) { $_exerciseFields } }',
+      {'input': {'name': name, 'category': category, 'muscleGroups': muscleGroups, 'equipment': equipment}},
+    );
+  }
+
+  Future<Exercise> updateExercise({
+    required String exerciseId,
+    required String name,
+    required String category,
+    required List<String> muscleGroups,
+    required String equipment,
+  }) {
+    return _mutateExercise(
+      'updateExercise',
+      'mutation UpdateExercise(\$id: UUID!, \$input: ExerciseInput!) { updateExercise(exerciseId: \$id, input: \$input) { $_exerciseFields } }',
+      {'id': exerciseId, 'input': {'name': name, 'category': category, 'muscleGroups': muscleGroups, 'equipment': equipment}},
+    );
+  }
+
+  Future<void> deleteExercise(String exerciseId) async {
+    final result = await _client.mutate(MutationOptions(
+      document: gql('mutation DeleteExercise(\$id: UUID!) { deleteExercise(exerciseId: \$id) }'),
+      variables: {'id': exerciseId},
+    ));
+    if (result.hasException) throw graphQLException(result.exception);
   }
 
   Future<Workout?> activeWorkout() async {
@@ -59,7 +99,7 @@ class WorkoutRepository {
       document: gql('query ActiveWorkout { activeWorkout { $_workoutFields } }'),
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final data = result.data!['activeWorkout'] as Map<String, dynamic>?;
     return data == null ? null : Workout.fromJson(data);
   }
@@ -73,7 +113,7 @@ class WorkoutRepository {
       '''),
       variables: {'templateId': templateId},
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return Workout.fromJson(result.data!['startWorkout'] as Map<String, dynamic>);
   }
 
@@ -105,7 +145,7 @@ class WorkoutRepository {
         'supersetId': supersetId,
       },
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final payload = result.data!['logSet'] as Map<String, dynamic>;
     final newRecords = (payload['newRecords'] as List<dynamic>)
         .map((r) => PersonalRecord.fromJson(r as Map<String, dynamic>))
@@ -137,7 +177,7 @@ class WorkoutRepository {
         'setType': setType.graphQLValue,
       },
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return WorkoutSet.fromJson(result.data!['updateSet'] as Map<String, dynamic>);
   }
 
@@ -150,7 +190,7 @@ class WorkoutRepository {
       '''),
       variables: {'setId': setId},
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
   }
 
   Future<void> deleteWorkout(String workoutId) async {
@@ -162,7 +202,7 @@ class WorkoutRepository {
       '''),
       variables: {'workoutId': workoutId},
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
   }
 
   /// Fetches the most recent set logged for this exercise (any workout), to
@@ -178,7 +218,7 @@ class WorkoutRepository {
       variables: {'exerciseId': exerciseId},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final data = result.data!['lastSetForExercise'] as Map<String, dynamic>?;
     return data == null ? null : WorkoutSet.fromJson(data);
   }
@@ -192,7 +232,7 @@ class WorkoutRepository {
       '''),
       variables: {'workoutId': workoutId, 'notes': notes},
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return Workout.fromJson(result.data!['finishWorkout'] as Map<String, dynamic>);
   }
 
@@ -209,7 +249,7 @@ class WorkoutRepository {
       variables: {'first': first, 'after': after},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final connection = result.data!['workoutHistory'] as Map<String, dynamic>;
     final edges = connection['edges'] as List<dynamic>;
     final pageInfo = connection['pageInfo'] as Map<String, dynamic>;
@@ -222,10 +262,10 @@ class WorkoutRepository {
 
   Future<List<PersonalRecord>> personalRecords() async {
     final result = await _client.query(QueryOptions(
-      document: gql('query PersonalRecords { personalRecords { exerciseId recordType value } }'),
+      document: gql('query PersonalRecords { personalRecords { exerciseId recordType value achievedAt } }'),
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final list = result.data!['personalRecords'] as List<dynamic>;
     return list.map((r) => PersonalRecord.fromJson(r as Map<String, dynamic>)).toList();
   }
@@ -243,7 +283,7 @@ class WorkoutRepository {
       variables: {'exerciseId': exerciseId},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final data = result.data!['progressionSuggestion'] as Map<String, dynamic>?;
     return data == null ? null : ProgressionSuggestion.fromJson(data);
   }
@@ -258,7 +298,7 @@ class WorkoutRepository {
       variables: {'exerciseId': exerciseId},
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return PlateauStatus.fromJson(result.data!['plateauStatus'] as Map<String, dynamic>);
   }
 }

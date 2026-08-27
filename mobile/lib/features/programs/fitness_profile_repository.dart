@@ -1,4 +1,5 @@
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../core/graphql/graphql_errors.dart';
 
 import 'fitness_profile_models.dart';
 
@@ -8,7 +9,7 @@ class FitnessProfileRepository {
   final GraphQLClient _client;
 
   static const _programFields = '''
-    id name goal daysPerWeek notes createdAt isActive
+    id name goal daysPerWeek notes createdAt isActive progressionRule
     days {
       id dayLabel position
       template {
@@ -23,7 +24,7 @@ class FitnessProfileRepository {
       document: gql('query MyFitnessProfile { myFitnessProfile { goal experienceLevel daysPerWeek equipmentAccess avoidMuscleGroups } }'),
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final data = result.data!['myFitnessProfile'] as Map<String, dynamic>?;
     return data == null ? null : UserFitnessProfile.fromJson(data);
   }
@@ -51,7 +52,7 @@ class FitnessProfileRepository {
         },
       },
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return UserFitnessProfile.fromJson(result.data!['saveFitnessProfile'] as Map<String, dynamic>);
   }
 
@@ -59,7 +60,7 @@ class FitnessProfileRepository {
     final result = await _client.mutate(MutationOptions(
       document: gql('mutation GenerateProgram { generateProgram { $_programFields } }'),
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return Program.fromJson(result.data!['generateProgram'] as Map<String, dynamic>);
   }
 
@@ -68,19 +69,30 @@ class FitnessProfileRepository {
       document: gql('query MyPrograms { myPrograms { $_programFields } }'),
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final list = result.data!['myPrograms'] as List<dynamic>;
     return list.map((p) => Program.fromJson(p as Map<String, dynamic>)).toList();
   }
 
   Future<NextWorkout?> nextWorkout() async {
     final result = await _client.query(QueryOptions(
-      document: gql('query NextWorkout { nextWorkout { program { $_programFields } day { id dayLabel position template { id name createdAt exercises { id exerciseId position targetSets targetReps supersetGroup } } } } }'),
+      document: gql('query NextWorkout { nextWorkout { weekNumber program { $_programFields } day { id dayLabel position template { id name createdAt exercises { id exerciseId position targetSets targetReps supersetGroup } } } } }'),
       fetchPolicy: FetchPolicy.networkOnly,
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     final data = result.data!['nextWorkout'] as Map<String, dynamic>?;
     return data == null ? null : NextWorkout.fromJson(data);
+  }
+
+  Future<List<ExerciseTarget>> programDayTargets(String programDayId) async {
+    final result = await _client.query(QueryOptions(
+      document: gql('query ProgramDayTargets(\$id: UUID!) { programDayTargets(programDayId: \$id) { exerciseId targetSets targetReps suggestedWeightKg weekNumber reasoning } }'),
+      variables: {'id': programDayId},
+      fetchPolicy: FetchPolicy.networkOnly,
+    ));
+    if (result.hasException) throw graphQLException(result.exception);
+    final list = result.data!['programDayTargets'] as List<dynamic>;
+    return list.map((t) => ExerciseTarget.fromJson(t as Map<String, dynamic>)).toList();
   }
 
   Future<Program> createProgramFromTemplates(String name, List<(String dayLabel, String templateId)> days) async {
@@ -99,7 +111,7 @@ class FitnessProfileRepository {
         },
       },
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return Program.fromJson(result.data!['createProgramFromTemplates'] as Map<String, dynamic>);
   }
 
@@ -112,7 +124,7 @@ class FitnessProfileRepository {
       '''),
       variables: {'programId': programId},
     ));
-    if (result.hasException) throw Exception(result.exception.toString());
+    if (result.hasException) throw graphQLException(result.exception);
     return Program.fromJson(result.data!['setActiveProgram'] as Map<String, dynamic>);
   }
 }

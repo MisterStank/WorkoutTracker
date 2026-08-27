@@ -52,8 +52,78 @@ type WorkoutHistoryPage struct {
 	EndCursor string
 }
 
-func (s *WorkoutService) ListExercises(ctx context.Context, search string) ([]*domain.Exercise, error) {
-	return s.exercises.List(ctx, search)
+func (s *WorkoutService) ListExercises(ctx context.Context, userID uuid.UUID, search string) ([]*domain.Exercise, error) {
+	return s.exercises.List(ctx, userID, search)
+}
+
+// CreateExercise adds a user-owned custom exercise. name/category/equipment
+// are validated the same way the program generator expects them.
+func (s *WorkoutService) CreateExercise(ctx context.Context, userID uuid.UUID, name, category string, muscleGroups []string, equipment string) (*domain.Exercise, error) {
+	name, err := ValidateExerciseInput(name, category, equipment)
+	if err != nil {
+		return nil, err
+	}
+	e := &domain.Exercise{
+		ID:           uuid.New(),
+		Name:         name,
+		Category:     category,
+		MuscleGroups: normalizeStrings(muscleGroups),
+		Equipment:    equipment,
+		IsCustom:     true,
+		CreatedBy:    &userID,
+		CreatedAt:    time.Now(),
+	}
+	if err := s.exercises.Create(ctx, e); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+func (s *WorkoutService) UpdateExercise(ctx context.Context, userID, exerciseID uuid.UUID, name, category string, muscleGroups []string, equipment string) (*domain.Exercise, error) {
+	existing, err := s.ownedExercise(ctx, userID, exerciseID)
+	if err != nil {
+		return nil, err
+	}
+	name, err = ValidateExerciseInput(name, category, equipment)
+	if err != nil {
+		return nil, err
+	}
+	existing.Name = name
+	existing.Category = category
+	existing.MuscleGroups = normalizeStrings(muscleGroups)
+	existing.Equipment = equipment
+	if err := s.exercises.Update(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func (s *WorkoutService) DeleteExercise(ctx context.Context, userID, exerciseID uuid.UUID) error {
+	if _, err := s.ownedExercise(ctx, userID, exerciseID); err != nil {
+		return err
+	}
+	refs, err := s.exercises.CountReferences(ctx, exerciseID)
+	if err != nil {
+		return err
+	}
+	if refs > 0 {
+		return domain.ErrExerciseInUse
+	}
+	return s.exercises.Delete(ctx, exerciseID)
+}
+
+// ownedExercise loads a custom exercise and confirms the caller owns it —
+// built-ins (CreatedBy == nil) and other users' exercises both return
+// ErrExerciseNotOwned.
+func (s *WorkoutService) ownedExercise(ctx context.Context, userID, exerciseID uuid.UUID) (*domain.Exercise, error) {
+	e, err := s.exercises.FindByID(ctx, exerciseID)
+	if err != nil {
+		return nil, err
+	}
+	if e.CreatedBy == nil || *e.CreatedBy != userID {
+		return nil, domain.ErrExerciseNotOwned
+	}
+	return e, nil
 }
 
 // StartWorkout is idempotent: if the user already has a workout in
@@ -92,6 +162,13 @@ func (s *WorkoutService) StartWorkout(ctx context.Context, userID uuid.UUID, tem
 }
 
 func (s *WorkoutService) CreateTemplate(ctx context.Context, userID uuid.UUID, name string, exercises []*domain.TemplateExercise) (*domain.WorkoutTemplate, error) {
+	name, err := ValidateTemplateName(name)
+	if err != nil {
+		return nil, err
+	}
+	if len(exercises) == 0 {
+		return nil, domain.ErrTemplateNoExercises
+	}
 	for i, ex := range exercises {
 		ex.ID = uuid.New()
 		ex.Position = i
@@ -107,6 +184,37 @@ func (s *WorkoutService) CreateTemplate(ctx context.Context, userID uuid.UUID, n
 		return nil, err
 	}
 	return t, nil
+}
+
+// UpdateTemplate replaces a template's name and full exercise list. Same
+// validation and ownership rules as CreateTemplate.
+func (s *WorkoutService) UpdateTemplate(ctx context.Context, userID, templateID uuid.UUID, name string, exercises []*domain.TemplateExercise) (*domain.WorkoutTemplate, error) {
+	existing, err := s.GetTemplate(ctx, userID, templateID)
+	if err != nil {
+		return nil, err
+	}
+	name, err = ValidateTemplateName(name)
+	if err != nil {
+		return nil, err
+	}
+	if len(exercises) == 0 {
+		return nil, domain.ErrTemplateNoExercises
+	}
+	for i, ex := range exercises {
+		ex.ID = uuid.New()
+		ex.Position = i
+	}
+	updated := &domain.WorkoutTemplate{
+		ID:        existing.ID,
+		UserID:    userID,
+		Name:      name,
+		CreatedAt: existing.CreatedAt,
+		Exercises: exercises,
+	}
+	if err := s.templates.Update(ctx, updated); err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (s *WorkoutService) ListTemplates(ctx context.Context, userID uuid.UUID) ([]*domain.WorkoutTemplate, error) {
@@ -162,7 +270,11 @@ func (s *WorkoutService) LogSet(ctx context.Context, userID, workoutID, exercise
 	if workout.Status != domain.WorkoutInProgress {
 		return nil, domain.ErrWorkoutNotActive
 	}
-	if _, err := s.exercises.FindByID(ctx, exerciseID); err != nil {
+	exercise, err := s.exercises.FindByID(ctx, exerciseID)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateSetInput(reps, weightKg, rpe, isBodyweight(exercise)); err != nil {
 		return nil, err
 	}
 	if setType == "" {
@@ -204,6 +316,14 @@ func (s *WorkoutService) UpdateSet(ctx context.Context, userID, setID uuid.UUID,
 		return nil, err
 	}
 	if err := s.checkSetOwnership(ctx, userID, set); err != nil {
+		return nil, err
+	}
+
+	exercise, err := s.exercises.FindByID(ctx, set.ExerciseID)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateSetInput(reps, weightKg, rpe, isBodyweight(exercise)); err != nil {
 		return nil, err
 	}
 
@@ -301,6 +421,9 @@ func (s *WorkoutService) FinishWorkout(ctx context.Context, userID, workoutID uu
 	}
 	if workout.Status != domain.WorkoutInProgress {
 		return nil, domain.ErrWorkoutNotActive
+	}
+	if err := ValidateNotes(notes); err != nil {
+		return nil, err
 	}
 	if err := s.workouts.Finish(ctx, workoutID, time.Now(), notes); err != nil {
 		return nil, err

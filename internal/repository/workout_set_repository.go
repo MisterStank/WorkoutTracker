@@ -138,10 +138,16 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 		domain.RecordTypeMaxWeight:    set.WeightKg,
 		domain.RecordTypeMaxVolume:    set.WeightKg * float64(set.Reps),
 		domain.RecordTypeEstimated1RM: estimated1RM(set.WeightKg, set.Reps),
+		domain.RecordTypeMaxReps:      float64(set.Reps),
 	}
 
 	var newRecords []*domain.PersonalRecord
 	for recordType, value := range candidates {
+		// Weight-based records are meaningless for a bodyweight set logged
+		// at 0 (or assisted, negative) added load — only the rep count is.
+		if value <= 0 {
+			continue
+		}
 		var returnedID uuid.UUID
 		err := tx.QueryRow(ctx,
 			`INSERT INTO personal_records (id, user_id, exercise_id, record_type, value, achieved_at, workout_set_id)

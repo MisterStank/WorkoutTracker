@@ -26,6 +26,7 @@ var recomputeOrderBy = map[string]string{
 	domain.RecordTypeMaxWeight:    "weight_kg",
 	domain.RecordTypeMaxVolume:    "weight_kg * reps",
 	domain.RecordTypeEstimated1RM: "weight_kg * (1 + reps / 30.0)",
+	domain.RecordTypeMaxReps:      "reps",
 }
 
 // Recompute rebuilds every record type for one user+exercise from the
@@ -55,6 +56,7 @@ func (r *PersonalRecordRepository) Recompute(ctx context.Context, userID, exerci
 			 FROM workout_sets ws
 			 JOIN workouts w ON w.id = ws.workout_id
 			 WHERE w.user_id = $1 AND ws.exercise_id = $2 AND ws.set_type != 'warmup'
+			   AND (`+orderBy+`) > 0
 			 ORDER BY `+orderBy+` DESC
 			 LIMIT 1`,
 			userID, exerciseID,

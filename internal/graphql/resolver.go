@@ -4,6 +4,8 @@ package graphql
 
 import (
 	"context"
+	"time"
+
 	"workouttracker/internal/domain"
 	appmiddleware "workouttracker/internal/middleware"
 	"workouttracker/internal/realtime"
@@ -169,6 +171,28 @@ func (r *mutationResolver) CreateWorkoutTemplate(ctx context.Context, name strin
 	return toWorkoutTemplateModel(t), nil
 }
 
+// UpdateWorkoutTemplate is the resolver for the updateWorkoutTemplate field.
+func (r *mutationResolver) UpdateWorkoutTemplate(ctx context.Context, templateID uuid.UUID, name string, exercises []*TemplateExerciseInput) (*WorkoutTemplate, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	domainExercises := make([]*domain.TemplateExercise, len(exercises))
+	for i, e := range exercises {
+		domainExercises[i] = &domain.TemplateExercise{
+			ExerciseID:    e.ExerciseID,
+			TargetSets:    e.TargetSets,
+			TargetReps:    e.TargetReps,
+			SupersetGroup: e.SupersetGroup,
+		}
+	}
+	t, err := r.Workout.UpdateTemplate(ctx, userID, templateID, name, domainExercises)
+	if err != nil {
+		return nil, err
+	}
+	return toWorkoutTemplateModel(t), nil
+}
+
 // DeleteWorkoutTemplate is the resolver for the deleteWorkoutTemplate field.
 func (r *mutationResolver) DeleteWorkoutTemplate(ctx context.Context, templateID uuid.UUID) (bool, error) {
 	userID, ok := appmiddleware.FromContext(ctx)
@@ -176,6 +200,44 @@ func (r *mutationResolver) DeleteWorkoutTemplate(ctx context.Context, templateID
 		return false, domain.ErrInvalidCredentials
 	}
 	if err := r.Workout.DeleteTemplate(ctx, userID, templateID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// CreateExercise is the resolver for the createExercise field.
+func (r *mutationResolver) CreateExercise(ctx context.Context, input ExerciseInput) (*Exercise, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	e, err := r.Workout.CreateExercise(ctx, userID, input.Name, input.Category, input.MuscleGroups, input.Equipment)
+	if err != nil {
+		return nil, err
+	}
+	return toExerciseModel(e), nil
+}
+
+// UpdateExercise is the resolver for the updateExercise field.
+func (r *mutationResolver) UpdateExercise(ctx context.Context, exerciseID uuid.UUID, input ExerciseInput) (*Exercise, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	e, err := r.Workout.UpdateExercise(ctx, userID, exerciseID, input.Name, input.Category, input.MuscleGroups, input.Equipment)
+	if err != nil {
+		return nil, err
+	}
+	return toExerciseModel(e), nil
+}
+
+// DeleteExercise is the resolver for the deleteExercise field.
+func (r *mutationResolver) DeleteExercise(ctx context.Context, exerciseID uuid.UUID) (bool, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return false, domain.ErrInvalidCredentials
+	}
+	if err := r.Workout.DeleteExercise(ctx, userID, exerciseID); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -277,7 +339,8 @@ func (r *queryResolver) Exercises(ctx context.Context, search *string) ([]*Exerc
 	if search != nil {
 		searchVal = *search
 	}
-	exercises, err := r.Workout.ListExercises(ctx, searchVal)
+	userID, _ := appmiddleware.FromContext(ctx) // uuid.Nil when unauthenticated → built-ins only
+	exercises, err := r.Workout.ListExercises(ctx, userID, searchVal)
 	if err != nil {
 		return nil, err
 	}
@@ -507,9 +570,27 @@ func (r *queryResolver) NextWorkout(ctx context.Context) (*NextWorkout, error) {
 		return nil, nil
 	}
 	return &NextWorkout{
-		Program: toProgramModel(nw.Program),
-		Day:     toProgramDayModel(nw.Day),
+		Program:    toProgramModel(nw.Program),
+		Day:        toProgramDayModel(nw.Day),
+		WeekNumber: programWeekNumber(nw.Program),
 	}, nil
+}
+
+// ProgramDayTargets is the resolver for the programDayTargets field.
+func (r *queryResolver) ProgramDayTargets(ctx context.Context, programDayID uuid.UUID) ([]*ExerciseTarget, error) {
+	userID, ok := appmiddleware.FromContext(ctx)
+	if !ok {
+		return nil, domain.ErrInvalidCredentials
+	}
+	targets, err := r.Program.ProgramDayTargets(ctx, userID, programDayID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*ExerciseTarget, len(targets))
+	for i, t := range targets {
+		out[i] = toExerciseTargetModel(t)
+	}
+	return out, nil
 }
 
 // WorkoutProgressUpdated is the resolver for the workoutProgressUpdated field.
@@ -662,6 +743,7 @@ func toProgressPointModel(p *domain.ProgressPoint) *ProgressPoint {
 		Day:         p.Day,
 		TotalVolume: p.TotalVolume,
 		MaxWeight:   p.MaxWeight,
+		MaxReps:     p.MaxReps,
 		SetCount:    p.SetCount,
 	}
 }
@@ -752,15 +834,44 @@ func toProgramModel(p *domain.Program) *Program {
 		days[i] = toProgramDayModel(d)
 	}
 	return &Program{
-		ID:          p.ID,
-		Name:        p.Name,
-		Goal:        goal,
-		DaysPerWeek: p.DaysPerWeek,
-		Notes:       p.Notes,
-		CreatedAt:   p.CreatedAt,
-		Days:        days,
-		IsActive:    p.IsActive,
+		ID:              p.ID,
+		Name:            p.Name,
+		Goal:            goal,
+		DaysPerWeek:     p.DaysPerWeek,
+		Notes:           p.Notes,
+		CreatedAt:       p.CreatedAt,
+		Days:            days,
+		IsActive:        p.IsActive,
+		ProgressionRule: toProgressionRuleModel(p.Goal),
 	}
+}
+
+func toProgressionRuleModel(goal domain.Goal) ProgressionRule {
+	switch domain.ProgressionRuleForGoal(goal) {
+	case domain.ProgressionLinear:
+		return ProgressionRuleLinear
+	case domain.ProgressionDouble:
+		return ProgressionRuleDoubleProgression
+	default:
+		return ProgressionRuleNone
+	}
+}
+
+func toExerciseTargetModel(t *domain.ExerciseTarget) *ExerciseTarget {
+	return &ExerciseTarget{
+		ExerciseID:        t.ExerciseID,
+		TargetSets:        t.TargetSets,
+		TargetReps:        t.TargetReps,
+		SuggestedWeightKg: t.SuggestedWeightKg,
+		WeekNumber:        t.WeekNumber,
+		Reasoning:         t.Reasoning,
+	}
+}
+
+// programWeekNumber is week 1 in the week a program was created, advancing
+// every 7 days — the same math ProgramService.ProgramDayTargets uses.
+func programWeekNumber(p *domain.Program) int {
+	return int(time.Since(p.CreatedAt).Hours()/(24*7)) + 1
 }
 func (r *Resolver) toWorkoutModel(ctx context.Context, userID uuid.UUID, w *domain.Workout) (*Workout, error) {
 	sets, err := r.Workout.SetsForWorkout(ctx, userID, w.ID)

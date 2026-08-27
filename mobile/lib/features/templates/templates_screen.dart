@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../programs/program_targets_provider.dart';
 import '../workout/superset_provider.dart';
 import '../workout/workout_provider.dart';
 import 'create_template_screen.dart';
@@ -10,7 +13,12 @@ import 'template_provider.dart';
 /// Lists saved workout templates; tapping one starts a workout from it and
 /// pops back to the home screen (which then shows the planned exercises).
 class TemplatesScreen extends ConsumerStatefulWidget {
-  const TemplatesScreen({super.key});
+  const TemplatesScreen({super.key, this.startOnTap = false});
+
+  /// When true (the "start a workout → from a template" flow), tapping a
+  /// template starts a workout from it. When false (the Templates tab),
+  /// tapping opens it for editing and a play button starts it.
+  final bool startOnTap;
 
   @override
   ConsumerState<TemplatesScreen> createState() => _TemplatesScreenState();
@@ -50,7 +58,15 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
   Future<void> _start(WorkoutTemplate template) async {
     ref.read(activeSupersetsProvider.notifier).reset();
     await ref.read(activeWorkoutProvider.notifier).start(templateId: template.id);
+    unawaited(ref.read(activeProgramTargetsProvider.notifier).loadForTemplate(template.id));
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _edit(WorkoutTemplate template) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => CreateTemplateScreen(initial: template)),
+    );
+    if (saved == true) setState(_reload);
   }
 
   @override
@@ -98,12 +114,26 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
                   title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('${t.exercises.length} exercises'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _delete(t.id),
+                  subtitle: Text(widget.startOnTap
+                      ? '${t.exercises.length} exercises'
+                      : '${t.exercises.length} exercises · tap to edit'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!widget.startOnTap)
+                        IconButton(
+                          icon: const Icon(Icons.play_arrow),
+                          tooltip: 'Start workout',
+                          onPressed: () => _start(t),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Delete',
+                        onPressed: () => _delete(t.id),
+                      ),
+                    ],
                   ),
-                  onTap: () => _start(t),
+                  onTap: () => widget.startOnTap ? _start(t) : _edit(t),
                 ),
               );
             },

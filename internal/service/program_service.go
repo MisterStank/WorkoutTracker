@@ -170,29 +170,123 @@ func (s *ProgramService) NextWorkout(ctx context.Context, userID uuid.UUID) (*do
 	return &domain.NextWorkout{Program: program, Day: nextDay}, nil
 }
 
-// dayPlan is one training day within a split: a label plus a sequence of
-// exercise categories to fill it with (the same "push"/"pull"/"legs"/
-// "arms"/"core" taxonomy exercises are already tagged with — a category
-// listed twice means "two exercises from that category", not one repeated
-// exercise).
-type dayPlan struct {
-	label      string
-	categories []string
+// ProgramDayTargets computes each exercise's prescription for a program
+// day *this week*: the template's sets/reps plus a suggested load derived
+// from the user's last working set and the program's progression rule.
+// Week 1 is the week the program was created; every 4th week is a lighter
+// deload.
+func (s *ProgramService) ProgramDayTargets(ctx context.Context, userID, programDayID uuid.UUID) ([]*domain.ExerciseTarget, error) {
+	programs, err := s.programs.ListForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var program *domain.Program
+	var day *domain.ProgramDay
+	for _, p := range programs {
+		for _, d := range p.Days {
+			if d.ID == programDayID {
+				program, day = p, d
+			}
+		}
+	}
+	if day == nil || day.Template == nil {
+		return nil, domain.ErrProgramNotFound
+	}
+
+	weeksElapsed := int(time.Since(program.CreatedAt).Hours() / (24 * 7))
+	weekNumber := weeksElapsed + 1
+	isDeload := weekNumber%4 == 0
+	rule := domain.ProgressionRuleForGoal(program.Goal)
+
+	targets := make([]*domain.ExerciseTarget, 0, len(day.Template.Exercises))
+	for _, te := range day.Template.Exercises {
+		last, err := s.workouts.LastSetForExercise(ctx, userID, te.ExerciseID)
+		if err != nil {
+			return nil, err
+		}
+		base := 0.0
+		if last != nil {
+			base = last.WeightKg
+		}
+
+		exercise, err := s.exercises.FindByID(ctx, te.ExerciseID)
+		if err != nil {
+			return nil, err
+		}
+		compound := isCompoundPattern(movementPattern(exercise))
+
+		suggested, reasoning := progressionTarget(rule, base, weekNumber, isDeload, compound)
+		targets = append(targets, &domain.ExerciseTarget{
+			ExerciseID:        te.ExerciseID,
+			TargetSets:        te.TargetSets,
+			TargetReps:        te.TargetReps,
+			SuggestedWeightKg: suggested,
+			WeekNumber:        weekNumber,
+			Reasoning:         reasoning,
+		})
+	}
+	return targets, nil
 }
 
-// splitForDaysPerWeek is the generator's core lookup table: 1-3 days/week
-// gets full-body sessions (there isn't enough weekly volume to specialize),
-// 4 alternates upper/lower, 5-6 moves to a push/pull/legs rotation — the
-// same progression most evidence-based programming guides recommend, kept
-// here as a fixed table rather than derived, so output is predictable and
-// testable.
+func progressionTarget(rule domain.ProgressionRule, base float64, week int, deload, compound bool) (float64, string) {
+	if base <= 0 {
+		return 0, "First time — pick a weight you can control for all sets."
+	}
+	if deload {
+		return roundToNearest(base*0.9, 1.25), fmt.Sprintf("Week %d is a deload — ~10%% lighter to recover.", week)
+	}
+	switch rule {
+	case domain.ProgressionLinear:
+		step := 1.25
+		if compound {
+			step = 2.5
+		}
+		add := step * float64(week-1)
+		return roundToNearest(base+add, 1.25), fmt.Sprintf("Linear progression — up ~%.2gkg/week from your last %gkg.", step, base)
+	case domain.ProgressionDouble:
+		return roundToNearest(base, 1.25), "Double progression — hold this weight and add reps until you hit the top of the range, then go up."
+	default:
+		return roundToNearest(base, 1.25), fmt.Sprintf("Repeat your last working weight (%gkg).", base)
+	}
+}
+
+// dayPlan is one training day within a split: a label plus an ordered list
+// of movement patterns to fill it with, compound patterns first. A pattern
+// listed twice means "two exercises for that pattern"; the generator picks
+// a different exercise each time.
+type dayPlan struct {
+	label    string
+	patterns []string
+}
+
+// splitForDaysPerWeek is the generator's core lookup table. Every lower /
+// full-body day contains both a squat and a hinge so hamstrings and glutes
+// aren't skipped; push days pair a horizontal and a vertical press, pull
+// days a horizontal and a vertical pull. 1-3 days is full-body, 4 is
+// upper/lower, 5-7 is a push/pull/legs rotation with extra upper/lower or
+// arm days as the count grows.
 func splitForDaysPerWeek(days int) []dayPlan {
-	fullBody := dayPlan{"Full Body", []string{"push", "pull", "legs", "arms", "core"}}
-	upper := dayPlan{"Upper", []string{"push", "push", "pull", "pull", "arms"}}
-	lower := dayPlan{"Lower", []string{"legs", "legs", "legs", "core"}}
-	push := dayPlan{"Push", []string{"push", "push", "push", "arms"}}
-	pull := dayPlan{"Pull", []string{"pull", "pull", "pull", "arms"}}
-	legs := dayPlan{"Legs", []string{"legs", "legs", "legs", "legs"}}
+	fullBody := dayPlan{"Full Body", []string{
+		patternSquat, patternHinge, patternHorizontalPush, patternHorizontalPull, patternVerticalPush, patternCore,
+	}}
+	upper := dayPlan{"Upper", []string{
+		patternHorizontalPush, patternHorizontalPull, patternVerticalPush, patternVerticalPull, patternTriceps, patternBiceps,
+	}}
+	lower := dayPlan{"Lower", []string{
+		patternSquat, patternHinge, patternSquat, patternHinge, patternCore,
+	}}
+	push := dayPlan{"Push", []string{
+		patternHorizontalPush, patternVerticalPush, patternHorizontalPush, patternTriceps,
+	}}
+	pull := dayPlan{"Pull", []string{
+		patternVerticalPull, patternHorizontalPull, patternHorizontalPull, patternBiceps,
+	}}
+	legs := dayPlan{"Legs", []string{
+		patternSquat, patternHinge, patternSquat, patternHinge, patternCore,
+	}}
+	arms := dayPlan{"Arms & Core", []string{
+		patternBiceps, patternTriceps, patternBiceps, patternTriceps, patternCore,
+	}}
 
 	switch {
 	case days <= 3:
@@ -205,17 +299,19 @@ func splitForDaysPerWeek(days int) []dayPlan {
 		return []dayPlan{upper, lower, upper, lower}
 	case days == 5:
 		return []dayPlan{push, pull, legs, upper, lower}
-	default: // 6+
+	case days == 6:
 		return []dayPlan{push, pull, legs, push, pull, legs}
+	default: // 7
+		return []dayPlan{push, pull, legs, upper, lower, arms, legs}
 	}
 }
 
 // setsRepsFor returns (targetSets, targetReps) for one exercise, varying by
-// goal and by whether it's a compound movement (push/pull/legs) or an
-// accessory (arms/core) — compounds get more sets at lower reps for
-// strength, accessories stay higher-rep regardless of goal.
-func setsRepsFor(goal domain.Goal, category string) (int, int) {
-	compound := category == "push" || category == "pull" || category == "legs"
+// goal and by whether its pattern is a compound or an accessory — compounds
+// get more sets at lower reps for strength, accessories stay higher-rep
+// regardless of goal.
+func setsRepsFor(goal domain.Goal, pattern string) (int, int) {
+	compound := isCompoundPattern(pattern)
 	switch goal {
 	case domain.GoalStrength:
 		if compound {
@@ -248,8 +344,8 @@ func (s *ProgramService) GenerateProgram(ctx context.Context, userID uuid.UUID) 
 	if days < 1 {
 		days = 1
 	}
-	if days > 6 {
-		days = 6
+	if days > 7 {
+		days = 7
 	}
 	plan := splitForDaysPerWeek(days)
 
@@ -266,17 +362,17 @@ func (s *ProgramService) GenerateProgram(ctx context.Context, userID uuid.UUID) 
 	for i, day := range plan {
 		usedExerciseIDs := map[uuid.UUID]bool{}
 		var templateExercises []*domain.TemplateExercise
-		for _, category := range day.categories {
-			exercise, err := s.pickExercise(ctx, category, profile.EquipmentAccess, profile.AvoidMuscleGroups, usedExerciseIDs)
+		for _, pattern := range day.patterns {
+			exercise, err := s.pickExercise(ctx, userID, pattern, profile.EquipmentAccess, profile.AvoidMuscleGroups, usedExerciseIDs)
 			if err != nil {
 				return nil, err
 			}
 			if exercise == nil {
-				skipped = append(skipped, fmt.Sprintf("%s: no eligible %s exercise for your equipment/exclusions", day.label, category))
+				skipped = append(skipped, fmt.Sprintf("%s: no eligible %s exercise for your equipment/exclusions", day.label, strings.ReplaceAll(pattern, "_", " ")))
 				continue
 			}
 			usedExerciseIDs[exercise.ID] = true
-			sets, reps := setsRepsFor(profile.Goal, category)
+			sets, reps := setsRepsFor(profile.Goal, pattern)
 			templateExercises = append(templateExercises, &domain.TemplateExercise{
 				ExerciseID: exercise.ID,
 				TargetSets: sets,
@@ -303,6 +399,11 @@ func (s *ProgramService) GenerateProgram(ctx context.Context, userID uuid.UUID) 
 			}
 		}
 
+		if len(templateExercises) == 0 {
+			skipped = append(skipped, fmt.Sprintf("%s: no eligible exercises, day omitted", dayLabel))
+			continue
+		}
+
 		tmpl, err := s.workouts.CreateTemplate(ctx, userID, dayLabel, templateExercises)
 		if err != nil {
 			return nil, err
@@ -327,19 +428,50 @@ func (s *ProgramService) GenerateProgram(ctx context.Context, userID uuid.UUID) 
 	return program, nil
 }
 
-// pickExercise returns the first (by name) eligible exercise in category
-// not already used elsewhere in the same day, or nil if none qualify.
-func (s *ProgramService) pickExercise(ctx context.Context, category string, equipment, avoidMuscleGroups []string, used map[uuid.UUID]bool) (*domain.Exercise, error) {
-	candidates, err := s.exercises.ListFiltered(ctx, equipment, avoidMuscleGroups, category)
+// patternCategory maps a movement pattern back to the exercise category it
+// lives in, so ListFiltered can narrow the candidate set at the DB.
+var patternCategory = map[string]string{
+	patternSquat:          "legs",
+	patternHinge:          "legs",
+	patternHorizontalPush: "push",
+	patternVerticalPush:   "push",
+	patternHorizontalPull: "pull",
+	patternVerticalPull:   "pull",
+	patternBiceps:         "arms",
+	patternTriceps:        "arms",
+	patternCore:           "core",
+}
+
+// pickExercise returns the first (by name) eligible exercise matching the
+// movement pattern and not already used elsewhere in the same day. Falls
+// back to any exercise in the pattern's category if nothing matches the
+// pattern exactly (e.g. a restrictive equipment list), or nil if none.
+func (s *ProgramService) pickExercise(ctx context.Context, userID uuid.UUID, pattern string, equipment, avoidMuscleGroups []string, used map[uuid.UUID]bool) (*domain.Exercise, error) {
+	category := patternCategory[pattern]
+	// The hinge pattern also lives in the "pull" category (deadlifts), so
+	// widen the DB filter for it and match on pattern afterward.
+	dbCategory := category
+	if pattern == patternHinge {
+		dbCategory = ""
+	}
+	candidates, err := s.exercises.ListFiltered(ctx, userID, equipment, avoidMuscleGroups, dbCategory)
 	if err != nil {
 		return nil, err
 	}
+
+	var categoryFallback *domain.Exercise
 	for _, c := range candidates {
-		if !used[c.ID] {
+		if used[c.ID] {
+			continue
+		}
+		if movementPattern(c) == pattern {
 			return c, nil
 		}
+		if categoryFallback == nil && c.Category == category {
+			categoryFallback = c
+		}
 	}
-	return nil, nil
+	return categoryFallback, nil
 }
 
 func splitName(plan []dayPlan) string {

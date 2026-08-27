@@ -75,6 +75,13 @@ type WorkoutTemplate {
   exercises: [TemplateExercise!]!
 }
 
+input ExerciseInput {
+  name: String!
+  category: String!
+  muscleGroups: [String!]!
+  equipment: String!
+}
+
 input TemplateExerciseInput {
   exerciseId: UUID!
   targetSets: Int!
@@ -115,6 +122,7 @@ type ProgressPoint {
   day: Time!
   totalVolume: Float!
   maxWeight: Float!
+  maxReps: Int!
   setCount: Int!
 }
 
@@ -175,6 +183,12 @@ type ProgramDay {
   template: WorkoutTemplate!
 }
 
+enum ProgressionRule {
+  LINEAR
+  DOUBLE_PROGRESSION
+  NONE
+}
+
 type Program {
   id: UUID!
   name: String!
@@ -184,11 +198,22 @@ type Program {
   createdAt: Time!
   days: [ProgramDay!]!
   isActive: Boolean!
+  progressionRule: ProgressionRule!
 }
 
 type NextWorkout {
   program: Program!
   day: ProgramDay!
+  weekNumber: Int!
+}
+
+type ExerciseTarget {
+  exerciseId: UUID!
+  targetSets: Int!
+  targetReps: Int
+  suggestedWeightKg: Float!
+  weekNumber: Int!
+  reasoning: String!
 }
 
 input ProgramDayInput {
@@ -220,6 +245,7 @@ type Query {
   myFitnessProfile: UserFitnessProfile
   myPrograms: [Program!]!
   nextWorkout: NextWorkout
+  programDayTargets(programDayId: UUID!): [ExerciseTarget!]!
 }
 
 type Mutation {
@@ -236,7 +262,12 @@ type Mutation {
   deleteWorkout(workoutId: UUID!): Boolean!
 
   createWorkoutTemplate(name: String!, exercises: [TemplateExerciseInput!]!): WorkoutTemplate!
+  updateWorkoutTemplate(templateId: UUID!, name: String!, exercises: [TemplateExerciseInput!]!): WorkoutTemplate!
   deleteWorkoutTemplate(templateId: UUID!): Boolean!
+
+  createExercise(input: ExerciseInput!): Exercise!
+  updateExercise(exerciseId: UUID!, input: ExerciseInput!): Exercise!
+  deleteExercise(exerciseId: UUID!): Boolean!
 
   logBodyMetric(metricType: String!, value: Float!): BodyMetric!
 

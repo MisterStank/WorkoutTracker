@@ -62,14 +62,25 @@ type ComplexityRoot struct {
 		Name         func(childComplexity int) int
 	}
 
+	ExerciseTarget struct {
+		ExerciseID        func(childComplexity int) int
+		Reasoning         func(childComplexity int) int
+		SuggestedWeightKg func(childComplexity int) int
+		TargetReps        func(childComplexity int) int
+		TargetSets        func(childComplexity int) int
+		WeekNumber        func(childComplexity int) int
+	}
+
 	LogSetResult struct {
 		NewRecords func(childComplexity int) int
 		Set        func(childComplexity int) int
 	}
 
 	Mutation struct {
+		CreateExercise             func(childComplexity int, input ExerciseInput) int
 		CreateProgramFromTemplates func(childComplexity int, input CreateProgramInput) int
 		CreateWorkoutTemplate      func(childComplexity int, name string, exercises []*TemplateExerciseInput) int
+		DeleteExercise             func(childComplexity int, exerciseID uuid.UUID) int
 		DeleteSet                  func(childComplexity int, setID uuid.UUID) int
 		DeleteWorkout              func(childComplexity int, workoutID uuid.UUID) int
 		DeleteWorkoutTemplate      func(childComplexity int, templateID uuid.UUID) int
@@ -84,12 +95,15 @@ type ComplexityRoot struct {
 		SetActiveProgram           func(childComplexity int, programID uuid.UUID) int
 		Signup                     func(childComplexity int, email string, password string, displayName string) int
 		StartWorkout               func(childComplexity int, templateID *uuid.UUID) int
+		UpdateExercise             func(childComplexity int, exerciseID uuid.UUID, input ExerciseInput) int
 		UpdateSet                  func(childComplexity int, setID uuid.UUID, reps int, weightKg float64, rpe *float64, setType *SetType) int
+		UpdateWorkoutTemplate      func(childComplexity int, templateID uuid.UUID, name string, exercises []*TemplateExerciseInput) int
 	}
 
 	NextWorkout struct {
-		Day     func(childComplexity int) int
-		Program func(childComplexity int) int
+		Day        func(childComplexity int) int
+		Program    func(childComplexity int) int
+		WeekNumber func(childComplexity int) int
 	}
 
 	PageInfo struct {
@@ -113,14 +127,15 @@ type ComplexityRoot struct {
 	}
 
 	Program struct {
-		CreatedAt   func(childComplexity int) int
-		Days        func(childComplexity int) int
-		DaysPerWeek func(childComplexity int) int
-		Goal        func(childComplexity int) int
-		ID          func(childComplexity int) int
-		IsActive    func(childComplexity int) int
-		Name        func(childComplexity int) int
-		Notes       func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		Days            func(childComplexity int) int
+		DaysPerWeek     func(childComplexity int) int
+		Goal            func(childComplexity int) int
+		ID              func(childComplexity int) int
+		IsActive        func(childComplexity int) int
+		Name            func(childComplexity int) int
+		Notes           func(childComplexity int) int
+		ProgressionRule func(childComplexity int) int
 	}
 
 	ProgramDay struct {
@@ -132,6 +147,7 @@ type ComplexityRoot struct {
 
 	ProgressPoint struct {
 		Day         func(childComplexity int) int
+		MaxReps     func(childComplexity int) int
 		MaxWeight   func(childComplexity int) int
 		SetCount    func(childComplexity int) int
 		TotalVolume func(childComplexity int) int
@@ -155,6 +171,7 @@ type ComplexityRoot struct {
 		NextWorkout           func(childComplexity int) int
 		PersonalRecords       func(childComplexity int) int
 		PlateauStatus         func(childComplexity int, exerciseID uuid.UUID) int
+		ProgramDayTargets     func(childComplexity int, programDayID uuid.UUID) int
 		ProgressOverTime      func(childComplexity int, exerciseID uuid.UUID, days int) int
 		ProgressionSuggestion func(childComplexity int, exerciseID uuid.UUID) int
 		VolumeTrend           func(childComplexity int, days int) int
@@ -248,7 +265,11 @@ type MutationResolver interface {
 	FinishWorkout(ctx context.Context, workoutID uuid.UUID, notes *string) (*Workout, error)
 	DeleteWorkout(ctx context.Context, workoutID uuid.UUID) (bool, error)
 	CreateWorkoutTemplate(ctx context.Context, name string, exercises []*TemplateExerciseInput) (*WorkoutTemplate, error)
+	UpdateWorkoutTemplate(ctx context.Context, templateID uuid.UUID, name string, exercises []*TemplateExerciseInput) (*WorkoutTemplate, error)
 	DeleteWorkoutTemplate(ctx context.Context, templateID uuid.UUID) (bool, error)
+	CreateExercise(ctx context.Context, input ExerciseInput) (*Exercise, error)
+	UpdateExercise(ctx context.Context, exerciseID uuid.UUID, input ExerciseInput) (*Exercise, error)
+	DeleteExercise(ctx context.Context, exerciseID uuid.UUID) (bool, error)
 	LogBodyMetric(ctx context.Context, metricType string, value float64) (*BodyMetric, error)
 	SaveFitnessProfile(ctx context.Context, input FitnessProfileInput) (*UserFitnessProfile, error)
 	GenerateProgram(ctx context.Context) (*Program, error)
@@ -271,6 +292,7 @@ type QueryResolver interface {
 	MyFitnessProfile(ctx context.Context) (*UserFitnessProfile, error)
 	MyPrograms(ctx context.Context) ([]*Program, error)
 	NextWorkout(ctx context.Context) (*NextWorkout, error)
+	ProgramDayTargets(ctx context.Context, programDayID uuid.UUID) ([]*ExerciseTarget, error)
 }
 type SubscriptionResolver interface {
 	WorkoutProgressUpdated(ctx context.Context, workoutID uuid.UUID) (<-chan *LogSetResult, error)
@@ -381,6 +403,43 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Exercise.Name(childComplexity), true
 
+	case "ExerciseTarget.exerciseId":
+		if e.ComplexityRoot.ExerciseTarget.ExerciseID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ExerciseTarget.ExerciseID(childComplexity), true
+	case "ExerciseTarget.reasoning":
+		if e.ComplexityRoot.ExerciseTarget.Reasoning == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ExerciseTarget.Reasoning(childComplexity), true
+	case "ExerciseTarget.suggestedWeightKg":
+		if e.ComplexityRoot.ExerciseTarget.SuggestedWeightKg == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ExerciseTarget.SuggestedWeightKg(childComplexity), true
+	case "ExerciseTarget.targetReps":
+		if e.ComplexityRoot.ExerciseTarget.TargetReps == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ExerciseTarget.TargetReps(childComplexity), true
+	case "ExerciseTarget.targetSets":
+		if e.ComplexityRoot.ExerciseTarget.TargetSets == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ExerciseTarget.TargetSets(childComplexity), true
+	case "ExerciseTarget.weekNumber":
+		if e.ComplexityRoot.ExerciseTarget.WeekNumber == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ExerciseTarget.WeekNumber(childComplexity), true
+
 	case "LogSetResult.newRecords":
 		if e.ComplexityRoot.LogSetResult.NewRecords == nil {
 			break
@@ -394,6 +453,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.LogSetResult.Set(childComplexity), true
 
+	case "Mutation.createExercise":
+		if e.ComplexityRoot.Mutation.CreateExercise == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createExercise_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateExercise(childComplexity, args["input"].(ExerciseInput)), true
 	case "Mutation.createProgramFromTemplates":
 		if e.ComplexityRoot.Mutation.CreateProgramFromTemplates == nil {
 			break
@@ -416,6 +486,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateWorkoutTemplate(childComplexity, args["name"].(string), args["exercises"].([]*TemplateExerciseInput)), true
+	case "Mutation.deleteExercise":
+		if e.ComplexityRoot.Mutation.DeleteExercise == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteExercise_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteExercise(childComplexity, args["exerciseId"].(uuid.UUID)), true
 	case "Mutation.deleteSet":
 		if e.ComplexityRoot.Mutation.DeleteSet == nil {
 			break
@@ -565,6 +646,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.StartWorkout(childComplexity, args["templateId"].(*uuid.UUID)), true
+	case "Mutation.updateExercise":
+		if e.ComplexityRoot.Mutation.UpdateExercise == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateExercise_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateExercise(childComplexity, args["exerciseId"].(uuid.UUID), args["input"].(ExerciseInput)), true
 	case "Mutation.updateSet":
 		if e.ComplexityRoot.Mutation.UpdateSet == nil {
 			break
@@ -576,6 +668,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateSet(childComplexity, args["setId"].(uuid.UUID), args["reps"].(int), args["weightKg"].(float64), args["rpe"].(*float64), args["setType"].(*SetType)), true
+	case "Mutation.updateWorkoutTemplate":
+		if e.ComplexityRoot.Mutation.UpdateWorkoutTemplate == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateWorkoutTemplate_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateWorkoutTemplate(childComplexity, args["templateId"].(uuid.UUID), args["name"].(string), args["exercises"].([]*TemplateExerciseInput)), true
 
 	case "NextWorkout.day":
 		if e.ComplexityRoot.NextWorkout.Day == nil {
@@ -589,6 +692,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.NextWorkout.Program(childComplexity), true
+	case "NextWorkout.weekNumber":
+		if e.ComplexityRoot.NextWorkout.WeekNumber == nil {
+			break
+		}
+
+		return e.ComplexityRoot.NextWorkout.WeekNumber(childComplexity), true
 
 	case "PageInfo.endCursor":
 		if e.ComplexityRoot.PageInfo.EndCursor == nil {
@@ -707,6 +816,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Program.Notes(childComplexity), true
+	case "Program.progressionRule":
+		if e.ComplexityRoot.Program.ProgressionRule == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Program.ProgressionRule(childComplexity), true
 
 	case "ProgramDay.dayLabel":
 		if e.ComplexityRoot.ProgramDay.DayLabel == nil {
@@ -739,6 +854,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ProgressPoint.Day(childComplexity), true
+	case "ProgressPoint.maxReps":
+		if e.ComplexityRoot.ProgressPoint.MaxReps == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProgressPoint.MaxReps(childComplexity), true
 	case "ProgressPoint.maxWeight":
 		if e.ComplexityRoot.ProgressPoint.MaxWeight == nil {
 			break
@@ -864,6 +985,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.PlateauStatus(childComplexity, args["exerciseId"].(uuid.UUID)), true
+	case "Query.programDayTargets":
+		if e.ComplexityRoot.Query.ProgramDayTargets == nil {
+			break
+		}
+
+		args, err := ec.field_Query_programDayTargets_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ProgramDayTargets(childComplexity, args["programDayId"].(uuid.UUID)), true
 	case "Query.progressOverTime":
 		if e.ComplexityRoot.Query.ProgressOverTime == nil {
 			break
@@ -1190,6 +1322,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCreateProgramInput,
+		ec.unmarshalInputExerciseInput,
 		ec.unmarshalInputFitnessProfileInput,
 		ec.unmarshalInputProgramDayInput,
 		ec.unmarshalInputTemplateExerciseInput,
@@ -1350,6 +1483,24 @@ func (ec *executionContext) childFields_Exercise(ctx context.Context, field grap
 	return nil, fmt.Errorf("no field named %q was found under type Exercise", field.Name)
 }
 
+func (ec *executionContext) childFields_ExerciseTarget(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "exerciseId":
+		return ec.fieldContext_ExerciseTarget_exerciseId(ctx, field)
+	case "targetSets":
+		return ec.fieldContext_ExerciseTarget_targetSets(ctx, field)
+	case "targetReps":
+		return ec.fieldContext_ExerciseTarget_targetReps(ctx, field)
+	case "suggestedWeightKg":
+		return ec.fieldContext_ExerciseTarget_suggestedWeightKg(ctx, field)
+	case "weekNumber":
+		return ec.fieldContext_ExerciseTarget_weekNumber(ctx, field)
+	case "reasoning":
+		return ec.fieldContext_ExerciseTarget_reasoning(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ExerciseTarget", field.Name)
+}
+
 func (ec *executionContext) childFields_LogSetResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "set":
@@ -1366,6 +1517,8 @@ func (ec *executionContext) childFields_NextWorkout(ctx context.Context, field g
 		return ec.fieldContext_NextWorkout_program(ctx, field)
 	case "day":
 		return ec.fieldContext_NextWorkout_day(ctx, field)
+	case "weekNumber":
+		return ec.fieldContext_NextWorkout_weekNumber(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type NextWorkout", field.Name)
 }
@@ -1428,6 +1581,8 @@ func (ec *executionContext) childFields_Program(ctx context.Context, field graph
 		return ec.fieldContext_Program_days(ctx, field)
 	case "isActive":
 		return ec.fieldContext_Program_isActive(ctx, field)
+	case "progressionRule":
+		return ec.fieldContext_Program_progressionRule(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Program", field.Name)
 }
@@ -1454,6 +1609,8 @@ func (ec *executionContext) childFields_ProgressPoint(ctx context.Context, field
 		return ec.fieldContext_ProgressPoint_totalVolume(ctx, field)
 	case "maxWeight":
 		return ec.fieldContext_ProgressPoint_maxWeight(ctx, field)
+	case "maxReps":
+		return ec.fieldContext_ProgressPoint_maxReps(ctx, field)
 	case "setCount":
 		return ec.fieldContext_ProgressPoint_setCount(ctx, field)
 	}
@@ -1720,6 +1877,20 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_createExercise_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (ExerciseInput, error) {
+			return ec.unmarshalNExerciseInput2workouttrackerᚋinternalᚋgraphqlᚐExerciseInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createProgramFromTemplates_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1753,6 +1924,20 @@ func (ec *executionContext) field_Mutation_createWorkoutTemplate_args(ctx contex
 		return nil, err
 	}
 	args["exercises"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteExercise_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "exerciseId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["exerciseId"] = arg0
 	return args, nil
 }
 
@@ -2026,6 +2211,28 @@ func (ec *executionContext) field_Mutation_startWorkout_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_updateExercise_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "exerciseId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["exerciseId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (ExerciseInput, error) {
+			return ec.unmarshalNExerciseInput2workouttrackerᚋinternalᚋgraphqlᚐExerciseInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateSet_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2069,6 +2276,36 @@ func (ec *executionContext) field_Mutation_updateSet_args(ctx context.Context, r
 		return nil, err
 	}
 	args["setType"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateWorkoutTemplate_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "templateId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["templateId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "name",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["name"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "exercises",
+		func(ctx context.Context, v any) ([]*TemplateExerciseInput, error) {
+			return ec.unmarshalNTemplateExerciseInput2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐTemplateExerciseInputᚄ(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["exercises"] = arg2
 	return args, nil
 }
 
@@ -2147,6 +2384,20 @@ func (ec *executionContext) field_Query_plateauStatus_args(ctx context.Context, 
 		return nil, err
 	}
 	args["exerciseId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_programDayTargets_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "programDayId",
+		func(ctx context.Context, v any) (uuid.UUID, error) {
+			return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["programDayId"] = arg0
 	return args, nil
 }
 
@@ -2625,6 +2876,144 @@ func (ec *executionContext) _Exercise_instructions(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_Exercise_instructions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Exercise", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ExerciseTarget_exerciseId(ctx context.Context, field graphql.CollectedField, obj *ExerciseTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ExerciseTarget_exerciseId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExerciseID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v uuid.UUID) graphql.Marshaler {
+			return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ExerciseTarget_exerciseId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ExerciseTarget", field, false, false, errors.New("field of type UUID does not have child fields"))
+}
+
+func (ec *executionContext) _ExerciseTarget_targetSets(ctx context.Context, field graphql.CollectedField, obj *ExerciseTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ExerciseTarget_targetSets(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TargetSets, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ExerciseTarget_targetSets(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ExerciseTarget", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ExerciseTarget_targetReps(ctx context.Context, field graphql.CollectedField, obj *ExerciseTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ExerciseTarget_targetReps(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TargetReps, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ExerciseTarget_targetReps(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ExerciseTarget", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ExerciseTarget_suggestedWeightKg(ctx context.Context, field graphql.CollectedField, obj *ExerciseTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ExerciseTarget_suggestedWeightKg(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SuggestedWeightKg, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ExerciseTarget_suggestedWeightKg(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ExerciseTarget", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ExerciseTarget_weekNumber(ctx context.Context, field graphql.CollectedField, obj *ExerciseTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ExerciseTarget_weekNumber(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WeekNumber, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ExerciseTarget_weekNumber(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ExerciseTarget", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ExerciseTarget_reasoning(ctx context.Context, field graphql.CollectedField, obj *ExerciseTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ExerciseTarget_reasoning(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Reasoning, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ExerciseTarget_reasoning(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ExerciseTarget", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _LogSetResult_set(ctx context.Context, field graphql.CollectedField, obj *LogSetResult) (ret graphql.Marshaler) {
@@ -3175,6 +3564,50 @@ func (ec *executionContext) fieldContext_Mutation_createWorkoutTemplate(ctx cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_updateWorkoutTemplate(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateWorkoutTemplate(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateWorkoutTemplate(ctx, fc.Args["templateId"].(uuid.UUID), fc.Args["name"].(string), fc.Args["exercises"].([]*TemplateExerciseInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *WorkoutTemplate) graphql.Marshaler {
+			return ec.marshalNWorkoutTemplate2ᚖworkouttrackerᚋinternalᚋgraphqlᚐWorkoutTemplate(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateWorkoutTemplate(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WorkoutTemplate(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateWorkoutTemplate_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_deleteWorkoutTemplate(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3213,6 +3646,138 @@ func (ec *executionContext) fieldContext_Mutation_deleteWorkoutTemplate(ctx cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_deleteWorkoutTemplate_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createExercise(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createExercise(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateExercise(ctx, fc.Args["input"].(ExerciseInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *Exercise) graphql.Marshaler {
+			return ec.marshalNExercise2ᚖworkouttrackerᚋinternalᚋgraphqlᚐExercise(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createExercise(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Exercise(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createExercise_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateExercise(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateExercise(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateExercise(ctx, fc.Args["exerciseId"].(uuid.UUID), fc.Args["input"].(ExerciseInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *Exercise) graphql.Marshaler {
+			return ec.marshalNExercise2ᚖworkouttrackerᚋinternalᚋgraphqlᚐExercise(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateExercise(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Exercise(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateExercise_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteExercise(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteExercise(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteExercise(ctx, fc.Args["exerciseId"].(uuid.UUID))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteExercise(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteExercise_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3489,6 +4054,29 @@ func (ec *executionContext) fieldContext_NextWorkout_day(_ context.Context, fiel
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _NextWorkout_weekNumber(ctx context.Context, field graphql.CollectedField, obj *NextWorkout) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_NextWorkout_weekNumber(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WeekNumber, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_NextWorkout_weekNumber(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("NextWorkout", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *PageInfo) (ret graphql.Marshaler) {
@@ -3937,6 +4525,29 @@ func (ec *executionContext) fieldContext_Program_isActive(_ context.Context, fie
 	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
+func (ec *executionContext) _Program_progressionRule(ctx context.Context, field graphql.CollectedField, obj *Program) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Program_progressionRule(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ProgressionRule, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v ProgressionRule) graphql.Marshaler {
+			return ec.marshalNProgressionRule2workouttrackerᚋinternalᚋgraphqlᚐProgressionRule(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Program_progressionRule(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Program", field, false, false, errors.New("field of type ProgressionRule does not have child fields"))
+}
+
 func (ec *executionContext) _ProgramDay_id(ctx context.Context, field graphql.CollectedField, obj *ProgramDay) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4105,6 +4716,29 @@ func (ec *executionContext) _ProgressPoint_maxWeight(ctx context.Context, field 
 }
 func (ec *executionContext) fieldContext_ProgressPoint_maxWeight(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ProgressPoint", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ProgressPoint_maxReps(ctx context.Context, field graphql.CollectedField, obj *ProgressPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProgressPoint_maxReps(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MaxReps, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProgressPoint_maxReps(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProgressPoint", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _ProgressPoint_setCount(ctx context.Context, field graphql.CollectedField, obj *ProgressPoint) (ret graphql.Marshaler) {
@@ -4794,6 +5428,50 @@ func (ec *executionContext) fieldContext_Query_nextWorkout(_ context.Context, fi
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_NextWorkout(ctx, field)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_programDayTargets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_programDayTargets(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ProgramDayTargets(ctx, fc.Args["programDayId"].(uuid.UUID))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ExerciseTarget) graphql.Marshaler {
+			return ec.marshalNExerciseTarget2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐExerciseTargetᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_programDayTargets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ExerciseTarget(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_programDayTargets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -7002,6 +7680,57 @@ func (ec *executionContext) unmarshalInputCreateProgramInput(ctx context.Context
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputExerciseInput(ctx context.Context, obj any) (ExerciseInput, error) {
+	var it ExerciseInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "category", "muscleGroups", "equipment"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "category":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("category"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Category = data
+		case "muscleGroups":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("muscleGroups"))
+			data, err := ec.unmarshalNString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MuscleGroups = data
+		case "equipment":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("equipment"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Equipment = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputFitnessProfileInput(ctx context.Context, obj any) (FitnessProfileInput, error) {
 	var it FitnessProfileInput
 	if obj == nil {
@@ -7325,6 +8054,69 @@ func (ec *executionContext) _Exercise(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
+var exerciseTargetImplementors = []string{"ExerciseTarget"}
+
+func (ec *executionContext) _ExerciseTarget(ctx context.Context, sel ast.SelectionSet, obj *ExerciseTarget) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, exerciseTargetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ExerciseTarget")
+		case "exerciseId":
+			out.Values[i] = ec._ExerciseTarget_exerciseId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "targetSets":
+			out.Values[i] = ec._ExerciseTarget_targetSets(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "targetReps":
+			out.Values[i] = ec._ExerciseTarget_targetReps(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "suggestedWeightKg":
+			out.Values[i] = ec._ExerciseTarget_suggestedWeightKg(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "weekNumber":
+			out.Values[i] = ec._ExerciseTarget_weekNumber(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reasoning":
+			out.Values[i] = ec._ExerciseTarget_reasoning(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var logSetResultImplementors = []string{"LogSetResult"}
 
 func (ec *executionContext) _LogSetResult(ctx context.Context, sel ast.SelectionSet, obj *LogSetResult) graphql.Marshaler {
@@ -7465,9 +8257,37 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateWorkoutTemplate":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateWorkoutTemplate(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "deleteWorkoutTemplate":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deleteWorkoutTemplate(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createExercise":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createExercise(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateExercise":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateExercise(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteExercise":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteExercise(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -7547,6 +8367,11 @@ func (ec *executionContext) _NextWorkout(ctx context.Context, sel ast.SelectionS
 			}
 		case "day":
 			out.Values[i] = ec._NextWorkout_day(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "weekNumber":
+			out.Values[i] = ec._NextWorkout_weekNumber(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -7777,6 +8602,11 @@ func (ec *executionContext) _Program(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "progressionRule":
+			out.Values[i] = ec._Program_progressionRule(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7875,6 +8705,11 @@ func (ec *executionContext) _ProgressPoint(ctx context.Context, sel ast.Selectio
 			}
 		case "maxWeight":
 			out.Values[i] = ec._ProgressPoint_maxWeight(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "maxReps":
+			out.Values[i] = ec._ProgressPoint_maxReps(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -8296,6 +9131,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}()
 				res = ec._Query_nextWorkout(ctx, field)
 				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "programDayTargets":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_programDayTargets(ctx, field)
+				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
@@ -9288,6 +10145,10 @@ func (ec *executionContext) unmarshalNCreateProgramInput2workouttrackerᚋintern
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNExercise2workouttrackerᚋinternalᚋgraphqlᚐExercise(ctx context.Context, sel ast.SelectionSet, v Exercise) graphql.Marshaler {
+	return ec._Exercise(ctx, sel, &v)
+}
+
 func (ec *executionContext) marshalNExercise2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐExerciseᚄ(ctx context.Context, sel ast.SelectionSet, v []*Exercise) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -9312,6 +10173,37 @@ func (ec *executionContext) marshalNExercise2ᚖworkouttrackerᚋinternalᚋgrap
 		return graphql.Null
 	}
 	return ec._Exercise(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNExerciseInput2workouttrackerᚋinternalᚋgraphqlᚐExerciseInput(ctx context.Context, v any) (ExerciseInput, error) {
+	res, err := ec.unmarshalInputExerciseInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNExerciseTarget2ᚕᚖworkouttrackerᚋinternalᚋgraphqlᚐExerciseTargetᚄ(ctx context.Context, sel ast.SelectionSet, v []*ExerciseTarget) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNExerciseTarget2ᚖworkouttrackerᚋinternalᚋgraphqlᚐExerciseTarget(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNExerciseTarget2ᚖworkouttrackerᚋinternalᚋgraphqlᚐExerciseTarget(ctx context.Context, sel ast.SelectionSet, v *ExerciseTarget) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ExerciseTarget(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNExperienceLevel2workouttrackerᚋinternalᚋgraphqlᚐExperienceLevel(ctx context.Context, v any) (ExperienceLevel, error) {
@@ -9534,6 +10426,16 @@ func (ec *executionContext) marshalNProgressPoint2ᚖworkouttrackerᚋinternal�
 		return graphql.Null
 	}
 	return ec._ProgressPoint(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNProgressionRule2workouttrackerᚋinternalᚋgraphqlᚐProgressionRule(ctx context.Context, v any) (ProgressionRule, error) {
+	var res ProgressionRule
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNProgressionRule2workouttrackerᚋinternalᚋgraphqlᚐProgressionRule(ctx context.Context, sel ast.SelectionSet, v ProgressionRule) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNSetType2workouttrackerᚋinternalᚋgraphqlᚐSetType(ctx context.Context, v any) (SetType, error) {

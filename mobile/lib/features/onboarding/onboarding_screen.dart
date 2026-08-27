@@ -39,7 +39,17 @@ const _slides = [
 /// skipped — either the whole tour (visible on every intro slide) or just
 /// the personalization step once reached.
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.showPersonalization = true, this.onDone});
+
+  /// Whether the last page (the goal/equipment form that generates a
+  /// program) is shown. False for a returning user who already has a
+  /// profile or program, and for replaying the tour from the menu.
+  final bool showPersonalization;
+
+  /// Called when the tour is finished or skipped. Defaults to marking
+  /// first-run onboarding complete; a replay-from-menu caller passes a
+  /// closure that pops its pushed route instead.
+  final VoidCallback? onDone;
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -49,7 +59,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _controller = PageController();
   int _page = 0;
 
-  void _complete() => markOnboardingComplete(ref);
+  void _complete() {
+    if (widget.onDone != null) {
+      widget.onDone!();
+    } else {
+      markOnboardingComplete(ref);
+    }
+  }
 
   void _next() {
     _controller.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
@@ -64,6 +80,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final onIntroSlide = _page < _slides.length;
+    final isLastIntroSlide = _page == _slides.length - 1;
 
     return Scaffold(
       body: SafeArea(
@@ -91,7 +108,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 onPageChanged: (i) => setState(() => _page = i),
                 children: [
                   for (final slide in _slides) _IntroSlideView(slide: slide),
-                  FitnessProfileForm(onSkip: _complete, onGenerated: _complete),
+                  if (widget.showPersonalization)
+                    FitnessProfileForm(onSkip: _complete, onGenerated: _complete),
                 ],
               ),
             ),
@@ -118,8 +136,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _next,
-                    child: Text(_page == _slides.length - 1 ? 'Get started' : 'Next'),
+                    onPressed: isLastIntroSlide && !widget.showPersonalization ? _complete : _next,
+                    child: Text(isLastIntroSlide ? 'Get started' : 'Next'),
                   ),
                 ),
               ),

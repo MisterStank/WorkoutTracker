@@ -46,6 +46,37 @@ func (r *WorkoutTemplateRepository) Create(ctx context.Context, t *domain.Workou
 	return tx.Commit(ctx)
 }
 
+func (r *WorkoutTemplateRepository) Update(ctx context.Context, t *domain.WorkoutTemplate) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `UPDATE workout_templates SET name = $2 WHERE id = $1`, t.ID, t.Name)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrTemplateNotFound
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM workout_template_exercises WHERE template_id = $1`, t.ID); err != nil {
+		return err
+	}
+	for _, ex := range t.Exercises {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO workout_template_exercises (id, template_id, exercise_id, position, target_sets, target_reps, superset_group)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			ex.ID, t.ID, ex.ExerciseID, ex.Position, ex.TargetSets, ex.TargetReps, ex.SupersetGroup,
+		); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (r *WorkoutTemplateRepository) ListForUser(ctx context.Context, userID uuid.UUID) ([]*domain.WorkoutTemplate, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT id, user_id, name, created_at FROM workout_templates WHERE user_id = $1 ORDER BY created_at DESC`,

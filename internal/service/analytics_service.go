@@ -120,6 +120,9 @@ func (s *AnalyticsService) InvalidateForSet(ctx context.Context, userID, exercis
 }
 
 func (s *AnalyticsService) LogBodyMetric(ctx context.Context, userID uuid.UUID, metricType string, value float64) (*domain.BodyMetric, error) {
+	if err := ValidateBodyMetric(metricType, value); err != nil {
+		return nil, err
+	}
 	m := &domain.BodyMetric{
 		ID:         uuid.New(),
 		UserID:     userID,
