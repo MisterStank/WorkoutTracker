@@ -212,4 +212,11 @@ Future<LoggedSetInput?> showLogSetSheet(
   );
 }
 
-String _formatWeight(double value) => value.truncateToDouble() == value ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+/// Whole numbers show with no decimals; fractional weights keep up to two
+/// places with trailing zeros trimmed (so a 2.5 kg-rounded suggestion like
+/// 67.5 stays "67.5", and a hand-logged 66.25 stays "66.25" rather than
+/// being mangled to "66.3").
+String _formatWeight(double value) {
+  if (value.truncateToDouble() == value) return value.toStringAsFixed(0);
+  return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+}

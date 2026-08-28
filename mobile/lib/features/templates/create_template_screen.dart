@@ -123,7 +123,12 @@ class _CreateTemplateScreenState extends ConsumerState<CreateTemplateScreen> {
         await repo.create(name: name, exercises: _exercises);
       }
       ref.invalidate(templateCatalogProvider);
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isEditing ? 'Template updated' : 'Template saved')),
+        );
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
       setState(() => _saving = false);
       if (mounted) {

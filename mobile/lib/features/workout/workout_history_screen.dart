@@ -67,6 +67,9 @@ class _WorkoutHistoryScreenState extends ConsumerState<WorkoutHistoryScreen> {
     setState(() => _workouts.removeWhere((w) => w.id == workout.id));
     try {
       await ref.read(workoutRepositoryProvider).deleteWorkout(workout.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Workout deleted')));
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _workouts.add(workout));

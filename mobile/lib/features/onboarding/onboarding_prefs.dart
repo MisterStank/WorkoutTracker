@@ -31,3 +31,13 @@ void markOnboardingComplete(WidgetRef ref) {
   ref.read(onboardingCompleteProvider.notifier).state = true;
   _storage.write(key: _onboardingCompleteKey, value: 'true');
 }
+
+/// Clears the device flag — called right after a fresh sign-up so a
+/// brand-new account still gets the tour and personalize step even if a
+/// previous user already completed onboarding in this browser / on this
+/// device. The persisted delete runs in the background; the provider flips
+/// synchronously so [AuthGate] re-evaluates immediately.
+void resetOnboarding(WidgetRef ref) {
+  ref.read(onboardingCompleteProvider.notifier).state = false;
+  _storage.delete(key: _onboardingCompleteKey);
+}

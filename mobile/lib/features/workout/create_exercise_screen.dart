@@ -68,7 +68,12 @@ class _CreateExerciseScreenState extends ConsumerState<CreateExerciseScreen> {
               equipment: _equipment,
             );
       ref.invalidate(exerciseCatalogProvider);
-      if (mounted) Navigator.of(context).pop(saved);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isEditing ? "Saved '${saved.name}'" : "Created '${saved.name}'")),
+        );
+        Navigator.of(context).pop(saved);
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);

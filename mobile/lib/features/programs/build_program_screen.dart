@@ -103,7 +103,10 @@ class _BuildProgramScreenState extends ConsumerState<BuildProgramScreen> {
             name,
             [for (final d in _days) (d.labelController.text.trim().isEmpty ? 'Day' : d.labelController.text.trim(), d.templateId)],
           );
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Created "$name"')));
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create program: $e')));

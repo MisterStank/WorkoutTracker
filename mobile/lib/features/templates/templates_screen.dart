@@ -48,6 +48,9 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
     try {
       await ref.read(templateRepositoryProvider).delete(templateId);
       setState(_reload);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Template deleted')));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not delete: $e')));

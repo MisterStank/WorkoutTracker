@@ -233,7 +233,7 @@ func progressionTarget(rule domain.ProgressionRule, base float64, week int, delo
 		return 0, "First time — pick a weight you can control for all sets."
 	}
 	if deload {
-		return roundToNearest(base*0.9, 1.25), fmt.Sprintf("Week %d is a deload — ~10%% lighter to recover.", week)
+		return roundToNearest(base*0.9, loadableStepKg), fmt.Sprintf("Week %d is a deload — ~10%% lighter to recover.", week)
 	}
 	switch rule {
 	case domain.ProgressionLinear:
@@ -242,11 +242,14 @@ func progressionTarget(rule domain.ProgressionRule, base float64, week int, delo
 			step = 2.5
 		}
 		add := step * float64(week-1)
-		return roundToNearest(base+add, 1.25), fmt.Sprintf("Linear progression — up ~%.2gkg/week from your last %gkg.", step, base)
+		if add == 0 {
+			return base, fmt.Sprintf("Week 1 — start at your last working weight (%gkg).", base)
+		}
+		return roundToNearest(base+add, loadableStepKg), fmt.Sprintf("Linear progression — up ~%.2gkg/week from your last %gkg.", step, base)
 	case domain.ProgressionDouble:
-		return roundToNearest(base, 1.25), "Double progression — hold this weight and add reps until you hit the top of the range, then go up."
+		return base, "Double progression — hold this weight and add reps until you hit the top of the range, then go up."
 	default:
-		return roundToNearest(base, 1.25), fmt.Sprintf("Repeat your last working weight (%gkg).", base)
+		return base, fmt.Sprintf("Repeat your last working weight (%gkg).", base)
 	}
 }
 

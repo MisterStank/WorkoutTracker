@@ -540,7 +540,27 @@ func (s *WorkoutService) SuggestNextSet(ctx context.Context, userID, exerciseID 
 		reasoning = fmt.Sprintf("Last set was near failure (RPE %.1f) — consider backing off slightly.", rpe)
 	}
 
-	suggested := roundToNearest(last.WeightKg*multiplier, 1.25)
+	var suggested float64
+	switch {
+	case multiplier == 1.0:
+		// "Repeat" — hand back exactly what they lifted, no rounding.
+		suggested = last.WeightKg
+	case multiplier > 1.0:
+		// Going up: round the target, but never below the next loadable step
+		// above the last weight (coarse rounding must not turn "go heavier"
+		// into "stay the same").
+		suggested = roundToNearest(last.WeightKg*multiplier, loadableStepKg)
+		if floor := math.Floor(last.WeightKg/loadableStepKg) * loadableStepKg; suggested <= floor {
+			suggested = floor + loadableStepKg
+		}
+	default:
+		// Backing off: round down so it's genuinely lighter, but keep at
+		// least one step on the bar.
+		suggested = math.Floor(last.WeightKg*multiplier/loadableStepKg) * loadableStepKg
+		if suggested < loadableStepKg {
+			suggested = loadableStepKg
+		}
+	}
 	return &ProgressionSuggestion{
 		SuggestedWeightKg: suggested,
 		SuggestedReps:     last.Reps,
@@ -548,6 +568,13 @@ func (s *WorkoutService) SuggestNextSet(ctx context.Context, userID, exerciseID 
 		BasedOnRPE:        last.RPE,
 	}, nil
 }
+
+// loadableStepKg is the smallest weight change a lifter can actually make on
+// a standard barbell — 1.25 kg plates per side, so 2.5 kg total. Progression
+// suggestions round to this so the pre-filled weight is a number you can
+// load without micro-plates (and one the app can display cleanly), instead
+// of e.g. 66.25 kg.
+const loadableStepKg = 2.5
 
 func roundToNearest(value, step float64) float64 {
 	return math.Round(value/step) * step

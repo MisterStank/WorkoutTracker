@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../onboarding/onboarding_prefs.dart';
+import '../onboarding/onboarding_status.dart';
 import 'auth_provider.dart';
 import 'auth_scaffold.dart';
 import 'auth_state.dart';
@@ -53,8 +55,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     // pushed route has to pop itself, or the user would end up "stuck"
     // looking at a still-mounted signup form.
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next is AuthAuthenticated && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+      if (next is AuthAuthenticated && previous is! AuthAuthenticated) {
+        // This is a brand-new account: make sure it gets the first-run tour
+        // even if a previous user already finished onboarding on this device,
+        // and drop any cached "returning user" decision from that session.
+        resetOnboarding(ref);
+        ref.invalidate(onboardingDecisionProvider);
+        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
       }
     });
 

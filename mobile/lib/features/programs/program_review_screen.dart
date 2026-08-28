@@ -36,7 +36,12 @@ class _ProgramReviewScreenState extends ConsumerState<ProgramReviewScreen> {
     setState(() => _activating = true);
     try {
       final updated = await ref.read(fitnessProfileRepositoryProvider).setActiveProgram(_program.id);
-      if (mounted) setState(() => _program = updated);
+      if (mounted) {
+        setState(() => _program = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Now following ${updated.name} — it's on your Home tab")),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not activate program: $e')));
@@ -61,6 +66,18 @@ class _ProgramReviewScreenState extends ConsumerState<ProgramReviewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(_program.name)),
+      // A clear way out of the flow — reached right after generating a
+      // program (on top of the now-stale profile form) or by tapping one
+      // on the Programs tab; either way "Done" returns to the app shell
+      // rather than making the user hunt for the back arrow, or tap it
+      // twice to get past the form.
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: OutlinedButton(
+          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          child: const Text('Done'),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

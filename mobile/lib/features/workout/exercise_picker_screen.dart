@@ -101,6 +101,9 @@ class _ExercisePickerScreenState extends ConsumerState<ExercisePickerScreen> {
         await ref.read(workoutRepositoryProvider).deleteExercise(exercise.id);
         ref.invalidate(exerciseCatalogProvider);
         await _search(_searchController.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Deleted '${exercise.name}'")));
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'.replaceFirst('Exception: ', ''))));
