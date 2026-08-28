@@ -29,9 +29,9 @@ Create an account with your email, a password (at least 8 characters), and a dis
   <img src="images/login-dark.png" width="200" alt="Login screen, dark theme">
 </p>
 
-Already have an account? Use **Log in** instead. To sign out at any time, open the **⋮** menu on the Home tab and tap **Log out**.
+Already have an account? Use **Log in** instead. To sign out, tap your **profile avatar** in the Home tab's top bar and choose **Log out**.
 
-**First-run tour**: the first time you log in on a device, a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Programs** tab. If you're signing in on a new device and your account already has a fitness profile or a program, the app skips the tour entirely and drops you straight into the home screen. You can replay the tour any time from **View app tour** in the Home tab's **⋮** menu.
+**First-run tour**: the first time you sign up — and the first time you log in on a device that hasn't seen it — a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Programs** tab. If you're signing in on a device that's already seen the tour and your account already has a fitness profile or a program, the app skips it entirely and drops you straight into the home screen. You can replay the tour any time from **View app tour** behind your profile avatar.
 
 <p>
   <img src="images/onboarding-slide-1.png" width="180" alt="Tour slide 1: Log workouts fast">
@@ -65,7 +65,7 @@ Once a workout is running, the top bar shows a live elapsed-time clock and your 
   <img src="images/resume-bar.png" width="220" alt="Resume-workout bar visible on a non-Home tab">
 </p>
 
-**Finishing up**: tap **Finish workout** at the bottom of the screen. You can add optional notes about how the session went before confirming — these are saved with the workout and visible later in your history. The same dialog has a **Discard** action if you want to throw the session away instead; and if you tap Finish without having logged any sets, the app offers to discard the empty session rather than clutter your history with it.
+**Finishing up**: tap **Finish workout** at the bottom of the screen. The panel that opens is a bottom sheet, not a cramped dialog — a set-count and duration line at the top, an optional notes field (saved with the workout, visible later in history), then **Finish workout** and **Keep going** stacked full-width, with **Discard workout** set apart below a divider so it can't be mis-tapped for the button next to it. If you tap Finish without having logged any sets, the app offers to discard the empty session rather than clutter your history with it.
 
 ## 3. Logging a set
 
@@ -100,7 +100,11 @@ Every logged set beyond a warm-up is checked against your history for four kinds
 
 **Bodyweight exercises**: for anything tagged *bodyweight* (pull-ups, dips, push-ups…), the weight field means *added* load — enter `0` for plain bodyweight, a positive number for weighted, or a negative number for assisted. Since the weight stays at zero, the **most reps** record is what tracks progress here, and the "By exercise" chart defaults to reps for them.
 
-**Plate calculator**: tap the calculator icon in the set sheet to see which plates to load per side of the bar for the weight you've entered — useful mid-set when doing the arithmetic in your head is the last thing you want to do.
+**Plate calculator**: tap the calculator icon in the set sheet and a little barbell diagram shows which plates to load per side for the weight you've entered — drawn to scale and colour-coded by size. Pick your bar with the **20 / 15 / 10 kg** presets (it remembers which you use) or type a custom weight; a line underneath confirms the exact total it loads to, or flags it when standard plates can't hit your target.
+
+<p>
+  <img src="images/plate-calculator.png" width="220" alt="Plate calculator — a barbell diagram of the plates per side">
+</p>
 
 **Repeat last set**: each exercise card in an active workout has a **Repeat last** button — logs another set identical to the one before it (same reps, weight, RPE, and set type) in a single tap, for straight sets across working sets.
 
@@ -217,6 +221,8 @@ Open the set sheet for an exercise you've logged before with an RPE, and a sugge
 | 7.5 – 8.5 | Solid effort — same weight, aim for an extra rep. |
 | > 8.5 | Near failure — weight reduced about 5%. |
 
+The suggested weight always lands on a loadable **2.5 kg / 5 lb** step (and "same weight" hands back exactly what you last lifted), so you're never told to load a number you can't actually make.
+
 No RPE logged yet for that exercise? The sheet just pre-fills your last set with no suggestion attached — log an RPE once and suggestions start from the next time.
 
 When the workout was started from a **program day**, the suggestion instead comes from that program's week-to-week progression rule (see [Chapter 6](#6-personalized-programs)) — labelled "Week N · …" — rather than this RPE table.
@@ -237,13 +243,15 @@ WorkoutTracker doesn't do live workout sharing — instead, you get a shareable 
   <img src="images/share-workout-summary.png" width="220" alt="Workout summary share card preview">
 </p>
 
-Either way, you get a preview first — nothing goes out until you tap **Share** on the preview, which hands the image to your device's normal share sheet so you can post it wherever you like (Instagram, messages, etc.). Both cards render with the same fixed dark red-and-black look regardless of your app theme, so the image looks consistent no matter which theme you're using.
+Either way, you get a preview first. It has **Download image** — a plain download, or your Files app — and **Share…**, which hands the image to your device's share sheet so you can post it wherever you like (Instagram, messages, etc.). Nothing leaves the app until you pick one. Both cards render with the same fixed dark red-and-black look regardless of your app theme, so the image looks consistent no matter which theme you're using.
 
 ## 11. Units & settings
 
-Tap the **KG** / **LB** label in the Home tab's top bar to switch your preferred weight unit. This changes how weight is displayed and entered across the entire app — set logging, history, progress charts, and body weight — in one place. Everything is still stored in kilograms behind the scenes, so switching back and forth never loses precision.
+Everything here lives behind your **profile avatar** in the Home tab's top bar — tap it to open the settings sheet.
 
-**Theme**: open the **⋮** menu on the Home tab and choose **System**, **Light**, or **Dark** — System follows your device's setting, and your choice is remembered.
+**Units**: switch **Kilograms** / **Pounds**. This changes how weight is displayed and entered across the entire app — set logging, history, progress charts, and body weight — in one place. Everything is still stored in kilograms behind the scenes, so switching back and forth never loses precision.
+
+**Appearance**: choose **System**, **Light**, or **Dark** — System follows your device's setting, and your choice is remembered. The theme changes instantly, so you can see it before closing the sheet.
 
 ---
 
