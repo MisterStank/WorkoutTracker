@@ -13,6 +13,7 @@ import '../../core/units/units_provider.dart';
 import '../../core/units/weight_unit.dart';
 import '../../core/widgets/semantic_banner.dart';
 import '../auth/auth_provider.dart';
+import '../auth/auth_state.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../programs/fitness_profile_models.dart';
 import '../programs/fitness_profile_provider.dart';
@@ -32,8 +33,51 @@ import 'workout_models.dart';
 import 'workout_provider.dart';
 import 'workout_state.dart';
 
-enum _OverflowAction { themeSystem, themeLight, themeDark, viewTour, logout }
 enum _SetAction { edit, delete }
+enum _FinishChoice { finish, discard }
+
+/// A confirm dialog whose two choices are stacked full-width with a gap
+/// between them, so a destructive action never sits shoulder-to-shoulder
+/// with the safe one in a cramped button row.
+Future<bool> _confirmDestructive(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  required String cancelLabel,
+}) async {
+  final colorScheme = Theme.of(context).colorScheme;
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(message),
+          const SizedBox(height: 24),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(cancelLabel),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              foregroundColor: colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+      actionsPadding: EdgeInsets.zero,
+    ),
+  );
+  return result == true;
+}
 
 class WorkoutHomeScreen extends ConsumerWidget {
   const WorkoutHomeScreen({super.key});
@@ -119,22 +163,14 @@ class WorkoutHomeScreen extends ConsumerWidget {
     final unit = ref.read(weightUnitProvider);
     final displayWeight = unit.fromKg(set.weightKg);
     final weightStr = displayWeight.toStringAsFixed(displayWeight.truncateToDouble() == displayWeight ? 0 : 1);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete set?'),
-        content: Text('This removes set ${set.setNumber} — ${set.reps} reps × $weightStr ${unit.label}.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await _confirmDestructive(
+      context,
+      title: 'Delete set?',
+      message: 'This removes set ${set.setNumber} — ${set.reps} reps × $weightStr ${unit.label}.',
+      confirmLabel: 'Delete set',
+      cancelLabel: 'Keep it',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await ref.read(activeWorkoutProvider.notifier).deleteSet(set.id);
   }
 
@@ -180,22 +216,14 @@ class WorkoutHomeScreen extends ConsumerWidget {
   }
 
   Future<void> _discard(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Discard workout?'),
-        content: const Text('This deletes the session and any sets logged in it. This can\'t be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+    final confirmed = await _confirmDestructive(
+      context,
+      title: 'Discard workout?',
+      message: "This deletes the session and any sets logged in it. This can't be undone.",
+      confirmLabel: 'Discard workout',
+      cancelLabel: 'Keep going',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await ref.read(activeWorkoutProvider.notifier).discard();
     ref.read(activeSupersetsProvider.notifier).reset();
     ref.read(activeProgramTargetsProvider.notifier).clear();
@@ -203,22 +231,20 @@ class WorkoutHomeScreen extends ConsumerWidget {
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
     final state = ref.read(activeWorkoutProvider);
-    final isEmpty = state is ActiveWorkoutInProgress && state.workout.sets.isEmpty;
-    if (isEmpty) {
+    if (state is! ActiveWorkoutInProgress) return;
+    final workout = state.workout;
+
+    if (workout.sets.isEmpty) {
       // Nothing to finish — offer to discard instead of saving a blank
       // session that would only clutter History.
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Nothing logged yet'),
-          content: const Text('You haven\'t logged any sets. Discard this session?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Keep going')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Discard')),
-          ],
-        ),
+      final discard = await _confirmDestructive(
+        context,
+        title: 'Nothing logged yet',
+        message: "You haven't logged any sets. Discard this session?",
+        confirmLabel: 'Discard session',
+        cancelLabel: 'Keep going',
       );
-      if (discard == true) {
+      if (discard && context.mounted) {
         await ref.read(activeWorkoutProvider.notifier).discard();
         ref.read(activeSupersetsProvider.notifier).reset();
         ref.read(activeProgramTargetsProvider.notifier).clear();
@@ -226,36 +252,19 @@ class WorkoutHomeScreen extends ConsumerWidget {
       return;
     }
 
-    final notes = await showDialog<String>(
+    final outcome = await showModalBottomSheet<(_FinishChoice, String)>(
       context: context,
-      builder: (context) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          title: const Text('Finish workout'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(labelText: 'Notes (optional)'),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _discard(context, ref);
-              },
-              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-              child: const Text('Discard'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text),
-              child: const Text('Finish'),
-            ),
-          ],
-        );
-      },
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _FinishWorkoutSheet(workout: workout),
     );
-    if (notes == null) return;
+    if (outcome == null || !context.mounted) return;
+
+    final (choice, notes) = outcome;
+    if (choice == _FinishChoice.discard) {
+      await _discard(context, ref);
+      return;
+    }
 
     final result = await ref.read(activeWorkoutProvider.notifier).finish(notes: notes.isEmpty ? null : notes);
     ref.read(activeSupersetsProvider.notifier).reset();
@@ -267,30 +276,9 @@ class WorkoutHomeScreen extends ConsumerWidget {
     );
   }
 
-  void _handleOverflowAction(BuildContext context, WidgetRef ref, _OverflowAction action) {
-    switch (action) {
-      case _OverflowAction.themeSystem:
-        ref.read(themeModeProvider.notifier).setMode(ThemeMode.system);
-      case _OverflowAction.themeLight:
-        ref.read(themeModeProvider.notifier).setMode(ThemeMode.light);
-      case _OverflowAction.themeDark:
-        ref.read(themeModeProvider.notifier).setMode(ThemeMode.dark);
-      case _OverflowAction.viewTour:
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (ctx) => OnboardingScreen(
-            showPersonalization: false,
-            onDone: () => Navigator.of(ctx).pop(),
-          ),
-        ));
-      case _OverflowAction.logout:
-        ref.read(authProvider.notifier).logout();
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(activeWorkoutProvider);
-    final unit = ref.watch(weightUnitProvider);
     // Keeps SyncService alive for as long as the home screen is mounted, so
     // queued offline sets get pushed as soon as connectivity returns even
     // if the user never re-opens the active-workout screen themselves.
@@ -303,33 +291,15 @@ class WorkoutHomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('WORKOUTTRACKER'),
         actions: [
-          TextButton(
-            onPressed: () => ref.read(weightUnitProvider.notifier).toggle(),
-            child: Text(unit.label.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
-          ),
           if (state is ActiveWorkoutInProgress)
             IconButton(
               icon: const Icon(Icons.link),
               tooltip: 'Group as superset',
               onPressed: () => _groupSuperset(context, ref),
             ),
-          PopupMenuButton<_OverflowAction>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More',
-            onSelected: (action) => _handleOverflowAction(context, ref, action),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Text('Theme', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ),
-              const PopupMenuItem(value: _OverflowAction.themeSystem, child: Text('System')),
-              const PopupMenuItem(value: _OverflowAction.themeLight, child: Text('Light')),
-              const PopupMenuItem(value: _OverflowAction.themeDark, child: Text('Dark')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: _OverflowAction.viewTour, child: Text('View app tour')),
-              const PopupMenuItem(value: _OverflowAction.logout, child: Text('Log out')),
-            ],
-          ),
+          // Account, units, theme and the tour all live behind the avatar
+          // now — one entry point instead of a second overflow menu.
+          const _ProfileAvatar(),
         ],
       ),
       floatingActionButton: state is ActiveWorkoutInProgress
@@ -349,6 +319,258 @@ class WorkoutHomeScreen extends ConsumerWidget {
             onFinish: () => _finish(context, ref),
           ),
       },
+    );
+  }
+}
+
+/// Initials for a display name: first letter of the first and last words
+/// ("Demo User" -> "DU"), or the first two letters of a single word.
+String _initials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  if (parts.isEmpty) return '?';
+  if (parts.length == 1) {
+    return parts.first.characters.take(2).toString().toUpperCase();
+  }
+  return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
+}
+
+/// The signed-in user's avatar in the AppBar — a filled circle with their
+/// initials. Tapping it opens [_ProfileSheet]: who you're logged in as, plus
+/// the app's settings (units, theme), the tour, and Log out — everything
+/// that used to be split between here and a separate overflow menu.
+class _ProfileAvatar extends ConsumerWidget {
+  const _ProfileAvatar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authProvider);
+    final name = auth is AuthAuthenticated ? auth.displayName : '';
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: IconButton(
+        tooltip: name.isEmpty ? 'Account & settings' : 'Signed in as $name',
+        onPressed: () => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          builder: (_) => const _ProfileSheet(),
+        ),
+        icon: CircleAvatar(
+          radius: 15,
+          backgroundColor: colorScheme.primaryContainer,
+          child: Text(
+            name.isEmpty ? '?' : _initials(name),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onPrimaryContainer,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSheet extends ConsumerWidget {
+  const _ProfileSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authProvider);
+    if (auth is! AuthAuthenticated) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final unit = ref.watch(weightUnitProvider);
+    final themeMode = ref.watch(themeModeProvider);
+
+    Widget sectionLabel(String text) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Text(
+            text.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              letterSpacing: 0.6,
+            ),
+          ),
+        );
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: colorScheme.primaryContainer,
+                  child: Text(
+                    _initials(auth.displayName),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.onPrimaryContainer),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(auth.displayName, style: theme.textTheme.titleMedium),
+                      Text(
+                        auth.email,
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          sectionLabel('Units'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SegmentedButton<WeightUnit>(
+              showSelectedIcon: false,
+              expandedInsets: EdgeInsets.zero,
+              segments: const [
+                ButtonSegment(value: WeightUnit.kg, label: Text('Kilograms')),
+                ButtonSegment(value: WeightUnit.lb, label: Text('Pounds')),
+              ],
+              selected: {unit},
+              onSelectionChanged: (s) {
+                if (s.first != unit) ref.read(weightUnitProvider.notifier).toggle();
+              },
+            ),
+          ),
+
+          sectionLabel('Appearance'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
+              expandedInsets: EdgeInsets.zero,
+              segments: const [
+                ButtonSegment(value: ThemeMode.system, label: Text('System')),
+                ButtonSegment(value: ThemeMode.light, label: Text('Light')),
+                ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+              ],
+              selected: {themeMode},
+              onSelectionChanged: (s) => ref.read(themeModeProvider.notifier).setMode(s.first),
+            ),
+          ),
+
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.map_outlined),
+            title: const Text('View app tour'),
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (ctx) => OnboardingScreen(
+                  showPersonalization: false,
+                  onDone: () => Navigator.of(ctx).pop(),
+                ),
+              ));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Log out'),
+            onTap: () {
+              Navigator.of(context).pop();
+              ref.read(authProvider.notifier).logout();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The "wrap up this workout" sheet. The primary action ("Finish workout")
+/// and the safe out ("Keep going") are stacked full-width; the destructive
+/// "Discard" is a small link pushed to the very bottom, well clear of the
+/// other two — so a mis-tap can't turn "I'm done" into "throw it all away".
+class _FinishWorkoutSheet extends StatefulWidget {
+  const _FinishWorkoutSheet({required this.workout});
+
+  final Workout workout;
+
+  @override
+  State<_FinishWorkoutSheet> createState() => _FinishWorkoutSheetState();
+}
+
+class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
+  final _notes = TextEditingController();
+
+  @override
+  void dispose() {
+    _notes.dispose();
+    super.dispose();
+  }
+
+  String get _summary {
+    final sets = widget.workout.sets.length;
+    final d = DateTime.now().difference(widget.workout.startedAt);
+    final mins = d.inMinutes;
+    final duration = mins >= 60 ? '${mins ~/ 60}h ${mins % 60}m' : '${mins}m';
+    return '$sets set${sets == 1 ? '' : 's'} · $duration';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 4,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Finish workout', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(_summary, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _notes,
+            decoration: const InputDecoration(
+              labelText: 'Notes (optional)',
+              hintText: 'How did it feel?',
+            ),
+            textInputAction: TextInputAction.done,
+            maxLines: 2,
+            minLines: 1,
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+            onPressed: () => Navigator.of(context).pop((_FinishChoice.finish, _notes.text.trim())),
+            child: const Text('Finish workout'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Keep going'),
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 4),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+            onPressed: () => Navigator.of(context).pop((_FinishChoice.discard, '')),
+            child: const Text('Discard workout'),
+          ),
+        ],
+      ),
     );
   }
 }
