@@ -24,7 +24,7 @@ type Resolver struct {
 
 // Signup is the resolver for the signup field.
 func (r *mutationResolver) Signup(ctx context.Context, email string, password string, displayName string) (*AuthPayload, error) {
-	res, err := r.Auth.SignUp(ctx, email, password, displayName)
+	res, err := r.Auth.SignUp(ctx, email, password, displayName, appmiddleware.ClientIPFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (r *mutationResolver) Signup(ctx context.Context, email string, password st
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, email string, password string) (*AuthPayload, error) {
-	res, err := r.Auth.Login(ctx, email, password)
+	res, err := r.Auth.Login(ctx, email, password, appmiddleware.ClientIPFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 
 // RefreshToken is the resolver for the refreshToken field.
 func (r *mutationResolver) RefreshToken(ctx context.Context, refreshToken string) (*AuthPayload, error) {
-	res, err := r.Auth.Refresh(ctx, refreshToken)
+	res, err := r.Auth.Refresh(ctx, refreshToken, appmiddleware.ClientIPFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}

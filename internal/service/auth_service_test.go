@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"workouttracker/internal/domain"
+	"workouttracker/internal/ratelimit"
 	"workouttracker/internal/service"
 
 	"github.com/google/uuid"
@@ -107,19 +108,19 @@ func (f *fakeRefreshTokenRepo) RevokeAllForUser(ctx context.Context, userID uuid
 }
 
 func newTestAuthService() *service.AuthService {
-	return service.NewAuthService(newFakeUserRepo(), newFakeRefreshTokenRepo(), service.NewTokenIssuer([]byte("test-secret")))
+	return service.NewAuthService(newFakeUserRepo(), newFakeRefreshTokenRepo(), service.NewTokenIssuer([]byte("test-secret")), ratelimit.NewMemoryLimiter())
 }
 
 func TestSignUpThenLogin(t *testing.T) {
 	ctx := context.Background()
 	auth := newTestAuthService()
 
-	signupRes, err := auth.SignUp(ctx, "jane@example.com", "correct-horse-battery-staple", "Jane")
+	signupRes, err := auth.SignUp(ctx, "jane@example.com", "correct-horse-battery-staple", "Jane", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, signupRes.AccessToken)
 	assert.NotEmpty(t, signupRes.RefreshToken)
 
-	loginRes, err := auth.Login(ctx, "jane@example.com", "correct-horse-battery-staple")
+	loginRes, err := auth.Login(ctx, "jane@example.com", "correct-horse-battery-staple", "")
 	require.NoError(t, err)
 	assert.Equal(t, signupRes.User.ID, loginRes.User.ID)
 }
@@ -128,10 +129,10 @@ func TestSignUpDuplicateEmailRejected(t *testing.T) {
 	ctx := context.Background()
 	auth := newTestAuthService()
 
-	_, err := auth.SignUp(ctx, "jane@example.com", "password123", "Jane")
+	_, err := auth.SignUp(ctx, "jane@example.com", "password123", "Jane", "")
 	require.NoError(t, err)
 
-	_, err = auth.SignUp(ctx, "jane@example.com", "different-password", "Jane 2")
+	_, err = auth.SignUp(ctx, "jane@example.com", "different-password", "Jane 2", "")
 	assert.ErrorIs(t, err, domain.ErrEmailTaken)
 }
 
@@ -149,7 +150,7 @@ func TestSignUpValidatesInput(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := newTestAuthService().SignUp(ctx, tc.email, tc.password, tc.display)
+			_, err := newTestAuthService().SignUp(ctx, tc.email, tc.password, tc.display, "")
 			assert.ErrorIs(t, err, tc.wantErr)
 		})
 	}
@@ -159,12 +160,12 @@ func TestSignUpNormalizesEmail(t *testing.T) {
 	ctx := context.Background()
 	auth := newTestAuthService()
 
-	res, err := auth.SignUp(ctx, "  Jane@Example.COM ", "password123", "  Jane  ")
+	res, err := auth.SignUp(ctx, "  Jane@Example.COM ", "password123", "  Jane  ", "")
 	require.NoError(t, err)
 	assert.Equal(t, "jane@example.com", res.User.Email)
 	assert.Equal(t, "Jane", res.User.DisplayName)
 
-	_, err = auth.Login(ctx, "JANE@example.com", "password123")
+	_, err = auth.Login(ctx, "JANE@example.com", "password123", "")
 	require.NoError(t, err)
 }
 
@@ -172,10 +173,10 @@ func TestLoginWrongPasswordRejected(t *testing.T) {
 	ctx := context.Background()
 	auth := newTestAuthService()
 
-	_, err := auth.SignUp(ctx, "jane@example.com", "correct-password", "Jane")
+	_, err := auth.SignUp(ctx, "jane@example.com", "correct-password", "Jane", "")
 	require.NoError(t, err)
 
-	_, err = auth.Login(ctx, "jane@example.com", "wrong-password")
+	_, err = auth.Login(ctx, "jane@example.com", "wrong-password", "")
 	assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
 }
 
@@ -183,15 +184,15 @@ func TestRefreshRotatesToken(t *testing.T) {
 	ctx := context.Background()
 	auth := newTestAuthService()
 
-	signupRes, err := auth.SignUp(ctx, "jane@example.com", "correct-password", "Jane")
+	signupRes, err := auth.SignUp(ctx, "jane@example.com", "correct-password", "Jane", "")
 	require.NoError(t, err)
 
-	refreshRes, err := auth.Refresh(ctx, signupRes.RefreshToken)
+	refreshRes, err := auth.Refresh(ctx, signupRes.RefreshToken, "")
 	require.NoError(t, err)
 	assert.NotEqual(t, signupRes.RefreshToken, refreshRes.RefreshToken, "refresh token should rotate on use")
 
 	// the old (now-revoked) refresh token must no longer work
-	_, err = auth.Refresh(ctx, signupRes.RefreshToken)
+	_, err = auth.Refresh(ctx, signupRes.RefreshToken, "")
 	assert.ErrorIs(t, err, domain.ErrRefreshTokenInvalid)
 }
 
@@ -199,11 +200,11 @@ func TestLogoutRevokesToken(t *testing.T) {
 	ctx := context.Background()
 	auth := newTestAuthService()
 
-	signupRes, err := auth.SignUp(ctx, "jane@example.com", "correct-password", "Jane")
+	signupRes, err := auth.SignUp(ctx, "jane@example.com", "correct-password", "Jane", "")
 	require.NoError(t, err)
 
 	require.NoError(t, auth.Logout(ctx, signupRes.RefreshToken))
 
-	_, err = auth.Refresh(ctx, signupRes.RefreshToken)
+	_, err = auth.Refresh(ctx, signupRes.RefreshToken, "")
 	assert.ErrorIs(t, err, domain.ErrRefreshTokenInvalid)
 }

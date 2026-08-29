@@ -7,6 +7,7 @@ var (
 	ErrEmailTaken          = errors.New("email already registered")
 	ErrInvalidCredentials  = errors.New("invalid email or password")
 	ErrRefreshTokenInvalid = errors.New("refresh token invalid or expired")
+	ErrTooManyRequests     = errors.New("too many attempts — wait a few minutes and try again")
 
 	ErrExerciseNotFound     = errors.New("exercise not found")
 	ErrExerciseNotOwned     = errors.New("that exercise can't be edited")
@@ -47,6 +48,7 @@ var (
 // internals like "ERROR: numeric field overflow (SQLSTATE 22003)".
 var userFacingErrors = []error{
 	ErrUserNotFound, ErrEmailTaken, ErrInvalidCredentials, ErrRefreshTokenInvalid,
+	ErrTooManyRequests,
 	ErrExerciseNotFound, ErrExerciseNotOwned, ErrExerciseNameTaken, ErrExerciseInUse,
 	ErrInvalidExercise,
 	ErrWorkoutNotFound, ErrWorkoutNotOwned, ErrWorkoutNotActive,

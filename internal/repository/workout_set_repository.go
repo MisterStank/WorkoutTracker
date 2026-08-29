@@ -134,15 +134,25 @@ func (r *WorkoutSetRepository) LogSet(ctx context.Context, userID uuid.UUID, set
 		return &domain.LoggedSet{Set: set}, nil
 	}
 
-	candidates := map[string]float64{
-		domain.RecordTypeMaxWeight:    set.WeightKg,
-		domain.RecordTypeMaxVolume:    set.WeightKg * float64(set.Reps),
-		domain.RecordTypeEstimated1RM: estimated1RM(set.WeightKg, set.Reps),
-		domain.RecordTypeMaxReps:      float64(set.Reps),
+	// Ordered, not a map: two concurrent LogSet calls for the same
+	// (user, exercise) each take a row lock per personal_records row via the
+	// upsert below. If they acquired those locks in different orders (Go
+	// randomizes map iteration) Postgres would detect a deadlock and abort
+	// one of them. A fixed order means every transaction locks the PR rows
+	// in the same sequence, so the second simply waits for the first.
+	candidates := []struct {
+		recordType string
+		value      float64
+	}{
+		{domain.RecordTypeMaxWeight, set.WeightKg},
+		{domain.RecordTypeMaxVolume, set.WeightKg * float64(set.Reps)},
+		{domain.RecordTypeEstimated1RM, estimated1RM(set.WeightKg, set.Reps)},
+		{domain.RecordTypeMaxReps, float64(set.Reps)},
 	}
 
 	var newRecords []*domain.PersonalRecord
-	for recordType, value := range candidates {
+	for _, c := range candidates {
+		recordType, value := c.recordType, c.value
 		// Weight-based records are meaningless for a bodyweight set logged
 		// at 0 (or assisted, negative) added load — only the rep count is.
 		if value <= 0 {

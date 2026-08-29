@@ -63,7 +63,10 @@ var dayOffsetInWeek = []int{0, 2, 4} // Mon, Wed, Fri
 
 func main() {
 	ctx := context.Background()
-	cfg := platform.LoadConfig()
+	cfg, err := platform.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	db, err := platform.NewPostgresPool(ctx, cfg.DatabaseURL)
 	if err != nil {

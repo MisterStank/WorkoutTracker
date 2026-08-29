@@ -12,6 +12,7 @@ import (
 	"workouttracker/internal/graphql"
 	appmiddleware "workouttracker/internal/middleware"
 	"workouttracker/internal/platform"
+	"workouttracker/internal/ratelimit"
 	"workouttracker/internal/realtime"
 	"workouttracker/internal/repository"
 	"workouttracker/internal/service"
@@ -31,7 +32,10 @@ import (
 )
 
 func main() {
-	cfg := platform.LoadConfig()
+	cfg, err := platform.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	ctx := context.Background()
 	db, err := platform.NewPostgresPool(ctx, cfg.DatabaseURL)
@@ -47,9 +51,10 @@ func main() {
 	defer redisClient.Close()
 
 	tokens := service.NewTokenIssuer([]byte(cfg.JWTSecret))
+	authLimiter := ratelimit.NewRedisLimiter(redisClient)
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
-	authService := service.NewAuthService(userRepo, refreshTokenRepo, tokens)
+	authService := service.NewAuthService(userRepo, refreshTokenRepo, tokens, authLimiter)
 
 	analyticsCache := cache.NewRedisCache(redisClient)
 	rollupRepo := repository.NewProgressRollupRepository(db)
@@ -82,6 +87,10 @@ func main() {
 	// access log just shows the real TCP peer (Render's proxy) instead.
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
+	// Records the caller's IP in the request context for the auth rate
+	// limiter (see internal/middleware/client_ip.go for the X-Forwarded-For
+	// handling).
+	r.Use(appmiddleware.ClientIP)
 	// Origins are configurable via ALLOWED_ORIGINS (defaults to local-dev
 	// patterns) since Flutter web's dev server runs on a random localhost
 	// port each run, and production needs the real deployed web origin.

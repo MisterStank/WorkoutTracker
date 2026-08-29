@@ -48,7 +48,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test -race ./internal/service/... ./internal/domain/...
+      # Everything that doesn't need a database. The repository and graphql
+      # packages are covered by integration-test below (they need Postgres);
+      # excluding them here keeps this job infra-free and fast. dbtest has no
+      # tests of its own.
+      - run: |
+          go test -race $(go list ./... | grep -vE '/internal/(repository|graphql|dbtest)$')
 
   integration-test:
     runs-on: ubuntu-latest
@@ -79,7 +84,9 @@ jobs:
           # driver postgres" the moment it tries to connect.
           go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
           migrate -database "postgres://postgres:postgres@localhost:5432/workouttracker?sslmode=disable" -path migrations up
-      - run: go test ./internal/repository/... ./internal/graphql/...
+      # DATABASE_URL is set, so the dbtest harness reuses this service
+      # container instead of booting an embedded Postgres.
+      - run: go test -race ./internal/repository/... ./internal/graphql/...
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/workouttracker?sslmode=disable
 

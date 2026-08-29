@@ -20,6 +20,19 @@ var argon2Params = struct {
 	keyLength   uint32
 }{memory: 64 * 1024, iterations: 3, parallelism: 2, saltLength: 16, keyLength: 32}
 
+// dummyPasswordHash is a valid argon2id hash of a random string, verified
+// against on the "email not found" login path so an unknown email costs the
+// same wall-clock time as a real one (defeats user enumeration by timing).
+var dummyPasswordHash = mustHashPassword("qX9$dummy-not-a-real-password-7fL2")
+
+func mustHashPassword(p string) string {
+	h, err := HashPassword(p)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}
+
 func HashPassword(password string) (string, error) {
 	salt := make([]byte, argon2Params.saltLength)
 	if _, err := rand.Read(salt); err != nil {

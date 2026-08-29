@@ -16,10 +16,16 @@ type AuthService struct {
 	users         domain.UserRepository
 	refreshTokens domain.RefreshTokenRepository
 	tokens        *TokenIssuer
+	throttle      *authThrottle
 }
 
-func NewAuthService(users domain.UserRepository, refreshTokens domain.RefreshTokenRepository, tokens *TokenIssuer) *AuthService {
-	return &AuthService{users: users, refreshTokens: refreshTokens, tokens: tokens}
+func NewAuthService(users domain.UserRepository, refreshTokens domain.RefreshTokenRepository, tokens *TokenIssuer, limiter domain.RateLimiter) *AuthService {
+	return &AuthService{
+		users:         users,
+		refreshTokens: refreshTokens,
+		tokens:        tokens,
+		throttle:      newAuthThrottle(limiter),
+	}
 }
 
 type AuthResult struct {
@@ -28,7 +34,11 @@ type AuthResult struct {
 	RefreshToken string
 }
 
-func (s *AuthService) SignUp(ctx context.Context, email, password, displayName string) (*AuthResult, error) {
+func (s *AuthService) SignUp(ctx context.Context, email, password, displayName, clientIP string) (*AuthResult, error) {
+	if err := s.throttle.checkSignup(ctx, clientIP); err != nil {
+		return nil, err
+	}
+
 	email, err := ValidateEmail(email)
 	if err != nil {
 		return nil, err
@@ -65,28 +75,44 @@ func (s *AuthService) SignUp(ctx context.Context, email, password, displayName s
 	return s.issueSession(ctx, user, "")
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResult, error) {
+func (s *AuthService) Login(ctx context.Context, email, password, clientIP string) (*AuthResult, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
+
+	if err := s.throttle.checkLogin(ctx, email, clientIP); err != nil {
+		return nil, err
+	}
+
 	user, err := s.users.FindByEmail(ctx, email)
 	if err != nil {
+		// Spend the same argon2 time on an unknown email as on a real one so
+		// login timing doesn't reveal which emails are registered.
+		_, _ = VerifyPassword(password, dummyPasswordHash)
+		s.throttle.recordLoginFailure(ctx, email, clientIP)
 		return nil, domain.ErrInvalidCredentials
 	}
 
 	ok, err := VerifyPassword(password, user.PasswordHash)
 	if err != nil || !ok {
+		s.throttle.recordLoginFailure(ctx, email, clientIP)
 		return nil, domain.ErrInvalidCredentials
 	}
 
+	s.throttle.clearLogin(ctx, email, clientIP)
 	return s.issueSession(ctx, user, "")
 }
 
 // Refresh rotates the refresh token on every use: the old one is revoked and
 // a new one issued, so a stolen-but-unused token becomes detectable (reuse
 // of a revoked token is a signal of theft, even though we don't act on it yet).
-func (s *AuthService) Refresh(ctx context.Context, refreshTokenPlain string) (*AuthResult, error) {
+func (s *AuthService) Refresh(ctx context.Context, refreshTokenPlain, clientIP string) (*AuthResult, error) {
+	if err := s.throttle.checkRefresh(ctx, clientIP); err != nil {
+		return nil, err
+	}
+
 	hash := HashRefreshToken(refreshTokenPlain)
 	stored, err := s.refreshTokens.FindByTokenHash(ctx, hash)
 	if err != nil || stored.RevokedAt != nil || stored.ExpiresAt.Before(time.Now()) {
+		s.throttle.recordRefreshFailure(ctx, clientIP)
 		return nil, domain.ErrRefreshTokenInvalid
 	}
 
