@@ -23,6 +23,10 @@ WORKDIR /app
 COPY . .
 ARG API_URL=http://localhost:8080/graphql
 RUN flutter pub get
+# Generate Drift/build_runner code (app_database.g.dart etc.) — these files are
+# not committed, so without this step the web compile fails with
+# "Error reading 'lib/core/offline/app_database.g.dart'". Mirrors CI (.github/workflows/mobile.yml).
+RUN dart run build_runner build --delete-conflicting-outputs
 RUN flutter build web --release --dart-define=API_URL=${API_URL} --base-href /
 
 FROM nginx:alpine
