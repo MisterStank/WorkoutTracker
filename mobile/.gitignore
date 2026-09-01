@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Wrangler / Cloudflare (local cache + state; wrangler.jsonc IS committed)
+.wrangler/
+.dev.vars
