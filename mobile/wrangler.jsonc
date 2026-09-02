@@ -1,8 +1,11 @@
 {
+  // Cloudflare Worker that serves the Flutter web build as static assets.
+  // No `main` = no Worker script; Cloudflare serves build/web/ from its edge.
   "name": "workouttracker-web",
   "compatibility_date": "2026-09-02",
   "assets": {
     "directory": "./build/web",
+    // Any unmatched path falls back to index.html (200) so hard refreshes work.
     "not_found_handling": "single-page-application"
   }
 }

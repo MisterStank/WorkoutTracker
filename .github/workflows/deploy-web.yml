@@ -1,0 +1,45 @@
+name: deploy-web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch: # manual re-deploy (e.g. after changing the API_URL variable)
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.0
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Generates the Drift code (app_database.g.dart etc.) — not committed,
+      # so the build fails without this. Mirrors .github/workflows/mobile.yml.
+      - run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build web bundle
+        run: flutter build web --release --base-href / --dart-define=API_URL=${{ vars.API_URL }}
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: mobile
+          command: deploy # reads mobile/wrangler.jsonc
