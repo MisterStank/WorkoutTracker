@@ -36,10 +36,11 @@ jobs:
       - name: Build web bundle
         run: flutter build web --release --base-href / --dart-define=API_URL=${{ vars.API_URL }}
 
+      # Run wrangler directly rather than cloudflare/wrangler-action@v3: that
+      # action still defaults to wrangler v3, which can't deploy a static-
+      # assets-only Worker (no `main`) and fails with "Missing entry-point".
       - name: Deploy to Cloudflare
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: mobile
-          command: deploy # reads mobile/wrangler.jsonc
+        run: npx --yes wrangler@4 deploy # reads mobile/wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
