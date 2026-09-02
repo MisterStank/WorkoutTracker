@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/workout/exercise_detail_sheet.dart';
-import 'package:mobile/features/workout/workout_models.dart';
+import 'package:gymon/features/workout/exercise_detail_sheet.dart';
+import 'package:gymon/features/workout/workout_models.dart';
 
 void main() {
   testWidgets('shows the exercise name, category, and written instructions', (tester) async {

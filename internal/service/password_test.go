@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"workouttracker/internal/service"
+	"gymon/internal/service"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -289,7 +289,7 @@ class WorkoutHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WORKOUTTRACKER'),
+        title: const Text('GYMON'),
         actions: [
           if (state is ActiveWorkoutInProgress)
             IconButton(

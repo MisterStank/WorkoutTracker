@@ -19,18 +19,18 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [onboardingCompleteProvider.overrideWith((ref) => seenOnboarding)],
-      child: const WorkoutTrackerApp(),
+      child: const GymonApp(),
     ),
   );
 }
 
-class WorkoutTrackerApp extends ConsumerWidget {
-  const WorkoutTrackerApp({super.key});
+class GymonApp extends ConsumerWidget {
+  const GymonApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'WorkoutTracker',
+      title: 'Gymon',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),

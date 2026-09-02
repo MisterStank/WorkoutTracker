@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"workouttracker/internal/domain"
-	"workouttracker/internal/repository"
+	"gymon/internal/domain"
+	"gymon/internal/repository"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

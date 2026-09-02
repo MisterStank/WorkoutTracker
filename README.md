@@ -1,6 +1,6 @@
-# WorkoutTracker
+# Gymon
 
-A workout tracker that adapts to user progress. Flutter mobile client, Go/GraphQL backend, Postgres, Redis.
+Raise a virtual companion by training. Your pet hatches on your first workout, evolves through stages, and unlocks gear as you keep a streak — a Tamagotchi-style layer over a real workout tracker (adaptive progression, offline logging, live analytics). Flutter mobile client, Go/GraphQL backend, Postgres, Redis.
 
 For what the app does and how to use it, see [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
@@ -156,7 +156,7 @@ flutter test
 
 **Backend:**
 ```bash
-docker build -t workouttracker-api .
+docker build -t gymon-api .
 ```
 
 **Mobile (Android APK):**
@@ -220,7 +220,7 @@ docker compose ps   # should show postgres and redis as "Up"
 
 **Migrations failed**: Verify `DATABASE_URL` in `.env` matches the running Postgres.
 ```bash
-echo $DATABASE_URL   # should be something like: postgres://user:pass@localhost:5432/workouttracker
+echo $DATABASE_URL   # should be something like: postgres://user:pass@localhost:5432/gymon
 ```
 
 **Mobile can't connect to API**: Ensure the `API_URL` passed to `flutter run` matches your backend's GraphQL endpoint.

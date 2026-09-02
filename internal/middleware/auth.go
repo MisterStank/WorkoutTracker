@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"workouttracker/internal/service"
+	"gymon/internal/service"
 
 	"github.com/google/uuid"
 )

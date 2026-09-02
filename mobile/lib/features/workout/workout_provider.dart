@@ -9,6 +9,7 @@ import '../../core/offline/app_database.dart';
 import '../../core/offline/offline_provider.dart';
 import '../../core/storage/recent_exercises_storage.dart';
 import '../auth/auth_provider.dart';
+import '../pet/pet_provider.dart';
 import 'workout_models.dart';
 import 'workout_repository.dart';
 import 'workout_state.dart';
@@ -243,6 +244,10 @@ class ActiveWorkoutNotifier extends StateNotifier<ActiveWorkoutState> {
       _stopWatching();
       state = const ActiveWorkoutNone();
       unawaited(_ref.read(retentionNudgeServiceProvider).rescheduleFrom(finished.endedAt ?? DateTime.now()));
+      // The pet's mood/streak/stage and any accessory unlocks are recomputed
+      // server-side from finished-workout history — refetch so the pet home
+      // screen reflects this workout immediately.
+      _ref.invalidate(petProvider);
       return FinishedWorkout(workout: finished, newRecords: records);
     } catch (e) {
       state = ActiveWorkoutError(e.toString());

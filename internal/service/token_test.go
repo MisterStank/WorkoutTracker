@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"workouttracker/internal/service"
+	"gymon/internal/service"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

@@ -1,6 +1,6 @@
-# WorkoutTracker — User Guide
+# Gymon — User Guide
 
-Everything the app does, and how to use it. Covers the mobile app end to end, in the order you'll actually meet each screen.
+Gymon is a virtual-companion game: you raise a pet that grows and stays happy only if you keep training. Under the companion layer is a full workout tracker. This covers the mobile app end to end, in the order you'll actually meet each screen.
 
 ## Contents
 
@@ -31,20 +31,16 @@ Create an account with your email, a password (at least 8 characters), and a dis
 
 Already have an account? Use **Log in** instead. To sign out, tap your **profile avatar** in the Home tab's top bar and choose **Log out**.
 
-**First-run tour**: the first time you sign up — and the first time you log in on a device that hasn't seen it — a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Programs** tab. If you're signing in on a device that's already seen the tour and your account already has a fitness profile or a program, the app skips it entirely and drops you straight into the home screen. You can replay the tour any time from **View app tour** behind your profile avatar.
+**First-run setup**: the first time you sign up — and the first time you log in on a device that hasn't seen it — Gymon walks you through setting up your companion. It's short and hands-on rather than a slideshow:
 
-<p>
-  <img src="images/onboarding-slide-1.png" width="180" alt="Tour slide 1: Log workouts fast">
-  <img src="images/onboarding-slide-2.png" width="180" alt="Tour slide 2: Templates and personalized programs">
-  <img src="images/onboarding-slide-3.png" width="180" alt="Tour slide 3: Progress and personal records">
-  <img src="images/onboarding-slide-4.png" width="180" alt="Tour slide 4: Share your stats">
-</p>
-<p>
-  <img src="images/onboarding-personalize.png" width="200" alt="Tour personalize step, with Skip for now">
-  <img src="images/onboarding-skip.png" width="200" alt="Home screen right after skipping the tour">
-</p>
+1. **Welcome** — what the companion is and why it exists.
+2. **Choose your companion** — pick a species and colour and give it a name. This hatches your pet then and there.
+3. **How it works** — the three rules: finishing a workout feeds and grows your companion; keeping a training streak unlocks accessories; disappearing for a week leaves it neglected (recoverable with one workout).
+4. **Set up a program** (optional) — answer a few questions about your goal, experience and equipment to generate a training split. Skippable; you can do it later from the **Programs** tab.
 
-The app has four main tabs at the bottom of the screen — **Home**, **History**, **Programs**, and **Progress** — everything below is organized around them. Your saved single-day templates live one level in, behind the checklist icon on the **Programs** tab (see [Chapter 5](#5-templates)).
+Steps 1–3 have no Skip — they take under a minute and step 2 is the fun part — so everyone lands in the app knowing what the companion is for. If you're signing in on a device that's already seen this and your account already has a fitness profile or a program, the app skips it entirely. You can replay steps 1 and 3 any time from **View app tour** behind your profile avatar.
+
+The app has five tabs at the bottom of the screen — **Companion** (your pet, and where you start a workout), **Train**, **History**, **Programs**, and **Progress**. Your saved single-day templates live one level in, behind the checklist icon on the **Programs** tab (see [Chapter 5](#5-templates)).
 
 ## 2. Starting a workout
 

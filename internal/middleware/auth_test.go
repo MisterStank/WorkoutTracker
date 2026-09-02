@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	appmiddleware "workouttracker/internal/middleware"
-	"workouttracker/internal/service"
+	appmiddleware "gymon/internal/middleware"
+	"gymon/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

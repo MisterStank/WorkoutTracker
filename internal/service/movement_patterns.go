@@ -3,7 +3,7 @@ package service
 import (
 	"strings"
 
-	"workouttracker/internal/domain"
+	"gymon/internal/domain"
 )
 
 // Movement patterns the program generator balances a training day around.

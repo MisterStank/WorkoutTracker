@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"workouttracker/internal/domain"
+	"gymon/internal/domain"
 
 	"github.com/google/uuid"
 )

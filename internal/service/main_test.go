@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"workouttracker/internal/service"
+	"gymon/internal/service"
 )
 
 // Lower the argon2id cost for the whole package: several auth tests hash or

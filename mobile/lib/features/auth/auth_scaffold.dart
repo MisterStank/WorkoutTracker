@@ -23,7 +23,7 @@ class AuthScaffold extends StatelessWidget {
               Icon(Icons.fitness_center, size: 40, color: colorScheme.primary),
               const SizedBox(height: 12),
               Text(
-                'WORKOUTTRACKER',
+                'GYMON',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w800,

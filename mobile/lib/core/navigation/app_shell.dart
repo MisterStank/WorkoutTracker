@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/analytics/analytics_screen.dart';
+import '../../features/pet/pet_home_screen.dart';
 import '../../features/programs/programs_screen.dart';
 import '../../features/workout/elapsed_time_text.dart';
 import '../../features/workout/rest_timer_provider.dart';
@@ -28,12 +29,17 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
   int _index = 0;
 
-  static const _tabs = [
-    WorkoutHomeScreen(),
-    WorkoutHistoryScreen(),
-    ProgramsScreen(),
-    AnalyticsScreen(),
-  ];
+  // The pet is the app's main goal, so it's the landing tab; a workout is
+  // started from it (or from the Train tab directly).
+  static const _workoutTabIndex = 1;
+
+  List<Widget> get _tabs => [
+        PetHomeScreen(onStartWorkout: () => setState(() => _index = _workoutTabIndex)),
+        const WorkoutHomeScreen(),
+        const WorkoutHistoryScreen(),
+        const ProgramsScreen(),
+        const AnalyticsScreen(),
+      ];
 
   @override
   void initState() {
@@ -60,19 +66,21 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final workoutState = ref.watch(activeWorkoutProvider);
     final activeWorkout = workoutState is ActiveWorkoutInProgress ? workoutState.workout : null;
-    final showResumeBar = activeWorkout != null && _index != 0;
+    final showResumeBar = activeWorkout != null && _index != _workoutTabIndex;
 
     return Scaffold(
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showResumeBar) _ResumeWorkoutBar(workout: activeWorkout, onTap: () => setState(() => _index = 0)),
+          if (showResumeBar)
+            _ResumeWorkoutBar(workout: activeWorkout, onTap: () => setState(() => _index = _workoutTabIndex)),
           NavigationBar(
             selectedIndex: _index,
             onDestinationSelected: (i) => setState(() => _index = i),
             destinations: const [
-              NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Home'),
+              NavigationDestination(icon: Icon(Icons.pets_outlined), selectedIcon: Icon(Icons.pets), label: 'Companion'),
+              NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Train'),
               NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'History'),
               NavigationDestination(icon: Icon(Icons.calendar_view_month_outlined), selectedIcon: Icon(Icons.calendar_view_month), label: 'Programs'),
               NavigationDestination(icon: Icon(Icons.show_chart), selectedIcon: Icon(Icons.show_chart), label: 'Progress'),

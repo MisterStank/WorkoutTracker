@@ -3,7 +3,7 @@ package platform_test
 import (
 	"testing"
 
-	"workouttracker/internal/platform"
+	"gymon/internal/platform"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

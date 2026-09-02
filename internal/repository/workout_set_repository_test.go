@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	"workouttracker/internal/domain"
-	"workouttracker/internal/repository"
+	"gymon/internal/domain"
+	"gymon/internal/repository"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"

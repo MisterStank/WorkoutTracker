@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/workout/workout_models.dart';
+import 'package:gymon/features/workout/workout_models.dart';
 
 void main() {
   test('Exercise.fromJson parses the custom-exercise fields', () {

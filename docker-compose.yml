@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: workouttracker
+      POSTGRES_DB: gymon
     ports:
       - "5432:5432"
     volumes:
@@ -28,7 +28,7 @@ services:
       redis:
         condition: service_started
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/workouttracker?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/gymon?sslmode=disable
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-secret-change-me
       PORT: 8080

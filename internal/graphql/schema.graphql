@@ -246,6 +246,12 @@ type Query {
   myPrograms: [Program!]!
   nextWorkout: NextWorkout
   programDayTargets(programDayId: UUID!): [ExerciseTarget!]!
+
+  # The caller's virtual companion, or null if they haven't created one yet
+  # (the client shows onboarding in that case). tzOffsetMinutes is the
+  # viewer's UTC offset in minutes (east-positive) so streak day-boundaries
+  # land on the user's local midnight; defaults to UTC.
+  pet(tzOffsetMinutes: Int): Pet
 }
 
 type Mutation {
@@ -275,10 +281,68 @@ type Mutation {
   generateProgram: Program!
   createProgramFromTemplates(input: CreateProgramInput!): Program!
   setActiveProgram(programId: UUID!): Program!
+
+  createPet(name: String!, species: PetSpecies!, color: PetColor!): Pet!
+  renamePet(name: String!): Pet!
+  setPetColor(color: PetColor!): Pet!
+  equipAccessory(accessoryId: UUID!): Pet!
+  unequipAccessory(accessoryId: UUID!): Pet!
 }
 
 type Subscription {
   # Streams every set logged (and any PRs it broke) to anyone watching this
   # workout, backed by Redis pub/sub so it fans out across API instances.
   workoutProgressUpdated(workoutId: UUID!): LogSetResult!
+}
+
+# --- Virtual companion pet ---------------------------------------------------
+
+enum PetSpecies { SPROUT EMBER PEBBLE DRIFT }
+enum PetColor { GREEN RED BLUE AMBER VIOLET }
+enum PetStage { EGG HATCHLING JUVENILE ADULT CHAMPION }
+enum MoodState { HAPPY CONTENT LOW NEGLECTED }
+
+# Asset keys, not baked images: v1 ships placeholder art, real art is a later
+# content drop that reuses the same keys with no schema or code change.
+type PetAppearance {
+  bodyAssetKey: String!
+  expressionAssetKey: String!
+  tint: String!
+  layers: [String!]!
+}
+
+type Accessory {
+  id: UUID!
+  code: String!
+  name: String!
+  slot: String!
+  unlockHint: String!
+}
+
+type PetAccessory {
+  accessory: Accessory!
+  unlockedAt: Time!
+  equipped: Boolean!
+}
+
+type Pet {
+  id: UUID!
+  name: String!
+  species: PetSpecies!
+  color: PetColor!
+  stage: PetStage!
+  stageLabel: String!
+  # Short-term 0..100 mood, derived on read from recent finished workouts.
+  mood: Int!
+  moodState: MoodState!
+  currentStreak: Int!
+  longestStreak: Int!
+  # Cumulative finished workouts still needed to reach the next stage; null at
+  # the final stage.
+  workoutsToNextStage: Int
+  hatchedAt: Time
+  appearance: PetAppearance!
+  accessories: [PetAccessory!]!
+  # Accessories unlocked on THIS read, for a one-time celebration.
+  newlyUnlocked: [PetAccessory!]!
 }

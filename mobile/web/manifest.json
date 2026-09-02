@@ -1,6 +1,6 @@
 {
-    "name": "WorkoutTracker",
-    "short_name": "WorkoutTracker",
+    "name": "Gymon",
+    "short_name": "Gymon",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#17191A",

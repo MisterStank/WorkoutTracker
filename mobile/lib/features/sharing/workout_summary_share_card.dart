@@ -125,7 +125,7 @@ class WorkoutSummaryShareCard extends StatelessWidget {
             children: [
               const Icon(Icons.fitness_center, color: _accent, size: 16),
               const SizedBox(width: 6),
-              Text('WORKOUTTRACKER',
+              Text('GYMON',
                   style: TextStyle(fontFamily: AppTypography.display, color: _text.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
             ],
           ),

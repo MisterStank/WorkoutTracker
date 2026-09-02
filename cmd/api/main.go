@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"workouttracker/internal/cache"
-	"workouttracker/internal/domain"
-	"workouttracker/internal/graphql"
-	appmiddleware "workouttracker/internal/middleware"
-	"workouttracker/internal/platform"
-	"workouttracker/internal/ratelimit"
-	"workouttracker/internal/realtime"
-	"workouttracker/internal/repository"
-	"workouttracker/internal/service"
+	"gymon/internal/cache"
+	"gymon/internal/domain"
+	"gymon/internal/graphql"
+	appmiddleware "gymon/internal/middleware"
+	"gymon/internal/platform"
+	"gymon/internal/ratelimit"
+	"gymon/internal/realtime"
+	"gymon/internal/repository"
+	"gymon/internal/service"
 
 	gqlgraphql "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -74,7 +74,12 @@ func main() {
 	programRepo := repository.NewProgramRepository(db, templateRepo)
 	programService := service.NewProgramService(fitnessProfileRepo, programRepo, exerciseRepo, workoutService)
 
-	resolver := &graphql.Resolver{Auth: authService, Workout: workoutService, Analytics: analyticsService, Program: programService, Events: eventBus}
+	petRepo := repository.NewPetRepository(db)
+	accessoryRepo := repository.NewAccessoryRepository(db)
+	petStatsRepo := repository.NewPetStatsRepository(db)
+	petService := service.NewPetService(petRepo, accessoryRepo, petStatsRepo, service.DefaultPetTuning)
+
+	resolver := &graphql.Resolver{Auth: authService, Workout: workoutService, Analytics: analyticsService, Program: programService, Pets: petService, Events: eventBus}
 	gqlHandler := newGraphQLServer(resolver, tokens, cfg.AllowedOrigins)
 
 	r := chi.NewRouter()

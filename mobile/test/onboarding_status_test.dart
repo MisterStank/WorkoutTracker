@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/onboarding/onboarding_status.dart';
+import 'package:gymon/features/onboarding/onboarding_status.dart';
 
 void main() {
   group('decideOnboarding', () {

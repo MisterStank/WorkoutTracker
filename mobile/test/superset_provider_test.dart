@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/workout/superset_provider.dart';
+import 'package:gymon/features/workout/superset_provider.dart';
 
 // Regression test for a real bug found in QA: ActiveSupersetsNotifier.group()
 // used to generate the ad-hoc supersetId as a plain string

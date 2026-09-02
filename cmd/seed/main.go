@@ -16,8 +16,8 @@ import (
 	"math/rand"
 	"time"
 
-	"workouttracker/internal/platform"
-	"workouttracker/internal/service"
+	"gymon/internal/platform"
+	"gymon/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -25,9 +25,13 @@ import (
 )
 
 const (
-	demoEmail    = "demo@workouttracker.app"
+	demoEmail    = "demo@gymon.app"
 	demoPassword = "demo12345"
-	weeks        = 6
+	weeks        = 8
+	// Extra light workouts on each of the last streakDays calendar days, so
+	// the demo companion has a live training streak (not just historical
+	// progressive-overload weeks on Mon/Wed/Fri).
+	streakDays = 12
 )
 
 // One push/pull/legs split, run 3x/week. Weight is the working-set starting
@@ -106,12 +110,22 @@ func main() {
 		}
 	}
 
+	streakWorkouts, err := seedStreakFinisher(ctx, db, userID, exerciseIDs, now, rng)
+	if err != nil {
+		log.Fatalf("seed streak finisher: %v", err)
+	}
+	workoutCount += streakWorkouts
+
 	if err := seedBodyMetrics(ctx, db, userID, start, now, rng); err != nil {
 		log.Fatalf("seed body metrics: %v", err)
 	}
 
+	if err := seedPet(ctx, db, userID); err != nil {
+		log.Fatalf("seed pet: %v", err)
+	}
+
 	fmt.Printf("Seeded demo account: %s / %s\n", demoEmail, demoPassword)
-	fmt.Printf("  %d workouts, %d sets across %d weeks\n", workoutCount, setCount, weeks)
+	fmt.Printf("  %d workouts (%d in a closing daily streak), %d sets\n", workoutCount, streakWorkouts, setCount)
 }
 
 func seedUser(ctx context.Context, db *pgxpool.Pool) (uuid.UUID, error) {
@@ -224,6 +238,84 @@ func roundToHalf(v float64) float64 {
 	return float64(int(v*2+0.5)) / 2
 }
 
+// streakFinisherExercises rotates through a handful of compound lifts at
+// steady working weights for the closing daily-streak block.
+var streakFinisherExercises = []struct {
+	name   string
+	weight float64
+	reps   int
+}{
+	{"Barbell Bench Press", 72.5, 6},
+	{"Barbell Back Squat", 95, 6},
+	{"Barbell Row", 57.5, 8},
+	{"Overhead Press", 47.5, 7},
+	{"Conventional Deadlift", 110, 4},
+}
+
+// seedStreakFinisher adds one short completed workout on each of the last
+// streakDays calendar days (skipping any day the split weeks already
+// covered), so the demo companion shows a live current streak rather than
+// only historical Mon/Wed/Fri sessions. Returns how many it inserted.
+func seedStreakFinisher(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, exerciseIDs map[string]uuid.UUID, now time.Time, rng *rand.Rand) (int, error) {
+	inserted := 0
+	for d := streakDays - 1; d >= 0; d-- {
+		day := now.AddDate(0, 0, -d)
+		workoutDate := time.Date(day.Year(), day.Month(), day.Day(), 7, 15, 0, 0, day.Location())
+		if workoutDate.After(now) {
+			continue
+		}
+
+		var exists bool
+		if err := db.QueryRow(ctx,
+			`SELECT EXISTS(
+			   SELECT 1 FROM workouts
+			   WHERE user_id = $1 AND status = 'completed'
+			     AND date_trunc('day', ended_at) = date_trunc('day', $2::timestamptz))`,
+			userID, workoutDate,
+		).Scan(&exists); err != nil {
+			return inserted, err
+		}
+		if exists {
+			continue
+		}
+
+		ex := streakFinisherExercises[d%len(streakFinisherExercises)]
+		exerciseID, ok := exerciseIDs[ex.name]
+		if !ok {
+			continue
+		}
+
+		tx, err := db.Begin(ctx)
+		if err != nil {
+			return inserted, err
+		}
+		workoutID := uuid.New()
+		endedAt := workoutDate.Add(35 * time.Minute)
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO workouts (id, user_id, started_at, ended_at, notes, status)
+			 VALUES ($1, $2, $3, $4, '', 'completed')`,
+			workoutID, userID, workoutDate, endedAt,
+		); err != nil {
+			_ = tx.Rollback(ctx)
+			return inserted, err
+		}
+		for i := 0; i < 3; i++ {
+			reps := ex.reps + rng.Intn(2)
+			rpe := 7.0 + rng.Float64()*2.0
+			t := workoutDate.Add(time.Duration(i+1) * 2 * time.Minute)
+			if err := logSeedSet(ctx, tx, userID, workoutID, exerciseID, i+1, reps, ex.weight, &rpe, false, t); err != nil {
+				_ = tx.Rollback(ctx)
+				return inserted, err
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return inserted, err
+		}
+		inserted++
+	}
+	return inserted, nil
+}
+
 // logSeedSet mirrors WorkoutSetRepository.LogSet's insert + PR-upsert +
 // rollup-upsert logic, parameterized on an explicit performedAt instead of
 // time.Now().
@@ -284,6 +376,40 @@ func logSeedSet(ctx context.Context, tx pgx.Tx, userID, workoutID, exerciseID uu
 
 // seedBodyMetrics logs a bodyweight entry twice a week with a gentle
 // downward trend plus noise, the way someone tracking a cut actually looks.
+// seedPet gives the demo account a companion so the pet screen — the app's
+// landing screen — has something to show. Mood, current streak, evolution
+// stage and which accessories are unlocked are all derived on read from the
+// workout history seeded above (see internal/service/pet_rules.go), so the
+// row is created near-empty; longest_streak is pre-set because it's the one
+// value the client can't rederive, and a couple of accessories are
+// pre-equipped so the demo pet isn't bare. The DELETE FROM users re-seed
+// already cascaded any prior pet away.
+func seedPet(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID) error {
+	petID := uuid.New()
+	hatched := time.Now().AddDate(0, 0, -50)
+	if _, err := db.Exec(ctx,
+		`INSERT INTO pets (id, user_id, name, species, color, stage, stage_updated_at, longest_streak, hatched_at, created_at)
+		 VALUES ($1, $2, 'Pixel', 'sprout', 'green', 0, now(), $3, $4, $4)`,
+		petID, userID, streakDays, hatched,
+	); err != nil {
+		return err
+	}
+
+	// Pre-equip one head + one collar accessory the seeded history is
+	// guaranteed to have unlocked (1 workout, 10 workouts). A read grants the
+	// rest via ON CONFLICT DO NOTHING, leaving these equipped.
+	for _, code := range []string{"starter_band", "collar_bronze"} {
+		if _, err := db.Exec(ctx,
+			`INSERT INTO pet_accessories (pet_id, accessory_id, slot, unlocked_at, equipped)
+			 SELECT $1, id, slot, now(), true FROM accessory_catalog WHERE code = $2`,
+			petID, code,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func seedBodyMetrics(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, start, now time.Time, rng *rand.Rand) error {
 	const startWeight = 82.0
 	const totalDrift = -2.5 // kg lost over the whole window
