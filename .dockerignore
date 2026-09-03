@@ -2,7 +2,6 @@
 .github
 mobile
 docs
-migrations
 *.md
 .env
 .env.*
