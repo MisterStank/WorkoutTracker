@@ -63,7 +63,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: workouttracker
+          POSTGRES_DB: gymon
         ports:
           - 5432:5432
         options: >-
@@ -83,12 +83,12 @@ jobs:
           # this build tag it compiles but errors at runtime with "unknown
           # driver postgres" the moment it tries to connect.
           go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-          migrate -database "postgres://postgres:postgres@localhost:5432/workouttracker?sslmode=disable" -path migrations up
+          migrate -database "postgres://postgres:postgres@localhost:5432/gymon?sslmode=disable" -path migrations up
       # DATABASE_URL is set, so the dbtest harness reuses this service
       # container instead of booting an embedded Postgres.
       - run: go test -race ./internal/repository/... ./internal/graphql/...
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/workouttracker?sslmode=disable
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/gymon?sslmode=disable
 
   # No deploy job here on purpose: Render builds and deploys straight from
   # this repo's Dockerfile on every push to main once the web service's

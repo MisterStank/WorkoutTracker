@@ -12,6 +12,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type Accessory struct {
+	ID         uuid.UUID `json:"id"`
+	Code       string    `json:"code"`
+	Name       string    `json:"name"`
+	Slot       string    `json:"slot"`
+	UnlockHint string    `json:"unlockHint"`
+}
+
 type AuthPayload struct {
 	User         *User  `json:"user"`
 	AccessToken  string `json:"accessToken"`
@@ -90,6 +98,37 @@ type PersonalRecord struct {
 	Value        float64   `json:"value"`
 	AchievedAt   time.Time `json:"achievedAt"`
 	WorkoutSetID uuid.UUID `json:"workoutSetId"`
+}
+
+type Pet struct {
+	ID                  uuid.UUID       `json:"id"`
+	Name                string          `json:"name"`
+	Species             PetSpecies      `json:"species"`
+	Color               PetColor        `json:"color"`
+	Stage               PetStage        `json:"stage"`
+	StageLabel          string          `json:"stageLabel"`
+	Mood                int             `json:"mood"`
+	MoodState           MoodState       `json:"moodState"`
+	CurrentStreak       int             `json:"currentStreak"`
+	LongestStreak       int             `json:"longestStreak"`
+	WorkoutsToNextStage *int            `json:"workoutsToNextStage,omitempty"`
+	HatchedAt           *time.Time      `json:"hatchedAt,omitempty"`
+	Appearance          *PetAppearance  `json:"appearance"`
+	Accessories         []*PetAccessory `json:"accessories"`
+	NewlyUnlocked       []*PetAccessory `json:"newlyUnlocked"`
+}
+
+type PetAccessory struct {
+	Accessory  *Accessory `json:"accessory"`
+	UnlockedAt time.Time  `json:"unlockedAt"`
+	Equipped   bool       `json:"equipped"`
+}
+
+type PetAppearance struct {
+	BodyAssetKey       string   `json:"bodyAssetKey"`
+	ExpressionAssetKey string   `json:"expressionAssetKey"`
+	Tint               string   `json:"tint"`
+	Layers             []string `json:"layers"`
 }
 
 type PlateauStatus struct {
@@ -326,6 +365,246 @@ func (e *FitnessGoal) UnmarshalJSON(b []byte) error {
 }
 
 func (e FitnessGoal) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type MoodState string
+
+const (
+	MoodStateHappy     MoodState = "HAPPY"
+	MoodStateContent   MoodState = "CONTENT"
+	MoodStateLow       MoodState = "LOW"
+	MoodStateNeglected MoodState = "NEGLECTED"
+)
+
+var AllMoodState = []MoodState{
+	MoodStateHappy,
+	MoodStateContent,
+	MoodStateLow,
+	MoodStateNeglected,
+}
+
+func (e MoodState) IsValid() bool {
+	switch e {
+	case MoodStateHappy, MoodStateContent, MoodStateLow, MoodStateNeglected:
+		return true
+	}
+	return false
+}
+
+func (e MoodState) String() string {
+	return string(e)
+}
+
+func (e *MoodState) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MoodState(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MoodState", str)
+	}
+	return nil
+}
+
+func (e MoodState) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *MoodState) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e MoodState) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type PetColor string
+
+const (
+	PetColorGreen  PetColor = "GREEN"
+	PetColorRed    PetColor = "RED"
+	PetColorBlue   PetColor = "BLUE"
+	PetColorAmber  PetColor = "AMBER"
+	PetColorViolet PetColor = "VIOLET"
+)
+
+var AllPetColor = []PetColor{
+	PetColorGreen,
+	PetColorRed,
+	PetColorBlue,
+	PetColorAmber,
+	PetColorViolet,
+}
+
+func (e PetColor) IsValid() bool {
+	switch e {
+	case PetColorGreen, PetColorRed, PetColorBlue, PetColorAmber, PetColorViolet:
+		return true
+	}
+	return false
+}
+
+func (e PetColor) String() string {
+	return string(e)
+}
+
+func (e *PetColor) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PetColor(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PetColor", str)
+	}
+	return nil
+}
+
+func (e PetColor) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PetColor) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PetColor) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type PetSpecies string
+
+const (
+	PetSpeciesSprout PetSpecies = "SPROUT"
+	PetSpeciesEmber  PetSpecies = "EMBER"
+	PetSpeciesPebble PetSpecies = "PEBBLE"
+	PetSpeciesDrift  PetSpecies = "DRIFT"
+)
+
+var AllPetSpecies = []PetSpecies{
+	PetSpeciesSprout,
+	PetSpeciesEmber,
+	PetSpeciesPebble,
+	PetSpeciesDrift,
+}
+
+func (e PetSpecies) IsValid() bool {
+	switch e {
+	case PetSpeciesSprout, PetSpeciesEmber, PetSpeciesPebble, PetSpeciesDrift:
+		return true
+	}
+	return false
+}
+
+func (e PetSpecies) String() string {
+	return string(e)
+}
+
+func (e *PetSpecies) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PetSpecies(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PetSpecies", str)
+	}
+	return nil
+}
+
+func (e PetSpecies) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PetSpecies) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PetSpecies) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type PetStage string
+
+const (
+	PetStageEgg       PetStage = "EGG"
+	PetStageHatchling PetStage = "HATCHLING"
+	PetStageJuvenile  PetStage = "JUVENILE"
+	PetStageAdult     PetStage = "ADULT"
+	PetStageChampion  PetStage = "CHAMPION"
+)
+
+var AllPetStage = []PetStage{
+	PetStageEgg,
+	PetStageHatchling,
+	PetStageJuvenile,
+	PetStageAdult,
+	PetStageChampion,
+}
+
+func (e PetStage) IsValid() bool {
+	switch e {
+	case PetStageEgg, PetStageHatchling, PetStageJuvenile, PetStageAdult, PetStageChampion:
+		return true
+	}
+	return false
+}
+
+func (e PetStage) String() string {
+	return string(e)
+}
+
+func (e *PetStage) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PetStage(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PetStage", str)
+	}
+	return nil
+}
+
+func (e PetStage) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PetStage) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PetStage) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

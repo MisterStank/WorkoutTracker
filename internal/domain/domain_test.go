@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"workouttracker/internal/domain"
+	"gymon/internal/domain"
 
 	"github.com/stretchr/testify/assert"
 )

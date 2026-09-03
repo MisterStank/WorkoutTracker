@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/workout/set_input_validation.dart';
+import 'package:gymon/features/workout/set_input_validation.dart';
 
 void main() {
   group('validateReps', () {

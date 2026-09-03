@@ -6,10 +6,10 @@ import (
 	"context"
 	"time"
 
-	"workouttracker/internal/domain"
-	appmiddleware "workouttracker/internal/middleware"
-	"workouttracker/internal/realtime"
-	"workouttracker/internal/service"
+	"gymon/internal/domain"
+	appmiddleware "gymon/internal/middleware"
+	"gymon/internal/realtime"
+	"gymon/internal/service"
 
 	"github.com/google/uuid"
 )
@@ -19,6 +19,7 @@ type Resolver struct {
 	Workout   *service.WorkoutService
 	Analytics *service.AnalyticsService
 	Program   *service.ProgramService
+	Pets      *service.PetService
 	Events    *realtime.RedisEventBus
 }
 

@@ -1,12 +1,13 @@
 ---
-name: workouttracker
-description: Project context for WorkoutTracker — what it is, its stack, how to set up/run/build/test the backend and mobile app, and the repo's directory structure. Use when working on this repo (backend, mobile, migrations, CI/CD, or architecture questions).
+name: gymon
+description: Project context for Gymon — what it is, its stack, how to set up/run/build/test the backend and mobile app, and the repo's directory structure. Use when working on this repo (backend, mobile, migrations, CI/CD, or architecture questions).
 ---
 
-# WorkoutTracker
+# Gymon
 
-A workout tracker that adapts to user progress. Built as a deep, portfolio-grade
-full-stack project — not a shallow CRUD app — deliberately demonstrating SOLID
+A virtual-companion game layered over an adaptive workout tracker: you raise a
+pet that hatches, evolves, and stays happy only while you keep training.
+Built as a deep, portfolio-grade full-stack project — not a shallow CRUD app — deliberately demonstrating SOLID
 design, caching, scalability, query optimization, real-time analytics, and a
 proper CI/CD pipeline.
 
@@ -44,10 +45,10 @@ Full architecture rationale and phased roadmap: `PLAN.md` at repo root.
 ## Repo structure
 
 ```
-WorkoutTracker/
+gymon/
 ├── PLAN.md                       full architecture + phased roadmap (source of truth)
 ├── README.md                     quick-start instructions
-├── go.mod / go.sum                Go module (module path: workouttracker)
+├── go.mod / go.sum                Go module (module path: gymon)
 ├── gqlgen.yml                     gqlgen codegen config
 ├── docker-compose.yml             local Postgres + Redis + api
 ├── Dockerfile                     backend container build
@@ -100,7 +101,7 @@ WorkoutTracker/
 │       └── redis.go               go-redis client constructor
 │
 ├── cmd/seed/main.go               `go run ./cmd/seed` — wipes/recreates a demo account
-│                                    (demo@workouttracker.app / demo12345) with 6 weeks of realistic
+│                                    (demo@gymon.app / demo12345) with 6 weeks of realistic
 │                                    progressive-overload history, so every screen has real data to look at
 │
 ├── migrations/                    0001 users/auth · 0002 exercises/workouts/sets/PRs (seeded exercise
@@ -154,7 +155,7 @@ WorkoutTracker/
 Prereqs: Go 1.25+, Docker, Flutter (stable channel).
 
 ```bash
-git clone <repo> && cd WorkoutTracker
+git clone <repo> && cd gymon
 cp .env.example .env
 docker compose up -d postgres redis
 
@@ -188,7 +189,7 @@ docker compose up --build
 
 Backend production image:
 ```bash
-docker build -t workouttracker-api .
+docker build -t gymon-api .
 ```
 
 Mobile release build:

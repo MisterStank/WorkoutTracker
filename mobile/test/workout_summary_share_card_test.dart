@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/units/weight_unit.dart';
-import 'package:mobile/features/sharing/workout_summary_share_card.dart';
-import 'package:mobile/features/workout/workout_models.dart';
+import 'package:gymon/core/units/weight_unit.dart';
+import 'package:gymon/features/sharing/workout_summary_share_card.dart';
+import 'package:gymon/features/workout/workout_models.dart';
 
 Exercise _exercise(String id, String name) => Exercise(id: id, name: name, category: 'push');
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"workouttracker/internal/domain"
+	"gymon/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

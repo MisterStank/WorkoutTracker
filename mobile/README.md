@@ -1,17 +1,22 @@
-# mobile
+# Gymon — mobile client
 
-A new Flutter project.
+The Flutter client for Gymon (package name `gymon`). Talks to the Go/GraphQL
+backend in the repo root.
 
-## Getting Started
+- Project overview and backend setup: [`../README.md`](../README.md)
+- What the app does, screen by screen: [`../docs/USER_GUIDE.md`](../docs/USER_GUIDE.md)
 
-This project is a starting point for a Flutter application.
+## Run
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs   # regenerates gitignored Drift code
+flutter run --dart-define=API_URL=http://localhost:8080/graphql
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Test
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter analyze
+flutter test
+```

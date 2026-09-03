@@ -30,26 +30,54 @@ class PendingSets extends Table {
   Set<Column> get primaryKey => {localId};
 }
 
-@DriftDatabase(tables: [PendingSets])
+/// A read-only snapshot of the user's pet, so the pet home screen — the
+/// app's landing screen — can render offline from the last-known state
+/// instead of a spinner or an error. Exactly one row (id = 'me'); the JSON
+/// is the full `pet { ... }` GraphQL selection. Purely a cache: the server
+/// recomputes mood/streak/unlocks on every online read, so a stale snapshot
+/// is only ever shown until the next successful fetch.
+class PetCache extends Table {
+  TextColumn get id => text()();
+  TextColumn get petJson => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [PendingSets, PetCache])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(impl.connect());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
-        // The offline outbox only ever holds transient, not-yet-synced data —
-        // dropping and recreating on a schema bump is safe (nothing is lost
-        // that the server doesn't also have a durable copy of once synced,
-        // and unsynced rows are, by definition, still sitting on the device
-        // that created them and haven't been confirmed anywhere else).
+        // Both tables hold only transient data the server has (or will have)
+        // a durable copy of — the offline outbox's not-yet-synced writes sit
+        // on the device that made them, and the pet cache is a throwaway
+        // snapshot. So a schema bump just drops and recreates them.
         onUpgrade: (m, from, to) async {
           await m.deleteTable(pendingSets.actualTableName);
           await m.createTable(pendingSets);
+          if (from < 3) {
+            await m.createTable(petCache);
+          }
         },
       );
+
+  Future<void> savePetSnapshot(String petJson) => into(petCache).insertOnConflictUpdate(
+        PetCacheCompanion.insert(id: 'me', petJson: petJson, updatedAt: DateTime.now()),
+      );
+
+  Future<String?> readPetSnapshot() async {
+    final row = await (select(petCache)..where((t) => t.id.equals('me'))).getSingleOrNull();
+    return row?.petJson;
+  }
+
+  Future<void> clearPetSnapshot() => (delete(petCache)..where((t) => t.id.equals('me'))).go();
 
   Future<List<PendingSet>> allPendingOldestFirst() =>
       (select(pendingSets)..orderBy([(t) => OrderingTerm.asc(t.createdAt)])).get();

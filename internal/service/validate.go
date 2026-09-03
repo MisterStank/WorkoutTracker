@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"workouttracker/internal/domain"
+	"gymon/internal/domain"
 )
 
 // This file holds all user-input validation for the service layer. The

@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 QueryExecutor connect() {
   return LazyDatabase(() async {
     final dir = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dir.path, 'workouttracker_offline.sqlite'));
+    final file = File(p.join(dir.path, 'gymon_offline.sqlite'));
     return NativeDatabase.createInBackground(file);
   });
 }

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"workouttracker/internal/domain"
-	"workouttracker/internal/ratelimit"
-	"workouttracker/internal/service"
+	"gymon/internal/domain"
+	"gymon/internal/ratelimit"
+	"gymon/internal/service"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

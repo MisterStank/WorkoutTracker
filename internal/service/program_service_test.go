@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"workouttracker/internal/domain"
-	"workouttracker/internal/service"
+	"gymon/internal/domain"
+	"gymon/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

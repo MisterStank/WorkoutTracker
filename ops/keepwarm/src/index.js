@@ -5,7 +5,7 @@
 // Deliberately /healthz only — no database query. Neon is left to scale to
 // zero: its resume is ~0.5s (vs Render's ~50s) and keeping it warm 24/7 would
 // blow the free 100 CU-hour/month budget in ~2 weeks.
-const TARGET = "https://workouttracker-api-pe1p.onrender.com/healthz";
+const TARGET = "https://gymon-api-pe1p.onrender.com/healthz";
 
 export default {
   async scheduled(_event, _env, ctx) {

@@ -33,7 +33,7 @@ func LoadConfig() (Config, error) {
 
 	return Config{
 		Port:           getEnv("PORT", "8080"),
-		DatabaseURL:    getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/workouttracker?sslmode=disable"),
+		DatabaseURL:    getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/gymon?sslmode=disable"),
 		RedisURL:       getEnv("REDIS_URL", "redis://localhost:6379"),
 		JWTSecret:      jwtSecret,
 		AllowedOrigins: getEnvList("ALLOWED_ORIGINS", []string{"http://localhost:*", "http://127.0.0.1:*"}),

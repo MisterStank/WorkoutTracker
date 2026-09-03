@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"workouttracker/internal/domain"
-	"workouttracker/internal/ratelimit"
-	"workouttracker/internal/service"
+	"gymon/internal/domain"
+	"gymon/internal/ratelimit"
+	"gymon/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

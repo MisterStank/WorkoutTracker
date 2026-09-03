@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"workouttracker/internal/domain"
+	"gymon/internal/domain"
 )
 
 // authThrottle holds the rate-limit policy for the auth endpoints. The

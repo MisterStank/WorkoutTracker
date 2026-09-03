@@ -27,6 +27,14 @@ var (
 	ErrProgramNotFound        = errors.New("program not found")
 	ErrProgramNotOwned        = errors.New("program does not belong to this user")
 
+	ErrPetNotFound          = errors.New("pet not found")
+	ErrPetAlreadyExists     = errors.New("you already have a pet")
+	ErrInvalidPetName       = errors.New("pet name must be between 1 and 30 characters")
+	ErrInvalidPetSpecies    = errors.New("unknown pet species")
+	ErrInvalidPetColor      = errors.New("unknown pet color")
+	ErrAccessoryNotFound    = errors.New("accessory not found")
+	ErrAccessoryNotUnlocked = errors.New("that accessory hasn't been unlocked yet")
+
 	// Input-validation errors. These carry user-facing messages and are
 	// passed through to GraphQL clients verbatim by the error presenter,
 	// unlike infrastructure errors which are masked.
@@ -55,6 +63,8 @@ var userFacingErrors = []error{
 	ErrWorkoutAlreadyActive, ErrWorkoutSetNotFound,
 	ErrTemplateNotFound, ErrTemplateNotOwned,
 	ErrFitnessProfileNotFound, ErrProgramNotFound, ErrProgramNotOwned,
+	ErrPetNotFound, ErrPetAlreadyExists, ErrInvalidPetName, ErrInvalidPetSpecies,
+	ErrInvalidPetColor, ErrAccessoryNotFound, ErrAccessoryNotUnlocked,
 	ErrInvalidSetValues, ErrInvalidRPE, ErrInvalidEmail, ErrWeakPassword,
 	ErrEmptyDisplayName, ErrInvalidMetricType, ErrInvalidMetricValue,
 	ErrEmptyTemplateName, ErrTemplateNoExercises, ErrNotesTooLong,

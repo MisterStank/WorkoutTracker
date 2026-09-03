@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"workouttracker/internal/dbtest"
-	"workouttracker/internal/domain"
+	"gymon/internal/dbtest"
+	"gymon/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"

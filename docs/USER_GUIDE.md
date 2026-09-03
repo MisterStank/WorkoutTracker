@@ -1,20 +1,21 @@
-# WorkoutTracker — User Guide
+# Gymon — User Guide
 
-Everything the app does, and how to use it. Covers the mobile app end to end, in the order you'll actually meet each screen.
+Gymon is a virtual-companion game: you raise a pet that grows and stays happy only if you keep training. Under the companion layer is a full workout tracker. This covers the mobile app end to end, in the order you'll actually meet each screen.
 
 ## Contents
 
 1. [Getting started](#1-getting-started)
-2. [Starting a workout](#2-starting-a-workout)
-3. [Logging a set](#3-logging-a-set)
-4. [Supersets](#4-supersets)
-5. [Templates](#5-templates)
-6. [Personalized programs](#6-personalized-programs)
-7. [Offline logging](#7-offline-logging)
-8. [Progress & records](#8-progress--records)
-9. [Coaching signals](#9-coaching-signals)
-10. [Sharing your stats](#10-sharing-your-stats)
-11. [Units & settings](#11-units--settings)
+2. [Your companion](#2-your-companion)
+3. [Starting a workout](#3-starting-a-workout)
+4. [Logging a set](#4-logging-a-set)
+5. [Supersets](#5-supersets)
+6. [Templates](#6-templates)
+7. [Personalized programs](#7-personalized-programs)
+8. [Offline logging](#8-offline-logging)
+9. [Progress & records](#9-progress--records)
+10. [Coaching signals](#10-coaching-signals)
+11. [Sharing](#11-sharing)
+12. [Units & settings](#12-units--settings)
 
 ## 1. Getting started
 
@@ -22,33 +23,63 @@ Create an account with your email, a password (at least 8 characters), and a dis
 
 1. Open the app and tap **Sign up** from the login screen.
 2. Enter your email, a password (8+ characters), and the name you want to appear in the app. Bad values are flagged before the request is sent.
-3. You're dropped straight into the home screen — no separate verification step.
+3. You're dropped straight into first-run setup — no separate verification step.
 
 <p>
   <img src="images/login-light.png" width="200" alt="Login screen, light theme">
   <img src="images/login-dark.png" width="200" alt="Login screen, dark theme">
 </p>
 
-Already have an account? Use **Log in** instead. To sign out, tap your **profile avatar** in the Home tab's top bar and choose **Log out**.
+Already have an account? Use **Log in** instead. To sign out, tap your **profile avatar** in the Train tab's top bar and choose **Log out**.
 
-**First-run tour**: the first time you sign up — and the first time you log in on a device that hasn't seen it — a short tour walks through logging workouts, templates and personalized programs, progress tracking, and sharing stats, followed by an optional prompt to fill in your goal/experience/equipment so a program can be generated for you right away. Every step can be skipped — tap **Skip** on any tour slide, or **Skip for now** on the personalization step — and you can always personalize a program later from the sparkle icon on the **Programs** tab. If you're signing in on a device that's already seen the tour and your account already has a fitness profile or a program, the app skips it entirely and drops you straight into the home screen. You can replay the tour any time from **View app tour** behind your profile avatar.
+**First-run setup**: the first time you sign up — and the first time you log in on a device that hasn't seen it — Gymon walks you through setting up your companion. It's short and hands-on rather than a slideshow:
+
+1. **Welcome** — what the companion is and why it exists.
+2. **Choose your companion** — pick a species and colour and give it a name. This hatches your pet then and there.
+3. **How it works** — the three rules: finishing a workout feeds and grows your companion; keeping a training streak unlocks accessories; disappearing for a week leaves it neglected (recoverable with one workout).
+4. **Set up a program** (optional) — answer a few questions about your goal, experience and equipment to generate a training split. Skippable; you can do it later from the **Programs** tab.
+
+Steps 1–3 have no Skip — they take under a minute and step 2 is the fun part — so everyone lands in the app knowing what the companion is for. If you're signing in on a device that's already seen this and your account already has a fitness profile or a program, the app skips it entirely. You can replay the Welcome and How-it-works screens any time from **View app tour** behind your profile avatar.
 
 <p>
-  <img src="images/onboarding-slide-1.png" width="180" alt="Tour slide 1: Log workouts fast">
-  <img src="images/onboarding-slide-2.png" width="180" alt="Tour slide 2: Templates and personalized programs">
-  <img src="images/onboarding-slide-3.png" width="180" alt="Tour slide 3: Progress and personal records">
-  <img src="images/onboarding-slide-4.png" width="180" alt="Tour slide 4: Share your stats">
+  <img src="images/onboarding-welcome.png" width="180" alt="First-run: welcome screen">
+  <img src="images/onboarding-choose-companion.png" width="180" alt="First-run: choosing a species, colour and name">
+  <img src="images/onboarding-how-it-works.png" width="180" alt="First-run: how the companion grows">
 </p>
+
+The app has five tabs at the bottom of the screen — **Companion** (your pet; the landing screen), **Train** (start and run a workout), **History**, **Programs**, and **Progress**. Your saved single-day templates live one level in, behind the checklist icon on the **Programs** tab (see [Chapter 6](#6-templates)).
+
+## 2. Your companion
+
+The **Companion** tab is where the app opens. It shows your pet, its mood and streak, how far it is from its next evolution, and a **Train to feed …** button that takes you straight to a workout.
+
 <p>
-  <img src="images/onboarding-personalize.png" width="200" alt="Tour personalize step, with Skip for now">
-  <img src="images/onboarding-skip.png" width="200" alt="Home screen right after skipping the tour">
+  <img src="images/companion-home.png" width="220" alt="The Companion home screen: pet, mood bar, streak, next-evolution note, Train button">
 </p>
 
-The app has four main tabs at the bottom of the screen — **Home**, **History**, **Programs**, and **Progress** — everything below is organized around them. Your saved single-day templates live one level in, behind the checklist icon on the **Programs** tab (see [Chapter 5](#5-templates)).
+Everything about the companion is worked out from your training history every time the screen loads. There is no currency, no shop, no timer to babysit — the only input is whether you train.
 
-## 2. Starting a workout
+**Mood** (0–100, shown as a bar with a word — *Thriving*, *Content*, *A bit down*, *Neglected*). It reflects how consistently you've trained *lately*: finishing workouts pushes it up, quiet days pull it down. Hitting roughly three workouts a week keeps it full.
 
-From the **Home** tab, tap **Start workout**. You'll be asked to choose:
+**Evolution stages** — **Egg → Hatchling → Juvenile → Adult → Champion**. Driven by your *total* number of finished workouts (the final stage also needs a long streak on record). Stages only ever move forward: a bad week costs mood, never progress. The Companion screen tells you how many workouts are left to the next stage. Your egg hatches on your first finished workout.
+
+**Streaks** — a *training day* is any day you finish at least one workout. Consecutive training days build your streak; miss a single day and it still holds, miss two and it breaks. Your longest streak ever is kept on the card even after the current one ends, and it's what gates the top evolution stage.
+
+**Accessories & wardrobe** — streaks, personal records, workout-count milestones and a handful of other feats (training before 7am, a weekend double, four weeks on target…) each unlock a cosmetic: hats, collars, capes, auras, backgrounds. Tap the **wardrobe icon** (top-right of the Companion screen) to open the detail screen: your pet larger, a colour picker, and every accessory you've unlocked so far, grouped by slot — tap one to equip it (one item per slot), tap again to take it off. When you open the app after earning something new, a note names it.
+
+<p>
+  <img src="images/companion-wardrobe.png" width="220" alt="Companion detail screen: colour picker and the accessory wardrobe grouped by slot">
+</p>
+
+**Neglect & recovery** — skip training for about a week and mood bottoms out; your companion looks dejected. Nothing is actually lost — a single workout starts bringing the mood back, and your stage, longest-streak record and unlocked accessories are all untouched. It's a nudge, not a punishment.
+
+**Renaming & recolouring** — from the wardrobe screen, the pencil icon renames your companion and the colour row recolours it, any time.
+
+**Sharing your companion** — tap the **share icon** on the Companion screen for a card showing your pet, its stage and mood, your streak and how many accessories you've unlocked. You get a preview first, then **Download image** or **Share…** — see [Chapter 11](#11-sharing).
+
+## 3. Starting a workout
+
+Open the **Train** tab — or tap **Train to feed …** on the Companion screen, which brings you here. Tap **Start workout** and choose:
 
 - **Blank workout** — starts immediately with nothing planned. Add exercises as you go — the natural choice if you're training by feel today.
 - **From a template** — opens your saved templates. Pick one and the app pre-loads every planned exercise as its own card, ready to log against — no need to add anything before you start.
@@ -62,12 +93,14 @@ Once a workout is running, the top bar shows a live elapsed-time clock and your 
 **Jumping back in**: if you switch to another tab mid-workout, a slim bar appears above the bottom navigation showing your elapsed time and set count. Tap it from anywhere in the app to return straight to your active workout.
 
 <p>
-  <img src="images/resume-bar.png" width="220" alt="Resume-workout bar visible on a non-Home tab">
+  <img src="images/resume-bar.png" width="220" alt="Resume-workout bar visible on a non-Train tab">
 </p>
 
 **Finishing up**: tap **Finish workout** at the bottom of the screen. The panel that opens is a bottom sheet, not a cramped dialog — a set-count and duration line at the top, an optional notes field (saved with the workout, visible later in history), then **Finish workout** and **Keep going** stacked full-width, with **Discard workout** set apart below a divider so it can't be mis-tapped for the button next to it. If you tap Finish without having logged any sets, the app offers to discard the empty session rather than clutter your history with it.
 
-## 3. Logging a set
+Finishing a workout also feeds your companion — its mood, streak and progress toward the next stage all update the next time you open the Companion tab, and any accessory you just earned is announced.
+
+## 4. Logging a set
 
 Tap **Log set** (the floating button on an active workout) and search for an exercise, or tap one already on screen — either a planned exercise chip or an exercise card. For a template-based workout, every planned exercise already has a card waiting, even before you've logged anything against it — tap **Add set** on an empty card to get started.
 
@@ -78,7 +111,7 @@ Tap **Log set** (the floating button on an active workout) and search for an exe
 Tapping either opens the set sheet:
 
 1. Enter **reps** (1–100) and **weight** (0–1000 kg / equivalent in lb). If you've done this exercise before, both fields pre-fill with your last set — you'll usually just need to confirm or tweak them.
-2. Optionally log **RPE** (rate of perceived exertion, 1–10 in half-point steps) — how hard that set felt. This is what powers the coaching suggestions in [Chapter 9](#9-coaching-signals).
+2. Optionally log **RPE** (rate of perceived exertion, 1–10 in half-point steps) — how hard that set felt. This is what powers the coaching suggestions in [Chapter 10](#10-coaching-signals).
 3. Choose a **set type**, then tap **Log set**. Values outside the ranges above are rejected with an explanation.
 
 <p>
@@ -94,7 +127,7 @@ Tapping either opens the set sheet:
 | Drop set | Reduced weight, continued past failure. | Yes |
 | Failure | Taken to muscular failure. | Yes |
 
-Every logged set beyond a warm-up is checked against your history for four kinds of personal record: heaviest weight, best single-set volume (weight × reps), estimated one-rep max, and most reps in a set. Beat one and a gold banner appears above your set list naming which record fell — tap the share icon on that banner to post it, see [Chapter 10](#10-sharing-your-stats).
+Every logged set beyond a warm-up is checked against your history for four kinds of personal record: heaviest weight, best single-set volume (weight × reps), estimated one-rep max, and most reps in a set. Beat one and a gold banner appears above your set list naming which record fell — tap the share icon on that banner to post it, see [Chapter 11](#11-sharing).
 
 **Custom exercises**: not in the built-in list? Tap **+** in the exercise picker (or, when a search comes up empty, the **Create "…"** button) to add your own — a name, a category, its equipment, and optionally the muscle groups it trains. Custom exercises work everywhere a built-in does, including as candidates when a program is generated. Long-press a custom exercise in the picker to edit or delete it (deletion is blocked while it's used by a logged set or a template).
 
@@ -120,16 +153,16 @@ Every logged set beyond a warm-up is checked against your history for four kinds
 
 **Rest timer**: logging a set starts a rest timer automatically, shown as a countdown ring above your exercise list. Add fifteen seconds with the **+** button, or tap **Skip** to end the rest early. When it reaches zero it fires a notification (with sound and vibration) so you don't have to keep the screen open. Long-press the **+** button to change the default rest length.
 
-## 4. Supersets
+## 5. Supersets
 
-A superset links two or more exercises you alternate between with no rest in between. WorkoutTracker supports both ways people actually plan them:
+A superset links two or more exercises you alternate between with no rest in between. Gymon supports both ways people actually plan them:
 
 - **Planned, in a template** — when building or editing a template, tap **Group as superset** between an exercise and the one above it to link them. Linked exercises show a connecting icon between their chips whenever that template is in use.
 - **Ad hoc, mid-workout** — tap the link icon in the top bar during an active workout, select two or more exercises, and confirm. Every set you log for those exercises from then on is tagged as part of that group, for that session only.
 
 A linked-set icon appears next to any set that's part of a superset, so you can see the pairing directly in your set list, not just in the planning view.
 
-## 5. Templates
+## 6. Templates
 
 Templates aren't a bottom-nav tab of their own — open the **checklist icon** in the top bar of the **Programs** tab to reach the template library. From there:
 
@@ -138,20 +171,19 @@ Templates aren't a bottom-nav tab of their own — open the **checklist icon** i
 - **Start from one** — tap the **▶** button on a template to launch a workout pre-loaded with its exercise list. (When you reach the same list via **Start workout → From a template**, tapping the row starts it directly instead of opening the editor.)
 - **Delete one** — swipe, or use the delete action on a template you no longer use. This doesn't touch any workouts you've already logged from it.
 
-To build a whole program instead of one template at a time, use the sparkle or **+** icons on the **Programs** tab — see [Chapter 6](#6-personalized-programs).
+To build a whole program instead of one template at a time, use the sparkle or **+** icons on the **Programs** tab — see [Chapter 7](#7-personalized-programs).
 
 <p>
-  <img src="images/templates-saved.png" width="220" alt="Saved templates list">
-  <img src="images/templates-list.png" width="220" alt="Templates tab including a generated program">
+  <img src="images/templates-saved.png" width="220" alt="The template library — each program day is also a template here">
 </p>
 
-Once a template-based workout is running, its planned exercises appear both as a row of progress chips up top and as a full card each further down — see [Chapter 2](#2-starting-a-workout).
+Once a template-based workout is running, its planned exercises appear both as a row of progress chips up top and as a full card each further down — see [Chapter 3](#3-starting-a-workout).
 
 <p>
   <img src="images/prepopulated-cards.png" width="220" alt="Pre-populated exercise cards when starting from a template">
 </p>
 
-## 6. Personalized programs
+## 7. Personalized programs
 
 Don't want to build templates by hand? On the **Programs** tab, tap the sparkle icon to generate a full multi-day training split from a short questionnaire (or the **+** icon to assemble a program from templates you've already made):
 
@@ -169,7 +201,7 @@ Tap **Generate** and the app builds a named, multi-day program — for example a
 
 Your answers are remembered — reopening the generator next time pre-fills your last profile, so tweaking and regenerating is quick.
 
-**Week-to-week progression**: a generated program carries a progression rule based on your goal — *linear* (add a little weight each week) for strength, *double progression* (add reps to the top of the range, then weight) for hypertrophy, or *maintain* otherwise. The program review screen shows which one you're on, and Home's **Continue** card shows which week of the program you're in. When you start a workout from a program day, the set sheet pre-fills a suggested weight for each planned exercise from that rule and your training history — including a deload roughly every fourth week.
+**Week-to-week progression**: a generated program carries a progression rule based on your goal — *linear* (add a little weight each week) for strength, *double progression* (add reps to the top of the range, then weight) for hypertrophy, or *maintain* otherwise. The program review screen shows which one you're on, and the Train tab's **Continue** card shows which week of the program you're in. When you start a workout from a program day, the set sheet pre-fills a suggested weight for each planned exercise from that rule and your training history — including a deload roughly every fourth week.
 
 **Finding a program again**: the **Programs** tab itself is the list — every program you've generated or built, newest first, each showing its goal and days per week, with a check mark on the one you're currently following. Tap one to reopen the review screen you saw right after generating it (mark it active, start any day, see its progression rule). Individual days always show up as ordinary templates in the library too — the Programs list is just the grouped view tying them back together.
 
@@ -177,18 +209,18 @@ Your answers are remembered — reopening the generator next time pre-fills your
   <img src="images/my-programs-list.png" width="220" alt="My Programs list, showing every generated program">
 </p>
 
-## 7. Offline logging
+## 8. Offline logging
 
 If a set fails to save because you've got no connection, it isn't lost — it's queued on your device and shown immediately with a small cloud-off icon so you know it hasn't synced yet. The app keeps checking for connectivity in the background and pushes every queued set the moment it's back, swapping the placeholder for the confirmed, PR-checked result automatically.
 
-> Nothing to do here. Log sets exactly as normal, connected or not — the queue and retry are automatic.
+> Nothing to do here. Log sets exactly as normal, connected or not — the queue and retry are automatic. (Starting and finishing a workout still need a connection; only mid-workout set logging is queued.)
 
-## 8. Progress & records
+## 9. Progress & records
 
 Open the **Progress** tab. It has four sub-tabs of its own:
 
 - **Volume** — total weight moved per day across all exercises, over the last 90 days — the highest-level view of whether you're training more or less than you used to.
-- **By exercise** — pick any exercise and chart it by **Weight**, **Reps**, or **Volume** over time (bodyweight exercises default to Reps). If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 9](#9-coaching-signals).
+- **By exercise** — pick any exercise and chart it by **Weight**, **Reps**, or **Volume** over time (bodyweight exercises default to Reps). If you haven't beaten your best in three weeks despite training it, a plateau notice appears — see [Chapter 10](#10-coaching-signals).
 - **Records** — every all-time personal record you hold, grouped by exercise with the date it was set — so a PR that scrolled past the in-workout banner isn't lost.
 - **Measurements** — track body weight and five circumference measurements — waist, chest, arms, thighs, hips — each on its own chart. Choose a measurement from the dropdown, tap **Log**, and enter today's reading. Circumferences can be entered and shown in **cm** or **in** (toggle beside the Log button); body weight follows your app-wide KG/LB setting.
 
@@ -197,7 +229,7 @@ Open the **Progress** tab. It has four sub-tabs of its own:
   <img src="images/progress-volume-dark.png" width="220" alt="Volume chart, dark theme">
 </p>
 
-Personal records are tracked per exercise across four categories — heaviest weight, best volume, estimated one-rep max, and most reps — and surface automatically as the gold banner described in [Chapter 3](#3-logging-a-set) as you hit them. The **Records** sub-tab is the place to browse all of them after the fact.
+Personal records are tracked per exercise across four categories — heaviest weight, best volume, estimated one-rep max, and most reps — and surface automatically as the gold banner described in [Chapter 4](#4-logging-a-set) as you hit them. The **Records** sub-tab is the place to browse all of them after the fact. PRs also feed your companion's accessory unlocks (see [Chapter 2](#2-your-companion)).
 
 Each entry in the **History** tab also shows that session's total volume, so you don't need to open a workout to see roughly how much work it was.
 
@@ -207,9 +239,9 @@ Each entry in the **History** tab also shows that session's total volume, so you
 
 **Fixing a past workout**: tap a card in the **History** tab to open the session and correct a mis-logged set — edit or delete any set the same way you would during the workout. You're warned once that this recalculates your personal records for that exercise.
 
-**Deleting a workout**: swipe a card left in the **History** tab and confirm to remove the entire session, including its sets. This can't be undone.
+**Deleting a workout**: swipe a card left in the **History** tab and confirm to remove the entire session, including its sets. This can't be undone. Deleting a finished workout also removes it from your companion's training history, so mood, streak and stage progress recompute accordingly.
 
-## 9. Coaching signals
+## 10. Coaching signals
 
 ### Next-set suggestions
 
@@ -225,34 +257,38 @@ The suggested weight always lands on a loadable **2.5 kg / 5 lb** step (and "sam
 
 No RPE logged yet for that exercise? The sheet just pre-fills your last set with no suggestion attached — log an RPE once and suggestions start from the next time.
 
-When the workout was started from a **program day**, the suggestion instead comes from that program's week-to-week progression rule (see [Chapter 6](#6-personalized-programs)) — labelled "Week N · …" — rather than this RPE table.
+When the workout was started from a **program day**, the suggestion instead comes from that program's week-to-week progression rule (see [Chapter 7](#7-personalized-programs)) — labelled "Week N · …" — rather than this RPE table.
 
 ### Plateau notices
 
-> **No new best in three weeks.** The [By exercise](#8-progress--records) tab shows a banner like this only when you've genuinely trained that lift at least twice recently without progressing — not simply because you haven't touched it lately. Take it as a cue to deload, change rep ranges, or swap in a variation.
+> **No new best in three weeks.** The [By exercise](#9-progress--records) tab shows a banner like this only when you've genuinely trained that lift at least twice recently without progressing — not simply because you haven't touched it lately. Take it as a cue to deload, change rep ranges, or swap in a variation.
 
-## 10. Sharing your stats
+## 11. Sharing
 
-WorkoutTracker doesn't do live workout sharing — instead, you get a shareable image any time you hit a milestone worth showing off:
+Gymon doesn't do live workout sharing — instead, you get a shareable image any time you hit a milestone worth showing off:
 
-- **A new personal record**: when the gold PR banner appears (see [Chapter 3](#3-logging-a-set)), tap its share icon to preview a card with the exercise, the record you hit, and the new value.
+- **Your companion**: tap the share icon on the **Companion** screen for a card with your pet, its stage and mood, your current streak, and how many accessories you've unlocked.
+- **A new personal record**: when the gold PR banner appears (see [Chapter 4](#4-logging-a-set)), tap its share icon to preview a card with the exercise, the record you hit, and the new value.
 - **A finished workout**: after tapping **Finish workout**, a **Share** action appears alongside the confirmation — it opens a card summarizing that session's total sets, volume, duration, and exercise list.
 
 <p>
+  <img src="images/share-companion.png" width="220" alt="Companion share card preview">
   <img src="images/share-pr-card.png" width="220" alt="PR share card preview">
   <img src="images/share-workout-summary.png" width="220" alt="Workout summary share card preview">
 </p>
 
-Either way, you get a preview first. It has **Download image** — a plain download, or your Files app — and **Share…**, which hands the image to your device's share sheet so you can post it wherever you like (Instagram, messages, etc.). Nothing leaves the app until you pick one. Both cards render with the same fixed dark red-and-black look regardless of your app theme, so the image looks consistent no matter which theme you're using.
+Either way, you get a preview first. It has **Download image** — a plain download, or your Files app — and **Share…**, which hands the image to your device's share sheet so you can post it wherever you like (Instagram, messages, etc.). Nothing leaves the app until you pick one. Every card renders with the same fixed dark red-and-black look regardless of your app theme, so the image looks consistent no matter which theme you're using.
 
-## 11. Units & settings
+## 12. Units & settings
 
-Everything here lives behind your **profile avatar** in the Home tab's top bar — tap it to open the settings sheet.
+Everything here lives behind your **profile avatar** in the Train tab's top bar — tap it to open the settings sheet.
 
 **Units**: switch **Kilograms** / **Pounds**. This changes how weight is displayed and entered across the entire app — set logging, history, progress charts, and body weight — in one place. Everything is still stored in kilograms behind the scenes, so switching back and forth never loses precision.
 
 **Appearance**: choose **System**, **Light**, or **Dark** — System follows your device's setting, and your choice is remembered. The theme changes instantly, so you can see it before closing the sheet.
 
+**View app tour**: replays the Welcome and How-it-works screens from first-run setup.
+
 ---
 
-If a screen doesn't match what's described here, the app has likely moved on since this guide was written — the underlying ideas (log fast, adapt to effort, keep working offline) won't have.
+If a screen doesn't match what's described here, the app has likely moved on since this guide was written — the underlying ideas (raise your companion by training, log fast, adapt to effort, keep working offline) won't have.
