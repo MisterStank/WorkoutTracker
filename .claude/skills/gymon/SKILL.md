@@ -45,7 +45,7 @@ Full architecture rationale and phased roadmap: `PLAN.md` at repo root.
 ## Repo structure
 
 ```
-WorkoutTracker/
+gymon/
 ├── PLAN.md                       full architecture + phased roadmap (source of truth)
 ├── README.md                     quick-start instructions
 ├── go.mod / go.sum                Go module (module path: gymon)
@@ -155,7 +155,7 @@ WorkoutTracker/
 Prereqs: Go 1.25+, Docker, Flutter (stable channel).
 
 ```bash
-git clone <repo> && cd WorkoutTracker
+git clone <repo> && cd gymon
 cp .env.example .env
 docker compose up -d postgres redis
 

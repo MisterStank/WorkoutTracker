@@ -2,7 +2,7 @@
   // Cron-only Worker: pings the Render API every 10 minutes so its free-tier
   // instance never idles into a ~50s cold start (Render spins down after 15
   // min of no traffic). Deploy once with:  cd ops/keepwarm && npx wrangler@4 deploy
-  "name": "workouttracker-keepwarm",
+  "name": "gymon-keepwarm",
   "main": "src/index.js",
   "compatibility_date": "2026-09-02",
   "triggers": {

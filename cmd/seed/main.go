@@ -124,8 +124,91 @@ func main() {
 		log.Fatalf("seed pet: %v", err)
 	}
 
+	if err := seedTemplatesAndProgram(ctx, db, userID, exerciseIDs); err != nil {
+		log.Fatalf("seed templates/program: %v", err)
+	}
+
 	fmt.Printf("Seeded demo account: %s / %s\n", demoEmail, demoPassword)
 	fmt.Printf("  %d workouts (%d in a closing daily streak), %d sets\n", workoutCount, streakWorkouts, setCount)
+}
+
+// seedTemplatesAndProgram gives the demo account a saved fitness profile,
+// three single-day templates and an active 3-day full-body program tying
+// them together — so the Templates library and Programs tab have real
+// content, and first-run onboarding is skipped (a "returning user").
+func seedTemplatesAndProgram(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, exerciseIDs map[string]uuid.UUID) error {
+	if _, err := db.Exec(ctx,
+		`INSERT INTO user_fitness_profiles (user_id, goal, experience_level, days_per_week, equipment_access)
+		 VALUES ($1, 'general_fitness', 'intermediate', 3, ARRAY['barbell','dumbbell','bodyweight','cable','machine'])`,
+		userID,
+	); err != nil {
+		return err
+	}
+
+	type tmplPlan struct {
+		name      string
+		exercises []struct {
+			name string
+			reps int
+		}
+	}
+	plans := []tmplPlan{
+		{"Full Body A", []struct {
+			name string
+			reps int
+		}{{"Barbell Back Squat", 5}, {"Barbell Bench Press", 5}, {"Barbell Row", 8}, {"Plank", 1}}},
+		{"Full Body B", []struct {
+			name string
+			reps int
+		}{{"Conventional Deadlift", 4}, {"Overhead Press", 6}, {"Pull-Up", 8}, {"Dumbbell Bicep Curl", 12}}},
+		{"Full Body C", []struct {
+			name string
+			reps int
+		}{{"Barbell Back Squat", 8}, {"Barbell Bench Press", 8}, {"Leg Press", 12}, {"Triceps Pushdown", 12}}},
+	}
+
+	templateIDs := make([]uuid.UUID, len(plans))
+	for i, p := range plans {
+		tid := uuid.New()
+		templateIDs[i] = tid
+		if _, err := db.Exec(ctx,
+			`INSERT INTO workout_templates (id, user_id, name) VALUES ($1, $2, $3)`, tid, userID, p.name,
+		); err != nil {
+			return err
+		}
+		for pos, ex := range p.exercises {
+			exID, ok := exerciseIDs[ex.name]
+			if !ok {
+				continue
+			}
+			if _, err := db.Exec(ctx,
+				`INSERT INTO workout_template_exercises (id, template_id, exercise_id, position, target_sets, target_reps)
+				 VALUES ($1, $2, $3, $4, 3, $5)`,
+				uuid.New(), tid, exID, pos, ex.reps,
+			); err != nil {
+				return err
+			}
+		}
+	}
+
+	programID := uuid.New()
+	if _, err := db.Exec(ctx,
+		`INSERT INTO programs (id, user_id, name, goal, days_per_week, is_active)
+		 VALUES ($1, $2, '3-Day Full Body Program', 'general_fitness', 3, true)`,
+		programID, userID,
+	); err != nil {
+		return err
+	}
+	for i, tid := range templateIDs {
+		if _, err := db.Exec(ctx,
+			`INSERT INTO program_days (id, program_id, day_label, position, template_id)
+			 VALUES ($1, $2, $3, $4, $5)`,
+			uuid.New(), programID, fmt.Sprintf("Day %c", 'A'+i), i, tid,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func seedUser(ctx context.Context, db *pgxpool.Pool) (uuid.UUID, error) {

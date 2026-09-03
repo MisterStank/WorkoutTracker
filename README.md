@@ -28,7 +28,7 @@ Runs Postgres, Redis, and the API backend in containers. Mobile runs locally on 
 
 ```bash
 # 1. Clone and setup
-git clone <repo> && cd WorkoutTracker
+git clone <repo> && cd gymon
 cp .env.example .env
 export $(grep -v '^#' .env | xargs)
 
@@ -70,7 +70,7 @@ For more control and faster iteration when modifying the backend.
 
 ```bash
 # 1. Clone and setup
-git clone <repo> && cd WorkoutTracker
+git clone <repo> && cd gymon
 cp .env.example .env
 export $(grep -v '^#' .env | xargs)
 
@@ -141,7 +141,7 @@ If you're only working on the Flutter app, use the production API:
 cd mobile
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
-flutter run --dart-define=API_URL=https://workouttracker-api.onrender.com/graphql
+flutter run --dart-define=API_URL=https://gymon-api.onrender.com/graphql
 ```
 
 Test:
