@@ -37,6 +37,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := platform.RunMigrations(cfg.DatabaseURL); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
+
 	ctx := context.Background()
 	db, err := platform.NewPostgresPool(ctx, cfg.DatabaseURL)
 	if err != nil {

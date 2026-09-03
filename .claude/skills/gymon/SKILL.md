@@ -51,8 +51,8 @@ gymon/
 ├── go.mod / go.sum                Go module (module path: gymon)
 ├── gqlgen.yml                     gqlgen codegen config
 ├── docker-compose.yml             local Postgres + Redis + api
-├── Dockerfile                     backend container build
-├── fly.toml                       Fly.io deploy config (release_command runs migrations)
+├── Dockerfile                     backend container build (deployed on Render, auto-deploy on push to main)
+├── migrations/embed.go            embeds the .sql files; the API applies them on boot via platform.RunMigrations
 ├── .env.example                   env vars the backend reads
 │
 ├── cmd/api/main.go                composition root: wires config, DB pool, services, GraphQL handler, chi router
@@ -159,8 +159,9 @@ git clone <repo> && cd gymon
 cp .env.example .env
 docker compose up -d postgres redis
 
-# install golang-migrate if you don't have it:
-# https://github.com/golang-migrate/migrate
+# migrations are embedded and run automatically when `cmd/api` boots.
+# to apply them by hand (e.g. before running the repo tests directly):
+# install golang-migrate — https://github.com/golang-migrate/migrate
 migrate -database "$DATABASE_URL" -path migrations up
 ```
 

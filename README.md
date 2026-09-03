@@ -189,10 +189,13 @@ cd mobile && flutter build web
 1. Create a new numbered pair under `migrations/`:
    - `NNNN_description.up.sql`
    - `NNNN_description.down.sql`
-2. Run migrations:
+2. Run migrations locally:
    ```bash
    migrate -database "$DATABASE_URL" -path migrations up
    ```
+   The `.sql` files are also embedded into the API binary (`migrations/embed.go`)
+   and applied automatically on boot (`internal/platform.RunMigrations`), so a
+   deploy to Render carries its own schema changes — no separate release step.
 
 ---
 
