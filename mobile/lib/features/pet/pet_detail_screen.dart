@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'pet_avatar.dart';
 import 'pet_models.dart';
-import 'pet_onboarding_screen.dart';
+import 'pet_palette.dart';
 import 'pet_provider.dart';
 
 /// Companion detail: bigger avatar, rename, recolour, and the accessory

@@ -1,0 +1,6 @@
+# The `dump` tag marks dev-only helpers that render artwork to build/ for a
+# human eyeball check. They assert nothing — skipped by default, run with
+# `flutter test <path> --run-skipped`.
+tags:
+  dump:
+    skip: "dev-only render dump — run with --run-skipped"
