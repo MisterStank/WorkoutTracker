@@ -16,6 +16,7 @@ Gymon is a virtual-companion game: you raise a pet that grows and stays happy on
 10. [Coaching signals](#10-coaching-signals)
 11. [Sharing](#11-sharing)
 12. [Units & settings](#12-units--settings)
+13. [Every version of your companion](#13-every-version-of-your-companion)
 
 ## 1. Getting started
 
@@ -75,6 +76,8 @@ Everything about the companion is worked out from your training history every ti
 
 **Renaming & recolouring** — from the wardrobe screen, the pencil icon renames your companion and the colour row recolours it, any time.
 
+**Every look** — species, colour, evolution stage and mood combine into your companion's appearance, and the art is drawn live from those four values. [Chapter 13](#13-every-version-of-your-companion) shows the full set.
+
 **Sharing your companion** — tap the **share icon** on the Companion screen for a card showing your pet, its stage and mood, your streak and how many accessories you've unlocked. You get a preview first, then **Download image** or **Share…** — see [Chapter 11](#11-sharing).
 
 ## 3. Starting a workout
@@ -97,6 +100,11 @@ Once a workout is running, the top bar shows a live elapsed-time clock and your 
 </p>
 
 **Finishing up**: tap **Finish workout** at the bottom of the screen. The panel that opens is a bottom sheet, not a cramped dialog — a set-count and duration line at the top, an optional notes field (saved with the workout, visible later in history), then **Finish workout** and **Keep going** stacked full-width, with **Discard workout** set apart below a divider so it can't be mis-tapped for the button next to it. If you tap Finish without having logged any sets, the app offers to discard the empty session rather than clutter your history with it.
+
+<p>
+  <img src="images/finish-workout-sheet.png" width="220" alt="The finish-workout bottom sheet">
+  <img src="images/workout-completion.png" width="220" alt="Workout-complete summary with a new-PR banner and share actions">
+</p>
 
 Finishing a workout also feeds your companion — its mood, streak and progress toward the next stage all update the next time you open the Companion tab, and any accessory you just earned is announced.
 
@@ -130,6 +138,8 @@ Tapping either opens the set sheet:
 Every logged set beyond a warm-up is checked against your history for four kinds of personal record: heaviest weight, best single-set volume (weight × reps), estimated one-rep max, and most reps in a set. Beat one and a gold banner appears above your set list naming which record fell — tap the share icon on that banner to post it, see [Chapter 11](#11-sharing).
 
 **Custom exercises**: not in the built-in list? Tap **+** in the exercise picker (or, when a search comes up empty, the **Create "…"** button) to add your own — a name, a category, its equipment, and optionally the muscle groups it trains. Custom exercises work everywhere a built-in does, including as candidates when a program is generated. Long-press a custom exercise in the picker to edit or delete it (deletion is blocked while it's used by a logged set or a template).
+
+**Exercise instructions**: tap the round category icon next to an exercise — in the picker, or at the top of the set sheet — for a short how-to-perform description. It doesn't select the exercise, it just explains it.
 
 **Bodyweight exercises**: for anything tagged *bodyweight* (pull-ups, dips, push-ups…), the weight field means *added* load — enter `0` for plain bodyweight, a positive number for weighted, or a negative number for assisted. Since the weight stays at zero, the **most reps** record is what tracks progress here, and the "By exercise" chart defaults to reps for them.
 
@@ -207,6 +217,7 @@ Your answers are remembered — reopening the generator next time pre-fills your
 
 <p>
   <img src="images/my-programs-list.png" width="220" alt="My Programs list, showing every generated program">
+  <img src="images/program-review.png" width="220" alt="A program's review screen: progression rule, mark active, start any day">
 </p>
 
 ## 8. Offline logging
@@ -229,6 +240,12 @@ Open the **Progress** tab. It has four sub-tabs of its own:
   <img src="images/progress-volume-dark.png" width="220" alt="Volume chart, dark theme">
 </p>
 
+<p>
+  <img src="images/progress-by-exercise.png" width="180" alt="By-exercise progress chart">
+  <img src="images/progress-records.png" width="180" alt="All-time personal records, grouped by exercise">
+  <img src="images/progress-measurements.png" width="180" alt="Body measurement tracking">
+</p>
+
 Personal records are tracked per exercise across four categories — heaviest weight, best volume, estimated one-rep max, and most reps — and surface automatically as the gold banner described in [Chapter 4](#4-logging-a-set) as you hit them. The **Records** sub-tab is the place to browse all of them after the fact. PRs also feed your companion's accessory unlocks (see [Chapter 2](#2-your-companion)).
 
 Each entry in the **History** tab also shows that session's total volume, so you don't need to open a workout to see roughly how much work it was.
@@ -238,6 +255,10 @@ Each entry in the **History** tab also shows that session's total volume, so you
 </p>
 
 **Fixing a past workout**: tap a card in the **History** tab to open the session and correct a mis-logged set — edit or delete any set the same way you would during the workout. You're warned once that this recalculates your personal records for that exercise.
+
+<p>
+  <img src="images/workout-detail.png" width="220" alt="A past workout opened from History, with per-set edit controls">
+</p>
 
 **Deleting a workout**: swipe a card left in the **History** tab and confirm to remove the entire session, including its sets. This can't be undone. Deleting a finished workout also removes it from your companion's training history, so mood, streak and stage progress recompute accordingly.
 
@@ -288,6 +309,73 @@ Everything here lives behind your **profile avatar** in the Train tab's top bar 
 **Appearance**: choose **System**, **Light**, or **Dark** — System follows your device's setting, and your choice is remembered. The theme changes instantly, so you can see it before closing the sheet.
 
 **View app tour**: replays the Welcome and How-it-works screens from first-run setup.
+
+## 13. Every version of your companion
+
+Your companion's look is built from four independent choices, and the art is
+drawn live from them — there are no fixed portraits.
+
+- **Species** (picked once, at hatch): **Sprout** (leaf crown), **Ember** (flame
+  crown), **Pebble** (stone crown), **Drift** (wings and a little cloud).
+- **Colour** (changeable any time from the wardrobe): green, red, blue, amber,
+  violet.
+- **Evolution stage** (earned by finishing workouts): Egg → Hatchling →
+  Juvenile → Adult → Champion. The body grows with each stage; Champion adds a
+  drifting sparkle ring.
+- **Mood** (reflects how consistently you've trained lately): Thriving, Content,
+  A bit down, Neglected — it changes the eyes, mouth and posture, and Neglected
+  also desaturates the colours and adds a tear.
+
+Below is every species across every stage and mood (all shown in green; the
+colour strip follows). This is the placeholder art set — richer hand-drawn
+assets are planned, and because the server sends asset *keys* the swap won't
+need an app update.
+
+#### Sprout — leaf crown
+
+| Stage | Thriving | Content | A bit down | Neglected |
+|---|---|---|---|---|
+| **Egg** | <img src="images/pet/sprout_egg_happy.png" width="96" alt="sprout egg happy"> | <img src="images/pet/sprout_egg_content.png" width="96" alt="sprout egg content"> | <img src="images/pet/sprout_egg_low.png" width="96" alt="sprout egg low"> | <img src="images/pet/sprout_egg_neglected.png" width="96" alt="sprout egg neglected"> |
+| **Hatchling** | <img src="images/pet/sprout_hatchling_happy.png" width="96" alt="sprout hatchling happy"> | <img src="images/pet/sprout_hatchling_content.png" width="96" alt="sprout hatchling content"> | <img src="images/pet/sprout_hatchling_low.png" width="96" alt="sprout hatchling low"> | <img src="images/pet/sprout_hatchling_neglected.png" width="96" alt="sprout hatchling neglected"> |
+| **Juvenile** | <img src="images/pet/sprout_juvenile_happy.png" width="96" alt="sprout juvenile happy"> | <img src="images/pet/sprout_juvenile_content.png" width="96" alt="sprout juvenile content"> | <img src="images/pet/sprout_juvenile_low.png" width="96" alt="sprout juvenile low"> | <img src="images/pet/sprout_juvenile_neglected.png" width="96" alt="sprout juvenile neglected"> |
+| **Adult** | <img src="images/pet/sprout_adult_happy.png" width="96" alt="sprout adult happy"> | <img src="images/pet/sprout_adult_content.png" width="96" alt="sprout adult content"> | <img src="images/pet/sprout_adult_low.png" width="96" alt="sprout adult low"> | <img src="images/pet/sprout_adult_neglected.png" width="96" alt="sprout adult neglected"> |
+| **Champion** | <img src="images/pet/sprout_champion_happy.png" width="96" alt="sprout champion happy"> | <img src="images/pet/sprout_champion_content.png" width="96" alt="sprout champion content"> | <img src="images/pet/sprout_champion_low.png" width="96" alt="sprout champion low"> | <img src="images/pet/sprout_champion_neglected.png" width="96" alt="sprout champion neglected"> |
+
+#### Ember — flame crown
+
+| Stage | Thriving | Content | A bit down | Neglected |
+|---|---|---|---|---|
+| **Egg** | <img src="images/pet/ember_egg_happy.png" width="96" alt="ember egg happy"> | <img src="images/pet/ember_egg_content.png" width="96" alt="ember egg content"> | <img src="images/pet/ember_egg_low.png" width="96" alt="ember egg low"> | <img src="images/pet/ember_egg_neglected.png" width="96" alt="ember egg neglected"> |
+| **Hatchling** | <img src="images/pet/ember_hatchling_happy.png" width="96" alt="ember hatchling happy"> | <img src="images/pet/ember_hatchling_content.png" width="96" alt="ember hatchling content"> | <img src="images/pet/ember_hatchling_low.png" width="96" alt="ember hatchling low"> | <img src="images/pet/ember_hatchling_neglected.png" width="96" alt="ember hatchling neglected"> |
+| **Juvenile** | <img src="images/pet/ember_juvenile_happy.png" width="96" alt="ember juvenile happy"> | <img src="images/pet/ember_juvenile_content.png" width="96" alt="ember juvenile content"> | <img src="images/pet/ember_juvenile_low.png" width="96" alt="ember juvenile low"> | <img src="images/pet/ember_juvenile_neglected.png" width="96" alt="ember juvenile neglected"> |
+| **Adult** | <img src="images/pet/ember_adult_happy.png" width="96" alt="ember adult happy"> | <img src="images/pet/ember_adult_content.png" width="96" alt="ember adult content"> | <img src="images/pet/ember_adult_low.png" width="96" alt="ember adult low"> | <img src="images/pet/ember_adult_neglected.png" width="96" alt="ember adult neglected"> |
+| **Champion** | <img src="images/pet/ember_champion_happy.png" width="96" alt="ember champion happy"> | <img src="images/pet/ember_champion_content.png" width="96" alt="ember champion content"> | <img src="images/pet/ember_champion_low.png" width="96" alt="ember champion low"> | <img src="images/pet/ember_champion_neglected.png" width="96" alt="ember champion neglected"> |
+
+#### Pebble — stone crown
+
+| Stage | Thriving | Content | A bit down | Neglected |
+|---|---|---|---|---|
+| **Egg** | <img src="images/pet/pebble_egg_happy.png" width="96" alt="pebble egg happy"> | <img src="images/pet/pebble_egg_content.png" width="96" alt="pebble egg content"> | <img src="images/pet/pebble_egg_low.png" width="96" alt="pebble egg low"> | <img src="images/pet/pebble_egg_neglected.png" width="96" alt="pebble egg neglected"> |
+| **Hatchling** | <img src="images/pet/pebble_hatchling_happy.png" width="96" alt="pebble hatchling happy"> | <img src="images/pet/pebble_hatchling_content.png" width="96" alt="pebble hatchling content"> | <img src="images/pet/pebble_hatchling_low.png" width="96" alt="pebble hatchling low"> | <img src="images/pet/pebble_hatchling_neglected.png" width="96" alt="pebble hatchling neglected"> |
+| **Juvenile** | <img src="images/pet/pebble_juvenile_happy.png" width="96" alt="pebble juvenile happy"> | <img src="images/pet/pebble_juvenile_content.png" width="96" alt="pebble juvenile content"> | <img src="images/pet/pebble_juvenile_low.png" width="96" alt="pebble juvenile low"> | <img src="images/pet/pebble_juvenile_neglected.png" width="96" alt="pebble juvenile neglected"> |
+| **Adult** | <img src="images/pet/pebble_adult_happy.png" width="96" alt="pebble adult happy"> | <img src="images/pet/pebble_adult_content.png" width="96" alt="pebble adult content"> | <img src="images/pet/pebble_adult_low.png" width="96" alt="pebble adult low"> | <img src="images/pet/pebble_adult_neglected.png" width="96" alt="pebble adult neglected"> |
+| **Champion** | <img src="images/pet/pebble_champion_happy.png" width="96" alt="pebble champion happy"> | <img src="images/pet/pebble_champion_content.png" width="96" alt="pebble champion content"> | <img src="images/pet/pebble_champion_low.png" width="96" alt="pebble champion low"> | <img src="images/pet/pebble_champion_neglected.png" width="96" alt="pebble champion neglected"> |
+
+#### Drift — wings & cloud
+
+| Stage | Thriving | Content | A bit down | Neglected |
+|---|---|---|---|---|
+| **Egg** | <img src="images/pet/drift_egg_happy.png" width="96" alt="drift egg happy"> | <img src="images/pet/drift_egg_content.png" width="96" alt="drift egg content"> | <img src="images/pet/drift_egg_low.png" width="96" alt="drift egg low"> | <img src="images/pet/drift_egg_neglected.png" width="96" alt="drift egg neglected"> |
+| **Hatchling** | <img src="images/pet/drift_hatchling_happy.png" width="96" alt="drift hatchling happy"> | <img src="images/pet/drift_hatchling_content.png" width="96" alt="drift hatchling content"> | <img src="images/pet/drift_hatchling_low.png" width="96" alt="drift hatchling low"> | <img src="images/pet/drift_hatchling_neglected.png" width="96" alt="drift hatchling neglected"> |
+| **Juvenile** | <img src="images/pet/drift_juvenile_happy.png" width="96" alt="drift juvenile happy"> | <img src="images/pet/drift_juvenile_content.png" width="96" alt="drift juvenile content"> | <img src="images/pet/drift_juvenile_low.png" width="96" alt="drift juvenile low"> | <img src="images/pet/drift_juvenile_neglected.png" width="96" alt="drift juvenile neglected"> |
+| **Adult** | <img src="images/pet/drift_adult_happy.png" width="96" alt="drift adult happy"> | <img src="images/pet/drift_adult_content.png" width="96" alt="drift adult content"> | <img src="images/pet/drift_adult_low.png" width="96" alt="drift adult low"> | <img src="images/pet/drift_adult_neglected.png" width="96" alt="drift adult neglected"> |
+| **Champion** | <img src="images/pet/drift_champion_happy.png" width="96" alt="drift champion happy"> | <img src="images/pet/drift_champion_content.png" width="96" alt="drift champion content"> | <img src="images/pet/drift_champion_low.png" width="96" alt="drift champion low"> | <img src="images/pet/drift_champion_neglected.png" width="96" alt="drift champion neglected"> |
+
+#### Colours (Sprout, adult, content)
+
+| Green | Red | Blue | Amber | Violet |
+|---|---|---|---|---|
+| <img src="images/pet/_colour_green.png" width="96" alt="green"> | <img src="images/pet/_colour_red.png" width="96" alt="red"> | <img src="images/pet/_colour_blue.png" width="96" alt="blue"> | <img src="images/pet/_colour_amber.png" width="96" alt="amber"> | <img src="images/pet/_colour_violet.png" width="96" alt="violet"> |
 
 ---
 
