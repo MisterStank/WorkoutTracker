@@ -21,8 +21,19 @@ class PrShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final headline = records.first;
-    final displayValue = unit.fromKg(headline.value);
     final labels = records.map((r) => recordTypeLabels[r.recordType] ?? r.recordType).join(' & ');
+
+    // "most reps" is a plain count, not a weight — don't unit-convert or tack a
+    // kg/lb label onto it. Everything else (heaviest weight, best volume,
+    // estimated 1RM) is a weight in kg.
+    final String headlineText;
+    if (headline.recordType == 'max_reps') {
+      headlineText = '${headline.value.toStringAsFixed(0)} reps';
+    } else {
+      final displayValue = unit.fromKg(headline.value);
+      final n = displayValue.toStringAsFixed(displayValue.truncateToDouble() == displayValue ? 0 : 1);
+      headlineText = '$n ${unit.label}';
+    }
 
     return Container(
       width: 340,
@@ -35,15 +46,20 @@ class PrShareCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.emoji_events, color: _accent, size: 40),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           const Text('NEW PERSONAL RECORD',
               style: TextStyle(fontFamily: AppTypography.display, color: _accent, fontWeight: FontWeight.w700, fontSize: 13, letterSpacing: 1.4)),
-          const SizedBox(height: 8),
-          Text(exerciseName,
-              style: const TextStyle(fontFamily: AppTypography.display, color: _text, fontSize: 26, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          // A long exercise name or headline must shrink to one line rather than
+          // wrap — wrapping pushes the "GYMON" footer out of the fixed-size card
+          // and clips it in the exported image.
+          _OneLine(
+            exerciseName,
+            style: const TextStyle(fontFamily: AppTypography.display, color: _text, fontSize: 26, fontWeight: FontWeight.w700),
+          ),
           const Spacer(),
-          Text(
-            '${displayValue.toStringAsFixed(displayValue.truncateToDouble() == displayValue ? 0 : 1)} ${unit.label}',
+          _OneLine(
+            headlineText,
             style: const TextStyle(fontFamily: AppTypography.mono, color: _text, fontSize: 46, fontWeight: FontWeight.w600, letterSpacing: -1),
           ),
           Text(labels, style: TextStyle(fontFamily: AppTypography.body, color: _text.withValues(alpha: 0.8), fontSize: 14)),
@@ -57,6 +73,26 @@ class PrShareCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Left-aligned text that scales down to a single line instead of wrapping.
+class _OneLine extends StatelessWidget {
+  const _OneLine(this.text, {required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(text, style: style, maxLines: 1, softWrap: false),
       ),
     );
   }
