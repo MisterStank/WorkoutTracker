@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'pet_avatar.dart';
 import 'pet_models.dart';
+import 'pet_palette.dart';
 import 'pet_provider.dart';
 
 /// Shown on the pet home tab when the user has no pet yet, and as a step of
@@ -158,17 +159,3 @@ class _PetOnboardingViewState extends ConsumerState<PetOnboardingView> {
   }
 }
 
-Color petColorSwatch(PetColor c) {
-  switch (c) {
-    case PetColor.green:
-      return const Color(0xFF4CAF7D);
-    case PetColor.red:
-      return const Color(0xFFE0574B);
-    case PetColor.blue:
-      return const Color(0xFF4C8DE0);
-    case PetColor.amber:
-      return const Color(0xFFE0A94C);
-    case PetColor.violet:
-      return const Color(0xFF9B6BE0);
-  }
-}
