@@ -12,7 +12,8 @@ design, caching, scalability, query optimization, real-time analytics, and a
 proper CI/CD pipeline.
 
 Build order (do not skip ahead): **auth → workout tracking → analytics**.
-Full architecture rationale and phased roadmap: `PLAN.md` at repo root.
+Full architecture rationale and phased roadmap: `tmp/PLAN.md` — local-only,
+gitignored, not part of the repo (same treatment as `tmp/PET_PLAN.md`).
 
 ## What it does
 
@@ -39,14 +40,13 @@ Full architecture rationale and phased roadmap: `PLAN.md` at repo root.
 | Cache / pub-sub | Redis | Analytics cache, refresh-token cache, rate limiting, subscription fan-out |
 | Migrations | golang-migrate | `migrations/*.up.sql` / `*.down.sql` |
 | Containerization | Docker / docker-compose | |
-| CI/CD | GitHub Actions → GHCR → Fly.io | `.github/workflows/api.yml`, `.github/workflows/mobile.yml` |
+| CI/CD | GitHub Actions → Render (API) + Cloudflare Workers (web) | `.github/workflows/api.yml`, `.github/workflows/mobile.yml`, `.github/workflows/deploy-web.yml` |
 | Auth | JWT access tokens (15m) + hashed, rotating refresh tokens (30d), argon2id password hashing | |
 
 ## Repo structure
 
 ```
 gymon/
-├── PLAN.md                       full architecture + phased roadmap (source of truth)
 ├── README.md                     quick-start instructions
 ├── go.mod / go.sum                Go module (module path: gymon)
 ├── gqlgen.yml                     gqlgen codegen config
@@ -143,12 +143,27 @@ gymon/
 │                                    connectivity_plus, fl_chart, gql
 │
 └── .github/workflows/
-    ├── api.yml                    lint → unit test → integration test (Postgres service container) →
-    │                               docker build → push GHCR → deploy staging (Fly.io)
-    └── mobile.yml                 flutter pub get → dart run build_runner build (Drift codegen, required —
-                                     app_database.g.dart is gitignored) → flutter analyze → flutter test →
-                                     flutter build apk --debug
+    ├── api.yml                    lint → unit test → integration test (Postgres service container);
+    │                               no deploy job — Render builds the Dockerfile and auto-deploys the
+    │                               API on every push to main once its dashboard auto-deploy is enabled
+    ├── mobile.yml                  flutter pub get → dart run build_runner build (Drift codegen, required —
+    │                                app_database.g.dart is gitignored) → flutter analyze → flutter test →
+    │                                flutter build apk --debug
+    └── deploy-web.yml              on push to main touching mobile/**: flutter build web --release →
+                                     wrangler deploy (Cloudflare Worker "gymon-web", static assets)
 ```
+
+## Hosting
+
+- **API**: Render, Docker container built from the repo `Dockerfile`, auto-deploys
+  on push to `main`. `ops/keepwarm` is a Cloudflare Worker (cron, every 10 min)
+  that pings `/healthz` to avoid Render free-tier cold starts (~50s).
+- **Database**: Postgres on Neon (serverless, scale-to-zero — its own resume is
+  ~0.5s, so it's deliberately left to sleep rather than kept warm).
+- **Web bundle**: Flutter web build deployed as static assets to a Cloudflare
+  Worker (`gymon-web`, see `mobile/wrangler.jsonc`), not Render.
+- **Redis**: hosted separately from Render/Neon; exact provider not recorded
+  in the repo — check `REDIS_URL` in the Render dashboard if this matters.
 
 ## Setup
 
@@ -240,8 +255,10 @@ that's already been applied anywhere — add a new one instead.
   integration tests. Don't chase coverage on gqlgen-generated files.
 - **Auth**: refresh tokens are stored hashed and rotate on every use — never
   store a refresh token in plaintext or reuse one after it's been redeemed.
-- **CI/CD**: both workflows must stay green; the API workflow only builds/pushes/
-  deploys on `main`, PRs only run lint/unit/integration tests.
+- **CI/CD**: all three workflows must stay green. `api.yml` runs lint/unit/
+  integration tests on every PR and push; it has no deploy job — Render's own
+  auto-deploy picks up pushes to `main`. `deploy-web.yml` only runs on push to
+  `main` and is the one that actually deploys (to Cloudflare).
 
 ## Current status / what's next
 

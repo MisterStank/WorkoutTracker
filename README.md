@@ -10,8 +10,8 @@ For what the app does and how to use it, see [docs/USER_GUIDE.md](docs/USER_GUID
 - **Backend**: Go, gqlgen (GraphQL), pgx
 - **Database**: Postgres
 - **Cache / pub-sub**: Redis
-- **CI/CD**: GitHub Actions (lint/test) → Render (auto-deploy on push to `main`)
-- **Hosting**: Render (API + Postgres + Redis + web bundle)
+- **CI/CD**: GitHub Actions — `api.yml` (lint/test, gated on `main`) → Render auto-deploys the API on push; `deploy-web.yml` builds the Flutter web bundle and deploys it to Cloudflare via `wrangler`
+- **Hosting**: API on Render (Docker, auto-deploy on push to `main`); Postgres on Neon (serverless, scale-to-zero); web bundle on Cloudflare Workers (static assets); a scheduled Cloudflare Worker (`ops/keepwarm`) pings the API every 10 min to avoid Render free-tier cold starts
 
 ## Quick Start: Launch Everything
 
@@ -200,6 +200,10 @@ cd mobile && flutter build web
 ---
 
 ## Architecture
+
+![Gymon architecture diagram](docs/images/architecture.png)
+
+[Interactive version](https://claude.ai/artifact/MzX9EhToPXY84oLsMde4TK)
 
 **Layering convention** (preserved to stay maintainable):
 - `domain/` — entities and repository interfaces (no framework deps)
